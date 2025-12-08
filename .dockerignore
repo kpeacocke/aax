@@ -1,0 +1,93 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Documentation
+README.md
+CONTRIBUTING.md
+CHANGELOG.md
+LICENSE
+CODE_OF_CONDUCT.md
+SECURITY.md
+docs/
+*.md
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+.Python
+*.so
+.pytest_cache
+.mypy_cache
+.coverage
+htmlcov/
+*.egg-info
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*.swn
+.DS_Store
+
+# Development
+.env
+.env.*
+!.env.example
+*.log
+tmp/
+temp/
+
+# Testing
+tests/
+test-results/
+coverage/
+
+# Build artifacts
+node_modules/
+npm-debug.log
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.tmp
+
+# Editor configs
+.editorconfig
+
+# Linting configs
+.pre-commit-config.yaml
+.yamllint.yml
+.flake8
+pylintrc
+
+# Development dependencies
+requirements-dev.txt
+Makefile
+pyproject.toml
+setup.py
+setup.cfg
+
+# Data directories
+data/
+backups/
+*.sql
+*.sqlite
+*.db
