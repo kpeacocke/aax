@@ -29,7 +29,7 @@ The platform consists of the following containerized services:
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/yourusername/AAX.git
+   git clone https://github.com/kpeacocke/AAX.git
    cd AAX
    ```
 
@@ -204,16 +204,6 @@ docker-compose exec awx_web nc -zv postgres 5432
 git config core.autocrlf input
 ```
 
-See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed solutions.
-
-## Migrating from AWX/AAP
-
-See [MIGRATION.md](MIGRATION.md) for:
-
-- Exporting data from existing AWX/AAP installation
-- Importing into AAX
-- Version compatibility matrix
-
 ## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
@@ -240,9 +230,9 @@ For security issues, please see our [Security Policy](SECURITY.md).
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/AAX/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/AAX/discussions)
-- **Documentation**: [Wiki](https://github.com/yourusername/AAX/wiki)
+- **Issues**: [GitHub Issues](https://github.com/kpeacocke/AAX/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/kpeacocke/AAX/discussions)
+- **Documentation**: [Wiki](https://github.com/kpeacocke/AAX/wiki)
 
 ## Acknowledgments
 
