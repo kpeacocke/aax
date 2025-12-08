@@ -30,6 +30,3 @@ The PR template ensures all contributions include:
 Consider adding:
 
 - GitHub Actions workflows for CI/CD
-- Dependabot configuration
-- CODEOWNERS file
-- Funding configuration

@@ -1,0 +1,29 @@
+# CODEOWNERS file for AAX project
+# This file defines individuals or teams responsible for code in the repository
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything in the repo
+*       @kpeacocke
+
+# GitHub configuration
+/.github/       @kpeacocke
+
+# Documentation
+*.md            @kpeacocke
+/docs/          @kpeacocke
+
+# Configuration files
+*.yml           @kpeacocke
+*.yaml          @kpeacocke
+.editorconfig   @kpeacocke
+.gitignore      @kpeacocke
+.gitattributes  @kpeacocke
+
+# Docker files
+docker-compose*.yml     @kpeacocke
+Dockerfile*             @kpeacocke
+.dockerignore           @kpeacocke
+
+# Security and compliance
+SECURITY.md             @kpeacocke
+LICENSE                 @kpeacocke
