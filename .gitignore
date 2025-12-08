@@ -1,0 +1,361 @@
+# AAX Project .gitignore
+
+# ==================== Environment ====================
+.env
+.env.local
+.env.*.local
+*.env
+
+# ==================== Docker ====================
+# Docker Compose override files
+docker-compose.override.yml
+docker-compose.*.local.yml
+
+# Docker volumes
+*.tar
+*.tar.gz
+
+# ==================== Python ====================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# ==================== Node.js ====================
+# Logs
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn
+.yarn-integrity
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# ==================== IDEs ====================
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# PyCharm
+.idea/
+
+# Eclipse
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.pydevproject
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ==================== Operating Systems ====================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ==================== Ansible ====================
+# Ansible retry files
+*.retry
+
+# Ansible vault files (be cautious with these)
+# vault_pass.txt
+# .vault_password
+
+# Ansible collections and roles downloaded
+collections/
+roles/downloaded/
+
+# ==================== Secrets & Credentials ====================
+# SSH keys
+*.pem
+*.key
+*.pub
+id_rsa*
+id_ed25519*
+id_ecdsa*
+
+# SSL certificates
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# AWS credentials
+.aws/credentials
+credentials
+
+# GCP credentials
+*-key.json
+gcp-key.json
+
+# Azure
+.azure/
+
+# Passwords and tokens
+*password*
+*secret*
+*token*
+*.pwd
+
+# ==================== Backup Files ====================
+*.bak
+*.backup
+*.old
+*.orig
+*.tmp
+*.temp
+~*
+
+# ==================== Logs & Databases ====================
+*.log
+*.sql
+*.sqlite
+*.db
+
+# ==================== Project Specific ====================
+# Backup directories
+backups/
+backup/
+
+# Temporary data
+tmp/
+temp/
+cache/
+
+# Local configurations
+local/
+*.local
+
+# Build artifacts
+build/
+dist/
+
+# Generated documentation
+docs/generated/
+
+# Test outputs
+test-results/
+test-reports/
+
+# Data directories
+data/
+*.csv
+*.json.gz
+
+# Certificates and keys for local development
+certs/
+keys/
+
+# Custom execution environments
+execution_environments/builds/
+ee/builds/
+
+# AWX/AAP specific
+awx_projects/
+receptor_work_dir/

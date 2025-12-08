@@ -1,0 +1,257 @@
+# AAX - Ansible Automation Platform Alternative
+
+A containerized, open-source implementation of Ansible Automation Platform (AAP) functionality using upstream components and Docker Compose.
+
+## Overview
+
+This project provides a production-ready Docker Compose setup that replicates core Ansible Automation Platform capabilities using open-source components. It enables organizations to run automation workflows, manage inventories, and execute playbooks in a containerized environment.
+
+## Architecture
+
+The platform consists of the following containerized services:
+
+- **AWX** - Web-based UI and API for automation workflows
+- **PostgreSQL** - Database backend for AWX and automation controller
+- **Redis** - Message broker for task distribution
+- **Receptor** - Overlay network for distributed automation execution
+- **Execution Environments** - Container images for running Ansible playbooks
+
+## Prerequisites
+
+- Docker Engine 20.10 or later
+- Docker Compose 2.0 or later
+- Minimum 4GB RAM allocated to Docker
+- 20GB available disk space
+- Supported platforms: macOS, Windows (WSL2), Linux
+
+## Quick Start
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/yourusername/AAX.git
+   cd AAX
+   ```
+
+2. **Configure environment variables**
+
+   ```bash
+   cp .env.example .env
+   # Edit .env with your specific configuration
+   ```
+
+3. **Start the services**
+
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Access the web interface**
+
+   - URL: <http://localhost:8080>
+   - Default credentials will be output in the logs:
+
+     ```bash
+     docker-compose logs awx_web | grep "Admin password"
+     ```
+
+## Configuration
+
+### Environment Variables
+
+Key environment variables in `.env`:
+
+- `AAX_ADMIN_PASSWORD` - Initial admin password (change immediately)
+- `POSTGRES_PASSWORD` - Database password
+- `SECRET_KEY` - Django secret key for AWX
+- `RECEPTOR_PEERS` - Comma-separated list of receptor mesh nodes
+
+### Volumes
+
+Persistent data is stored in Docker volumes:
+
+- `postgres_data` - Database storage
+- `receptor_data` - Receptor mesh state
+- `awx_projects` - Git repositories and project files
+- `awx_redis` - Redis cache data
+
+### Custom Execution Environments
+
+To add custom execution environments:
+
+1. Build your execution environment image
+2. Add the image to `docker-compose.yml`
+3. Register it in AWX through the UI or API
+
+## Building from Source
+
+All components are built from upstream open-source repositories:
+
+```bash
+# Build all images
+docker-compose build
+
+# Build specific service
+docker-compose build awx_web
+```
+
+See `docker-compose.build.yml` for build configurations.
+
+## Production Deployment
+
+### Security Hardening
+
+1. **Change default passwords** immediately after first deployment
+2. **Enable HTTPS** using a reverse proxy (nginx, Traefik, Caddy)
+3. **Restrict network access** using firewall rules
+4. **Enable authentication** (LDAP, SAML, OAuth)
+5. **Regular updates** of all container images
+
+### High Availability
+
+For production HA deployments:
+
+1. Deploy multiple AWX instances with a load balancer
+2. Use external PostgreSQL cluster with replication
+3. Deploy Redis Sentinel for cache HA
+4. Configure receptor mesh across multiple availability zones
+
+### Monitoring
+
+Integrate with:
+
+- Prometheus for metrics collection
+- Grafana for visualization
+- ELK/Loki for log aggregation
+- Health check endpoints at `/api/v2/ping`
+
+## Backup and Restore
+
+### Backup
+
+```bash
+# Database backup
+docker-compose exec postgres pg_dump -U awx awx > backup.sql
+
+# Volume backup
+docker run --rm -v aax_postgres_data:/data -v $(pwd):/backup \
+  alpine tar czf /backup/postgres_data.tar.gz -C /data .
+```
+
+### Restore
+
+```bash
+# Database restore
+docker-compose exec -T postgres psql -U awx awx < backup.sql
+
+# Volume restore
+docker run --rm -v aax_postgres_data:/data -v $(pwd):/backup \
+  alpine tar xzf /backup/postgres_data.tar.gz -C /data
+```
+
+## Development
+
+### Local Development Setup
+
+```bash
+# Install development dependencies
+pip install -r requirements-dev.txt
+
+# Run linters
+pre-commit run --all-files
+
+# Run tests
+docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+```
+
+### Updating Components
+
+To update to latest upstream versions:
+
+1. Update version tags in `docker-compose.yml`
+2. Rebuild images: `docker-compose build --no-cache`
+3. Run migration: `docker-compose exec awx_web awx-manage migrate`
+4. Test thoroughly in staging environment
+
+## Troubleshooting
+
+### Common Issues
+
+#### Services fail to start
+
+```bash
+# Check logs
+docker-compose logs
+
+# Verify resources
+docker stats
+```
+
+#### Database connection errors
+
+```bash
+# Ensure PostgreSQL is healthy
+docker-compose exec postgres pg_isready
+
+# Check network connectivity
+docker-compose exec awx_web nc -zv postgres 5432
+```
+
+#### Permission issues on Windows/WSL2
+
+```bash
+# Ensure proper line endings
+git config core.autocrlf input
+```
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed solutions.
+
+## Migrating from AWX/AAP
+
+See [MIGRATION.md](MIGRATION.md) for:
+
+- Exporting data from existing AWX/AAP installation
+- Importing into AAX
+- Version compatibility matrix
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
+
+- Code of conduct
+- Development workflow
+- Pull request process
+- Coding standards
+
+## License
+
+This project is licensed under the Apache License 2.0 - see [LICENSE](LICENSE) file for details.
+
+Individual components maintain their original licenses:
+
+- AWX: Apache 2.0
+- Ansible: GPL 3.0
+- PostgreSQL: PostgreSQL License
+- Redis: BSD-3-Clause
+
+## Security
+
+For security issues, please see our [Security Policy](SECURITY.md).
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/yourusername/AAX/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/yourusername/AAX/discussions)
+- **Documentation**: [Wiki](https://github.com/yourusername/AAX/wiki)
+
+## Acknowledgments
+
+Built on the shoulders of giants:
+
+- [AWX Project](https://github.com/ansible/awx)
+- [Ansible](https://github.com/ansible/ansible)
+- [Receptor](https://github.com/ansible/receptor)
+
+## Disclaimer
+
+This project is not affiliated with, endorsed by, or sponsored by Red Hat, Inc. or Ansible, Inc. All trademarks are property of their respective owners.

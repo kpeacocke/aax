@@ -1,0 +1,183 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Source code
+*.py text eol=lf diff=python
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+*.fish text eol=lf
+
+# Scripts
+*.js text eol=lf
+*.ts text eol=lf
+*.jsx text eol=lf
+*.tsx text eol=lf
+*.go text eol=lf
+*.rs text eol=lf
+*.rb text eol=lf
+*.php text eol=lf
+*.pl text eol=lf
+*.lua text eol=lf
+
+# Web files
+*.html text eol=lf diff=html
+*.css text eol=lf diff=css
+*.scss text eol=lf
+*.sass text eol=lf
+*.less text eol=lf
+*.xml text eol=lf
+
+# Configuration files
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.conf text eol=lf
+*.config text eol=lf
+
+# Docker
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+docker-compose*.yml text eol=lf
+.dockerignore text eol=lf
+
+# Ansible
+*.j2 text eol=lf
+*.jinja text eol=lf
+*.jinja2 text eol=lf
+
+# Documentation
+*.md text eol=lf diff=markdown
+*.txt text eol=lf
+*.rst text eol=lf
+*.adoc text eol=lf
+LICENSE text eol=lf
+AUTHORS text eol=lf
+CONTRIBUTORS text eol=lf
+CHANGELOG text eol=lf
+
+# Templates
+*.tmpl text eol=lf
+*.template text eol=lf
+
+# Git
+.gitattributes text eol=lf
+.gitignore text eol=lf
+.gitmodules text eol=lf
+
+# CI/CD
+.gitlab-ci.yml text eol=lf
+.travis.yml text eol=lf
+appveyor.yml text eol=lf
+*.jenkinsfile text eol=lf
+Jenkinsfile text eol=lf
+
+# Makefiles
+Makefile text eol=lf
+*.mk text eol=lf
+*.make text eol=lf
+
+# Windows-specific files
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# SQL
+*.sql text eol=lf
+
+# Compiled sources
+*.pyc binary
+*.pyo binary
+*.pyd binary
+*.so binary
+*.dll binary
+*.dylib binary
+*.exe binary
+*.class binary
+*.jar binary
+*.war binary
+*.ear binary
+
+# Archives
+*.7z binary
+*.gz binary
+*.tar binary
+*.zip binary
+*.rar binary
+*.bz2 binary
+*.xz binary
+*.tgz binary
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text
+*.webp binary
+*.bmp binary
+*.tiff binary
+
+# Fonts
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+
+# Documents
+*.pdf binary
+*.doc binary
+*.docx binary
+*.xls binary
+*.xlsx binary
+*.ppt binary
+*.pptx binary
+
+# Media
+*.mp3 binary
+*.mp4 binary
+*.avi binary
+*.mov binary
+*.wav binary
+*.ogg binary
+
+# Certificates and keys
+*.pem binary
+*.key binary
+*.p12 binary
+*.pfx binary
+*.crt binary
+*.cer binary
+
+# Database files
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Diff behavior for specific file types
+*.json diff=json
+*.yml diff=yaml
+*.yaml diff=yaml
+
+# Linguist overrides (for GitHub language statistics)
+*.sql linguist-detectable=true
+*.sh linguist-detectable=true
+*.py linguist-detectable=true
+docs/* linguist-documentation
+tests/* linguist-vendored=false
+
+# Export-ignore (files not included in archives)
+.gitattributes export-ignore
+.gitignore export-ignore
+.github export-ignore
+.gitlab export-ignore
+.editorconfig export-ignore
+.pre-commit-config.yaml export-ignore
+tests/ export-ignore
+*.test.py export-ignore
+Makefile export-ignore
