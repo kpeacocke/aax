@@ -300,6 +300,7 @@ gcp-key.json
 # Passwords and tokens
 *password*
 *secret*
+!.secrets.baseline
 *token*
 *.pwd
 
