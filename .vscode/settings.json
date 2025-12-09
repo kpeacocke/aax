@@ -107,4 +107,3 @@
   ],
   "containers.composeBuild": true,
   "containers.composeDetached": true
-}

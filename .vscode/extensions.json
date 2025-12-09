@@ -20,7 +20,7 @@
 
     // EditorConfig
     "editorconfig.editorconfig",
-
+    
     // Makefile
     "ms-vscode.makefile-tools"
   ]
