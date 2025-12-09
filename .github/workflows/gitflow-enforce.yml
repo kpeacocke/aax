@@ -1,0 +1,78 @@
+name: Enforce Gitflow Branch Names
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  check-branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch name follows gitflow
+        run: |
+          BRANCH_NAME="${{ github.head_ref }}"
+          echo "Checking branch name: $BRANCH_NAME"
+
+          # Allow specific gitflow branch patterns
+          if [[ "$BRANCH_NAME" =~ ^(feature|bugfix|hotfix|release)/[a-z0-9._-]+$ ]] || \
+             [[ "$BRANCH_NAME" == "develop" ]]; then
+            echo "✓ Branch name follows gitflow convention"
+            exit 0
+          else
+            echo "✗ Branch name does not follow gitflow convention"
+            echo ""
+            echo "Valid branch names:"
+            echo "  feature/<description>  - New features"
+            echo "  bugfix/<description>   - Bug fixes"
+            echo "  hotfix/<description>   - Emergency fixes"
+            echo "  release/<version>      - Release preparation"
+            echo "  develop                - Integration branch"
+            echo ""
+            echo "Examples:"
+            echo "  feature/add-redis-support"
+            echo "  bugfix/fix-port-binding"
+            echo "  hotfix/security-patch"
+            echo "  release/1.2.0"
+            exit 1
+          fi
+
+  check-target-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR target follows gitflow
+        run: |
+          SOURCE_BRANCH="${{ github.head_ref }}"
+          TARGET_BRANCH="${{ github.base_ref }}"
+
+          echo "Source: $SOURCE_BRANCH → Target: $TARGET_BRANCH"
+
+          # Gitflow rules:
+          # feature/* and bugfix/* → develop
+          # release/* → main
+          # hotfix/* → main (and should also merge to develop)
+          # develop → main (for releases)
+
+          VALID=false
+
+          if [[ "$SOURCE_BRANCH" =~ ^(feature|bugfix)/ ]] && [[ "$TARGET_BRANCH" == "develop" ]]; then
+            VALID=true
+          elif [[ "$SOURCE_BRANCH" =~ ^(hotfix|release)/ ]] && [[ "$TARGET_BRANCH" == "main" ]]; then
+            VALID=true
+          elif [[ "$SOURCE_BRANCH" == "develop" ]] && [[ "$TARGET_BRANCH" == "main" ]]; then
+            VALID=true
+          fi
+
+          if [ "$VALID" = true ]; then
+            echo "✓ PR target branch follows gitflow convention"
+            exit 0
+          else
+            echo "✗ Invalid PR target branch for gitflow"
+            echo ""
+            echo "Gitflow merge rules:"
+            echo "  feature/* or bugfix/* → develop"
+            echo "  release/* or hotfix/*  → main"
+            echo "  develop               → main (for releases)"
+            echo ""
+            echo "Your PR: $SOURCE_BRANCH → $TARGET_BRANCH"
+            exit 1
+          fi

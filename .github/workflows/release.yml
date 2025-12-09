@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      # Only trigger on code changes, not docs
+      - 'docker-compose*.yml'
+      - 'Dockerfile*'
+      - '.dockerignore'
+      - 'scripts/**'
+      - 'config/**'
+      - '.env.example'
+      - 'Makefile'
+      # Exclude documentation and non-code files
+      - '!**.md'
+      - '!docs/**'
+      - '!LICENSE'
+      - '!.github/ISSUE_TEMPLATE/**'
+      - '!.github/pull_request_template.md'
+      - '!.editorconfig'
+      - '!.gitignore'
+      - '!.gitattributes'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/release-please-action@v4
+        id: release
+        with:
+          release-type: simple
+
+      # Optional: Build and tag Docker images when release is created
+      - name: Checkout code
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        if: ${{ steps.release.outputs.release_created }}
+        uses: docker/setup-buildx-action@v3
+
+      # Add your Docker build/push steps here when ready
+      # - name: Build and push Docker images
+      #   if: ${{ steps.release.outputs.release_created }}
+      #   run: |
+      #     echo "Building version ${{ steps.release.outputs.tag_name }}"
+      #     # docker-compose build
+      #     # docker tag and push commands

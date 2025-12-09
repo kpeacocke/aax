@@ -69,14 +69,13 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 We actively welcome your pull requests:
 
-1. **Fork the repository** and create your branch from `main`
-2. **Follow the development setup** instructions below
+1. **Fork the repository** and create your branch from `develop` (or `main` for hotfixes)
+2. **Follow the gitflow branching strategy** (see below)
 3. **Make your changes** following our coding standards
-4. **Add tests** if applicable
-5. **Ensure all tests pass**
-6. **Update documentation** as needed
-7. **Write a clear commit message** following our commit conventions
-8. **Submit a pull request**
+4. **Ensure Docker Compose configuration is valid**
+5. **Update documentation** as needed
+6. **Write conventional commit messages** (see below)
+7. **Submit a pull request** to the correct target branch
 
 ## Development Setup
 
@@ -84,8 +83,7 @@ We actively welcome your pull requests:
 
 - Docker Desktop (macOS/Windows) or Docker Engine + Docker Compose (Linux)
 - Git
-- Python 3.9+ (for development tools)
-- Make (optional, for convenience)
+- Make (optional, for convenience commands)
 
 ### Setting Up Development Environment
 
@@ -285,13 +283,23 @@ How has this been tested?
 
 ## Release Process
 
-Releases are managed by maintainers:
+Releases are automated using [release-please](https://github.com/googleapis/release-please):
 
-1. Version bump following [Semantic Versioning](https://semver.org/)
-2. Update CHANGELOG.md
-3. Create release tag
-4. Build and publish container images
-5. Create GitHub release with notes
+1. **Automatic Release PRs** - When code changes are pushed to `main`, release-please:
+   - Analyzes commit messages since last release
+   - Determines version bump based on commit types
+   - Creates/updates a Release PR with changelog
+
+2. **Release Creation** - When Release PR is merged:
+   - Creates GitHub release with tag
+   - Includes auto-generated changelog
+   - Follows [Semantic Versioning](https://semver.org/)
+
+3. **Triggers** - Only code changes trigger releases:
+   - ✅ docker-compose files, Dockerfiles, scripts, configs, Makefile
+   - ❌ Documentation (*.md), LICENSE, templates, editor configs
+
+**Note:** Documentation-only changes do NOT create releases
 
 ## Community
 
