@@ -4,47 +4,38 @@
     "dockerfile": "Dockerfile",
     "context": ".."
   },
-
   // Mount Docker socket from host
   "mounts": [
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
   ],
-
   // Add capabilities needed for Docker operations
   "runArgs": [
     "--network=host"
   ],
-
   // Set environment variables
   "containerEnv": {
-    "DOCKER_HOST": "unix:///var/run/docker.sock"
+    "DOCKER_HOST": "unix:///var/run/docker.sock",
+    "TZ": "Etc/UTC"
   },
-
   // Configure VS Code
   "customizations": {
     "vscode": {
       "extensions": [
         // Docker
         "ms-azuretools.vscode-docker",
-
         // YAML and configuration
         "redhat.vscode-yaml",
-
         // Shell scripting
         "timonwong.shellcheck",
         "foxundermoon.shell-format",
-
         // Markdown
         "davidanson.vscode-markdownlint",
         "yzhang.markdown-all-in-one",
-
         // Git
         "eamodio.gitlens",
         "github.vscode-pull-request-github",
-
         // EditorConfig
         "editorconfig.editorconfig",
-
         // Makefile
         "ms-vscode.makefile-tools"
       ],
@@ -64,13 +55,10 @@
       }
     }
   },
-
   // Post-create command to set up environment
   "postCreateCommand": "git config --global --add safe.directory ${containerWorkspaceFolder} && pre-commit install || true",
-
   // Forward any ports you might need
   "forwardPorts": [],
-
   // Set up features
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
@@ -82,7 +70,6 @@
       "version": "latest"
     }
   },
-
   // Run as non-root user
   "remoteUser": "vscode"
 }
