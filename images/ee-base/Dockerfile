@@ -19,6 +19,7 @@ ENV PIP_NO_CACHE_DIR=1 \
 
 COPY requirements.txt /tmp/requirements.txt
 COPY ansible.cfg /etc/ansible/ansible.cfg
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 
 # hadolint ignore=DL3008
 RUN mkdir -p /etc/ansible && \
@@ -36,7 +37,8 @@ RUN mkdir -p /etc/ansible && \
   jq \
   && rm -rf /var/lib/apt/lists/* && \
   pip install --no-cache-dir -r /tmp/requirements.txt && \
-  rm /tmp/requirements.txt
+  rm /tmp/requirements.txt && \
+  chmod +x /usr/local/bin/entrypoint.sh
 
 USER ansible
 WORKDIR /home/ansible
@@ -44,4 +46,5 @@ WORKDIR /home/ansible
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD python3 -c "import ansible; import ansible_runner" || exit 1
 
-CMD ["tail", "-f", "/dev/null"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["/bin/bash"]
