@@ -70,6 +70,9 @@
   // Terminal
   "terminal.integrated.defaultProfile.linux": "zsh",
   "terminal.integrated.defaultProfile.osx": "zsh",
+  "terminal.integrated.shellIntegration.enabled": true,
+  "terminal.integrated.shellIntegration.decorationsEnabled": "both",
+  "terminal.integrated.shellIntegration.history": 100,
   // File associations
   "files.associations": {
     "*.yml": "yaml",
@@ -84,8 +87,10 @@
   "cSpell.words": [
     "Buildx",
     "davidanson",
+    "dearmor",
     "Dockerfiles",
     "donotpresent",
+    "dpkg",
     "eamodio",
     "elif",
     "encryptable",
@@ -96,6 +101,7 @@
     "hotfixes",
     "htmlcov",
     "isready",
+    "keyrings",
     "msix",
     "nosetests",
     "pipefail",
@@ -112,7 +118,6 @@
   ],
   "containers.composeBuild": true,
   "containers.composeDetached": true,
-
   // Makefile Tools configuration
   "makefile.configurations": [
     {
