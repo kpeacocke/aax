@@ -106,4 +106,16 @@
     "webassets"
   ],
   "containers.composeBuild": true,
-  "containers.composeDetached": true
+  "containers.composeDetached": true,
+
+  // Makefile Tools configuration
+  "makefile.configurations": [
+    {
+      "name": "Default",
+      "buildTarget": "build"
+    }
+  ],
+  "makefile.buildTarget": "build",
+  "makefile.makefilePath": "${workspaceFolder}/Makefile",
+  "makefile.makePath": "make",
+  "makefile.buildLog": "${workspaceFolder}/.vscode/build.log"
