@@ -1,19 +1,110 @@
 {
-    "cSpell.words": [
-        "donotpresent",
-        "encryptable",
-        "esktop",
-        "eslintcache",
-        "htmlcov",
-        "isready",
-        "msix",
-        "nosetests",
-        "pipenv",
-        "Pipfile",
-        "psql",
-        "pyenv",
-        "SIEM",
-        "stackdump",
-        "webassets"
+  // Editor settings
+  "files.eol": "\n",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit"
+  },
+  "editor.rulers": [
+    80,
+    120
+  ],
+  "editor.trimAutoWhitespace": true,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  // Language-specific formatting
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.tabSize": 2
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "yzhang.markdown-all-in-one",
+    "files.trimTrailingWhitespace": false
+  },
+  "[dockerfile]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-containers"
+  },
+  "[shellscript]": {
+    "editor.tabSize": 2
+  },
+  "[makefile]": {
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4
+  },
+  // Docker extension
+  "docker.dockerComposeBuild": true,
+  "docker.dockerComposeDetached": true,
+  // YAML extension
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-workflow.json": [
+      ".github/workflows/*.yml",
+      ".github/workflows/*.yaml"
+    ],
+    "https://json.schemastore.org/github-issue-forms.json": [
+      ".github/ISSUE_TEMPLATE/bug_report.yml",
+      ".github/ISSUE_TEMPLATE/feature_request.yml",
+      ".github/ISSUE_TEMPLATE/documentation.yml"
+    ],
+    "https://json.schemastore.org/github-issue-config.json": [
+      ".github/ISSUE_TEMPLATE/config.yml"
+    ],
+    "https://json.schemastore.org/dependabot-2.0.json": [
+      ".github/dependabot.yml"
+    ],
+    "https://json.schemastore.org/docker-compose.json": [
+      "docker-compose*.yml",
+      "docker-compose*.yaml"
     ]
+  },
+  "yaml.format.enable": true,
+  "yaml.validate": true,
+  // Markdown linting
+  "markdownlint.config": {
+    "extends": ".markdownlint.json"
+  },
+  // Git settings
+  "git.enableCommitSigning": false,
+  "git.inputValidation": true,
+  "git.inputValidationLength": 72,
+  "git.inputValidationSubjectLength": 50,
+  // Terminal
+  "terminal.integrated.defaultProfile.linux": "zsh",
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  // File associations
+  "files.associations": {
+    "*.yml": "yaml",
+    "*.yaml": "yaml",
+    "Dockerfile*": "dockerfile",
+    ".dockerignore": "ignore",
+    ".gitignore": "ignore",
+    ".gitattributes": "properties",
+    "Makefile": "makefile"
+  },
+  // Spell checker dictionary
+  "cSpell.words": [
+    "Buildx",
+    "Dockerfiles",
+    "donotpresent",
+    "elif",
+    "encryptable",
+    "esktop",
+    "eslintcache",
+    "gitflow",
+    "hotfixes",
+    "htmlcov",
+    "isready",
+    "msix",
+    "nosetests",
+    "pipefail",
+    "pipenv",
+    "Pipfile",
+    "psql",
+    "pyenv",
+    "shellcheck",
+    "SIEM",
+    "stackdump",
+    "webassets"
+  ],
+  "containers.composeBuild": true,
+  "containers.composeDetached": true
 }

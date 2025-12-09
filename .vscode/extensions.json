@@ -1,0 +1,27 @@
+{
+  "recommendations": [
+    // Docker
+    "ms-azuretools.vscode-docker",
+
+    // YAML and configuration
+    "redhat.vscode-yaml",
+
+    // Shell scripting
+    "timonwong.shellcheck",
+    "foxundermoon.shell-format",
+
+    // Markdown
+    "davidanson.vscode-markdownlint",
+    "yzhang.markdown-all-in-one",
+
+    // Git
+    "eamodio.gitlens",
+    "github.vscode-pull-request-github",
+
+    // EditorConfig
+    "editorconfig.editorconfig",
+
+    // Makefile
+    "ms-vscode.makefile-tools"
+  ]
+}
