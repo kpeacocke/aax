@@ -83,12 +83,15 @@
   // Spell checker dictionary
   "cSpell.words": [
     "Buildx",
+    "davidanson",
     "Dockerfiles",
     "donotpresent",
+    "eamodio",
     "elif",
     "encryptable",
     "esktop",
     "eslintcache",
+    "foxundermoon",
     "gitflow",
     "hotfixes",
     "htmlcov",
@@ -103,7 +106,9 @@
     "shellcheck",
     "SIEM",
     "stackdump",
-    "webassets"
+    "timonwong",
+    "webassets",
+    "yzhang"
   ],
   "containers.composeBuild": true,
   "containers.composeDetached": true,
@@ -119,3 +124,4 @@
   "makefile.makefilePath": "${workspaceFolder}/Makefile",
   "makefile.makePath": "make",
   "makefile.buildLog": "${workspaceFolder}/.vscode/build.log"
+}
