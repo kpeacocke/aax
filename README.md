@@ -1,5 +1,8 @@
 # AAX - Ansible Automation Platform Alternative
 
+[![CI](https://github.com/kpeacocke/AAX/actions/workflows/ci.yml/badge.svg)](https://github.com/kpeacocke/AAX/actions/workflows/ci.yml)
+[![Release](https://github.com/kpeacocke/AAX/actions/workflows/release.yml/badge.svg)](https://github.com/kpeacocke/AAX/actions/workflows/release.yml)
+
 A containerized, open-source implementation of Ansible Automation Platform (AAP) functionality using upstream components and Docker Compose.
 
 ## Overview
@@ -156,13 +159,58 @@ docker run --rm -v aax_postgres_data:/data -v $(pwd):/backup \
 ```bash
 # Install development dependencies
 pip install -r requirements-dev.txt
+pip install pytest
 
 # Run linters
 pre-commit run --all-files
 
+# Build images
+make build-images
+
 # Run tests
-docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+make test              # Run pytest test suite
+make test-all          # Build and test all images
+make ci                # Full CI pipeline locally
 ```
+
+### Testing
+
+The project includes comprehensive automated tests:
+
+- **Unit tests** - Python pytest suite in `tests/`
+- **Integration tests** - Docker image build and functionality tests
+- **Linting** - Hadolint for Dockerfiles, pre-commit hooks
+- **Security scanning** - Trivy vulnerability scanning
+
+#### Running Tests in VS Code
+
+Tests are integrated with VS Code Test Explorer:
+
+1. Open Testing view (`Cmd+Shift+T`)
+2. Tests auto-discover from `tests/` directory
+3. Click ▶️ to run individual or all tests
+4. View results inline with pass/fail indicators
+
+See [tests/README.md](tests/README.md) for detailed testing documentation.
+
+### CI/CD Pipelines
+
+The project uses GitHub Actions for automated testing and releases:
+
+- **CI Pipeline** ([ci.yml](.github/workflows/ci.yml))
+  - Runs on all branches and pull requests
+  - Lints code and Dockerfiles
+  - Builds and tests all images
+  - Security scanning on develop branch
+
+- **Release Pipeline** ([release.yml](.github/workflows/release.yml))
+  - Runs on merges to main
+  - Full test suite (blocking)
+  - Security scan (blocking)
+  - Semantic versioning with release-please
+  - Pushes images to GitHub Container Registry
+
+For detailed workflow documentation, see [.github/workflows/README.md](.github/workflows/README.md).
 
 ### Updating Components
 
