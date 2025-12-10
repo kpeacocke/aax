@@ -99,6 +99,9 @@ make build-ee-base
 # Build execution environment builder
 make build-ee-builder
 
+# Build development tools
+make build-dev-tools
+
 # Build all images
 make build-images
 ```

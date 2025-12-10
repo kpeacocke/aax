@@ -45,6 +45,20 @@ test-ee-builder: build-ee-builder ## Test ee-builder image
 	@docker run --rm $(REGISTRY)/ee-builder:latest ansible --version
 	@echo "✓ All tests passed"
 
+.PHONY: build-dev-tools
+build-dev-tools: build-ee-base ## Build Ansible development tools image
+	@echo "Building dev-tools image..."
+	docker build $(BUILD_ARGS) -t $(REGISTRY)/dev-tools:$(VERSION) -t $(REGISTRY)/dev-tools:latest images/dev-tools/
+	@echo "Built $(REGISTRY)/dev-tools:$(VERSION)"
+
+.PHONY: test-dev-tools
+test-dev-tools: build-dev-tools ## Test dev-tools image
+	@echo "Testing dev-tools image..."
+	@docker run --rm $(REGISTRY)/dev-tools:latest ansible-navigator --version
+	@docker run --rm $(REGISTRY)/dev-tools:latest ansible-lint --version
+	@docker run --rm $(REGISTRY)/dev-tools:latest ansible --version
+	@echo "✓ All tests passed"
+
 .PHONY: lint-dockerfiles
 lint-dockerfiles: ## Lint all Dockerfiles with hadolint
 	@find images -name "Dockerfile" -exec hadolint {} \;
@@ -60,11 +74,11 @@ test-fast: ## Run pytest tests without rebuilding images
 	pytest tests/ -v --no-cov
 
 .PHONY: build-images
-build-images: build-ee-base build-ee-builder ## Build all images
+build-images: build-ee-base build-ee-builder build-dev-tools ## Build all images
 	@echo "All images built successfully"
 
 .PHONY: test-all
-test-all: test-ee-base test-ee-builder test ## Build and test all images
+test-all: test-ee-base test-ee-builder test-dev-tools test ## Build and test all images
 	@echo "All tests passed successfully"
 
 .PHONY: ci

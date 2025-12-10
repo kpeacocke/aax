@@ -23,6 +23,7 @@ jobs:
         image:
           - ee-base
           - ee-builder
+          - dev-tools
       fail-fast: true
     steps:
       - name: Checkout code
@@ -62,6 +63,7 @@ jobs:
       matrix:
         image:
           - ee-base
+          - dev-tools
           - ee-builder
       fail-fast: false
     steps:
@@ -114,6 +116,7 @@ jobs:
         image:
           - ee-base
           - ee-builder
+          - dev-tools
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

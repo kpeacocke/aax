@@ -177,3 +177,89 @@ class TestEEBuilderImage:
             text=True
         )
         assert result.returncode == 0
+
+
+class TestDevToolsImage:
+    """Tests for the Ansible development tools image."""
+
+    IMAGE_NAME = "aax/dev-tools:latest"
+
+    def test_image_builds(self):
+        """Test that the dev-tools image builds successfully."""
+        result = subprocess.run(
+            ["make", "build-dev-tools"],
+            capture_output=True,
+            text=True,
+            cwd="/workspaces/AAX"
+        )
+        assert result.returncode == 0, f"Build failed: {result.stderr}"
+
+    def test_ansible_navigator_installed(self):
+        """Test that ansible-navigator is installed and accessible."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "ansible-navigator", "--version"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0, f"ansible-navigator not found: {result.stderr}"
+        assert "24.2.0" in result.stdout
+
+    def test_ansible_lint_installed(self):
+        """Test that ansible-lint is installed and accessible."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "ansible-lint", "--version"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0, f"ansible-lint not found: {result.stderr}"
+        assert "24.9.2" in result.stdout
+
+    def test_inherits_from_base(self):
+        """Test that dev-tools inherits ansible from ee-base."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "ansible", "--version"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert "ansible [core 2.20.0]" in result.stdout
+
+    def test_python_version(self):
+        """Test that the correct Python version is installed."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "--version"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert "Python 3.14" in result.stdout
+
+    def test_user_is_ansible(self):
+        """Test that the container runs as the ansible user."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "whoami"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == "ansible"
+
+    def test_workspace_directory(self):
+        """Test that the workspace directory is set correctly."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "pwd"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == "/workspace"
+
+    def test_pager_disabled(self):
+        """Test that PAGER environment variable is set."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "printenv", "PAGER"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == ""
