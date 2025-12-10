@@ -88,10 +88,52 @@ To add custom execution environments:
 
 ## Building from Source
 
-All components are built from upstream open-source repositories:
+### Execution Environment Images
+
+Build custom Ansible Execution Environment images:
 
 ```bash
+# Build base execution environment
+make build-ee-base
+
+# Build execution environment builder
+make build-ee-builder
+
 # Build all images
+make build-images
+```
+
+### Using ansible-builder for Custom EEs
+
+Create an `execution-environment.yml`:
+
+```yaml
+version: 3
+images:
+  base_image:
+    name: aax/ee-base:latest
+dependencies:
+  galaxy: requirements.yml
+  python: requirements.txt
+  system: bindep.txt
+```
+
+Build your custom execution environment:
+
+```bash
+docker run --rm -it \
+  -v $(pwd):/workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  aax/ee-builder:latest \
+  ansible-builder build --tag my-custom-ee:latest
+```
+
+### Platform Components
+
+All platform components are built from upstream open-source repositories:
+
+```bash
+# Build all services
 docker-compose build
 
 # Build specific service
