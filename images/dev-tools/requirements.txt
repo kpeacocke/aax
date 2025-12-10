@@ -1,0 +1,4 @@
+ansible-navigator==24.2.0
+ansible-lint==24.9.2
+ansible-sign==0.1.1
+ansible-dev-tools==24.9.1
