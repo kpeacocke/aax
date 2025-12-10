@@ -102,3 +102,78 @@ class TestEEBaseImage:
         )
         assert result.returncode == 0
         assert "success" in result.stdout
+
+
+class TestEEBuilderImage:
+    """Tests for the Ansible EE builder image."""
+
+    IMAGE_NAME = "aax/ee-builder:latest"
+
+    def test_image_builds(self):
+        """Test that the ee-builder image builds successfully."""
+        result = subprocess.run(
+            ["make", "build-ee-builder"],
+            capture_output=True,
+            text=True,
+            cwd="/workspaces/AAX"
+        )
+        assert result.returncode == 0, f"Build failed: {result.stderr}"
+
+    def test_ansible_builder_installed(self):
+        """Test that ansible-builder is installed and accessible."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "ansible-builder", "--version"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0, f"ansible-builder not found: {result.stderr}"
+        assert "3.1.0" in result.stdout
+
+    def test_inherits_from_base(self):
+        """Test that ee-builder inherits ansible from ee-base."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "ansible", "--version"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert "ansible [core 2.20.0]" in result.stdout
+
+    def test_python_version(self):
+        """Test that the correct Python version is installed."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "--version"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert "Python 3.14" in result.stdout
+
+    def test_user_is_ansible(self):
+        """Test that the container runs as the ansible user."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "whoami"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == "ansible"
+
+    def test_workspace_directory(self):
+        """Test that the workspace directory is set correctly."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "pwd"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == "/workspace"
+
+    def test_healthcheck_works(self):
+        """Test that the healthcheck passes."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "ansible-builder", "--version"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
