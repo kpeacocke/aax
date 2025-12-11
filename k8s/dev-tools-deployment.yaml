@@ -1,0 +1,100 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-tools
+  namespace: aax
+  labels:
+    app: dev-tools
+    app.kubernetes.io/name: dev-tools
+    app.kubernetes.io/component: development
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dev-tools
+  template:
+    metadata:
+      labels:
+        app: dev-tools
+        app.kubernetes.io/name: dev-tools
+        app.kubernetes.io/component: development
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: dev-tools
+          image: aax/dev-tools:latest
+          imagePullPolicy: IfNotPresent
+          command: ["sleep", "infinity"]
+          workingDir: /workspace
+          env:
+            - name: PAGER
+              value: ""
+            - name: HOME
+              value: "/home/ansible"
+          envFrom:
+            - configMapRef:
+                name: aax-config
+          resources:
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          volumeMounts:
+            - name: dev-workspace
+              mountPath: /workspace
+          livenessProbe:
+            exec:
+              command:
+                - ansible-navigator
+                - --version
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - ansible-navigator
+                - --version
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 3
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+      volumes:
+        - name: dev-workspace
+          persistentVolumeClaim:
+            claimName: dev-workspace
+      securityContext:
+        fsGroup: 1000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-tools
+  namespace: aax
+  labels:
+    app: dev-tools
+    app.kubernetes.io/name: dev-tools
+    app.kubernetes.io/component: development
+    app.kubernetes.io/part-of: aax
+spec:
+  selector:
+    app: dev-tools
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP

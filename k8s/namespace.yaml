@@ -1,0 +1,9 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aax
+  labels:
+    name: aax
+    app.kubernetes.io/name: ansible-automation-execution
+    app.kubernetes.io/part-of: aax

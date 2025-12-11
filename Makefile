@@ -110,3 +110,63 @@ compose-logs: ## View logs from all services
 .PHONY: compose-ps
 compose-ps: ## Show status of all services
 	docker compose ps
+
+.PHONY: k8s-deploy
+k8s-deploy: ## Deploy to Kubernetes using kustomize
+	@echo "Deploying to Kubernetes..."
+	kubectl apply -k k8s/
+	@echo "✓ Deployed to Kubernetes"
+
+.PHONY: k8s-delete
+k8s-delete: ## Delete Kubernetes deployment
+	@echo "Deleting Kubernetes deployment..."
+	kubectl delete namespace aax
+	@echo "✓ Kubernetes deployment deleted"
+
+.PHONY: k8s-status
+k8s-status: ## Show status of Kubernetes deployment
+	@echo "Kubernetes deployment status:"
+	@kubectl get all -n aax
+
+.PHONY: k8s-logs
+k8s-logs: ## View logs from Kubernetes pods
+	@echo "Select deployment to view logs:"
+	@echo "1) ee-base"
+	@echo "2) ee-builder"
+	@echo "3) dev-tools"
+	@read -p "Enter choice [1-3]: " choice; \
+	case $$choice in \
+		1) kubectl logs -n aax -l app=ee-base -f ;; \
+		2) kubectl logs -n aax -l app=ee-builder -f ;; \
+		3) kubectl logs -n aax -l app=dev-tools -f ;; \
+		*) echo "Invalid choice" ;; \
+	esac
+
+.PHONY: k8s-exec
+k8s-exec: ## Execute shell in Kubernetes pod
+	@echo "Select deployment to exec into:"
+	@echo "1) ee-base"
+	@echo "2) ee-builder"
+	@echo "3) dev-tools"
+	@read -p "Enter choice [1-3]: " choice; \
+	case $$choice in \
+		1) kubectl exec -it -n aax deployment/ee-base -- /bin/bash ;; \
+		2) kubectl exec -it -n aax deployment/ee-builder -- /bin/bash ;; \
+		3) kubectl exec -it -n aax deployment/dev-tools -- /bin/bash ;; \
+		*) echo "Invalid choice" ;; \
+	esac
+
+.PHONY: k8s-test
+k8s-test: ## Test Kubernetes deployment functionality
+	@echo "Testing Kubernetes deployment..."
+	@kubectl exec -n aax deployment/ee-base -- ansible --version
+	@kubectl exec -n aax deployment/ee-builder -- ansible-builder --version
+	@kubectl exec -n aax deployment/dev-tools -- ansible-navigator --version
+	@kubectl exec -n aax deployment/dev-tools -- ansible-lint --version
+	@echo "✓ All Kubernetes tests passed"
+
+.PHONY: k8s-restart
+k8s-restart: ## Restart all Kubernetes deployments
+	@echo "Restarting Kubernetes deployments..."
+	kubectl rollout restart deployment -n aax
+	@echo "✓ Deployments restarted"

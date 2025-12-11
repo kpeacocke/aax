@@ -37,7 +37,9 @@ RUN apt-get update && \
   apt-get purge -y gcc g++ make libc6-dev libonig-dev && \
   apt-get autoremove -y && \
   rm -rf /var/lib/apt/lists/* && \
-  rm -f /tmp/requirements.txt
+  rm -f /tmp/requirements.txt && \
+  mkdir -p /home/ansible/.ansible && \
+  chown -R ansible:ansible /home/ansible/.ansible
 
 # OCI metadata labels
 LABEL org.opencontainers.image.title="AAX Development Tools" \

@@ -293,6 +293,106 @@ The project uses GitHub Actions for automated testing and releases:
 
 For detailed workflow documentation, see [.github/workflows/README.md](.github/workflows/README.md).
 
+## Kubernetes Deployment
+
+The AAX platform can also be deployed to Kubernetes using the provided manifests in the `k8s/` directory.
+
+### Kubernetes Prerequisites
+
+- Kubernetes cluster (v1.24+)
+- kubectl CLI configured
+- Container images built and available
+- Storage class available (default: `hostpath` for Docker Desktop)
+
+### Kubernetes Quick Start
+
+Deploy to Kubernetes:
+
+```bash
+# Deploy all resources
+make k8s-deploy
+# Or: kubectl apply -k k8s/
+
+# Check deployment status
+make k8s-status
+# Or: kubectl get all -n aax
+
+# Test the deployment
+make k8s-test
+```
+
+> **Note**: The Kubernetes test suite (`tests/test_kubernetes.py`) requires a configured Kubernetes cluster. `kubectl` is installed in the dev container, but you need to enable Kubernetes in Docker Desktop or configure another cluster for the tests to run.
+
+### Kubernetes Resources
+
+The deployment creates:
+
+- **Namespace**: `aax` - Isolated namespace for all resources
+- **Deployments**: ee-base, ee-builder, dev-tools (1 replica each)
+- **Services**: ClusterIP services for inter-pod communication
+- **PersistentVolumeClaims**: workspace, ee-builds, ee-definitions, dev-workspace
+- **ConfigMap**: Shared environment configuration
+
+### Managing the Deployment
+
+```bash
+# View pod logs
+make k8s-logs
+
+# Execute shell in a pod
+make k8s-exec
+
+# Restart all deployments
+make k8s-restart
+
+# Delete the deployment
+make k8s-delete
+```
+
+### Accessing Services
+
+```bash
+# Execute commands in pods
+kubectl exec -n aax deployment/ee-base -- ansible --version
+kubectl exec -n aax deployment/ee-builder -- ansible-builder --version
+kubectl exec -n aax deployment/dev-tools -- ansible-navigator --version
+kubectl exec -n aax deployment/dev-tools -- ansible-lint --version
+
+# Get an interactive shell
+kubectl exec -it -n aax deployment/dev-tools -- /bin/bash
+```
+
+### Resource Configuration
+
+Each deployment has:
+
+- **CPU**: 1-2 cores (1 requested, 2 limit)
+- **Memory**: 1-2Gi (1Gi requested, 2Gi limit)
+- **Health Checks**: Liveness and readiness probes
+- **Security**: Non-root user, dropped capabilities
+
+### Storage
+
+Persistent volumes for:
+
+- `workspace` (10Gi) - Shared workspace for Ansible operations
+- `ee-builds` (20Gi) - Execution environment build outputs
+- `ee-definitions` (5Gi) - EE definition files
+- `dev-workspace` (10Gi) - Development workspace
+
+### Production Considerations
+
+For production deployments:
+
+1. **Update storage class** in `k8s/persistent-volumes.yaml` to use cloud provider storage
+2. **Change access mode** from `ReadWriteOnce` to `ReadWriteMany` if using NFS/CephFS
+3. **Increase replicas** for high availability
+4. **Configure ingress** for external access
+5. **Set up monitoring** with Prometheus/Grafana
+6. **Implement backup** for persistent volumes
+
+See [k8s/README.md](k8s/README.md) for detailed Kubernetes deployment documentation.
+
 ### Updating Components
 
 To update to latest upstream versions:
