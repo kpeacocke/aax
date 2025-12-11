@@ -212,7 +212,7 @@ class TestDevToolsImage:
             text=True
         )
         assert result.returncode == 0, f"ansible-lint not found: {result.stderr}"
-        assert "24.9.2" in result.stdout
+        assert "25.12.1" in result.stdout
 
     def test_inherits_from_base(self):
         """Test that dev-tools inherits ansible from ee-base."""

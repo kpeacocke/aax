@@ -106,6 +106,38 @@ make build-dev-tools
 make build-images
 ```
 
+### Using Docker Compose for Local Development
+
+The project includes a `docker-compose.yml` for easy local development:
+
+```bash
+# Build all images
+make compose-build
+# or: docker compose build
+
+# Start all services
+make compose-up
+# or: docker compose up -d
+
+# View service status
+make compose-ps
+# or: docker compose ps
+
+# View logs
+make compose-logs
+# or: docker compose logs -f
+
+# Stop all services
+make compose-down
+# or: docker compose down
+```
+
+Services include:
+
+- `ee-base` - Base execution environment with ansible-core 2.20.0
+- `ee-builder` - Execution environment builder with ansible-builder 3.1.0
+- `dev-tools` - Development tools with ansible-navigator, ansible-lint, and ansible-dev-tools
+
 ### Using ansible-builder for Custom EEs
 
 Create an `execution-environment.yml`:
@@ -124,6 +156,10 @@ dependencies:
 Build your custom execution environment:
 
 ```bash
+# Using the dev-tools container
+docker compose run --rm dev-tools ansible-builder build --tag my-custom-ee:latest
+
+# Or using the ee-builder container directly
 docker run --rm -it \
   -v $(pwd):/workspace \
   -v /var/run/docker.sock:/var/run/docker.sock \

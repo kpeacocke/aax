@@ -44,7 +44,7 @@ services:
         condition: service_healthy
     working_dir: /workspace
     volumes:
-      - ./ee_definitions:/workspace:rw
+      - ee_definitions:/workspace:rw
       - ee_builds:/builds:rw
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
@@ -81,8 +81,7 @@ services:
         condition: service_healthy
     working_dir: /workspace
     volumes:
-      - ./project:/workspace:rw
-      - ${HOME}/.ssh:/home/ansible/.ssh:ro
+      - dev_workspace:/workspace:rw
     environment:
       ANSIBLE_NOCOWS: "1"
       PAGER: ""
@@ -117,3 +116,9 @@ volumes:
   ee_builds:
     labels:
       com.aax.description: "Output directory for execution environment builds"
+  ee_definitions:
+    labels:
+      com.aax.description: "Execution environment definition files"
+  dev_workspace:
+    labels:
+      com.aax.description: "Development workspace for Ansible projects"

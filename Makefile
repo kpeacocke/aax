@@ -84,3 +84,29 @@ test-all: test-ee-base test-ee-builder test-dev-tools test ## Build and test all
 .PHONY: ci
 ci: lint-dockerfiles test-all ## Run full CI pipeline locally
 	@echo "✓ CI pipeline completed successfully"
+
+.PHONY: compose-build
+compose-build: ## Build all images using docker-compose
+	@echo "Building images with docker-compose..."
+	BUILD_DATE=$(BUILD_DATE) VCS_REF=$(VCS_REF) VERSION=$(VERSION) docker compose build
+	@echo "✓ All images built with docker-compose"
+
+.PHONY: compose-up
+compose-up: ## Start all services with docker-compose
+	@echo "Starting services with docker-compose..."
+	BUILD_DATE=$(BUILD_DATE) VCS_REF=$(VCS_REF) VERSION=$(VERSION) docker compose up -d
+	@echo "✓ Services started"
+
+.PHONY: compose-down
+compose-down: ## Stop all services with docker-compose
+	@echo "Stopping services with docker-compose..."
+	docker compose down
+	@echo "✓ Services stopped"
+
+.PHONY: compose-logs
+compose-logs: ## View logs from all services
+	docker compose logs -f
+
+.PHONY: compose-ps
+compose-ps: ## Show status of all services
+	docker compose ps
