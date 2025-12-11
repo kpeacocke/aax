@@ -22,10 +22,21 @@ USER root
 # Copy Python requirements
 COPY --chown=ansible:ansible requirements.txt /tmp/requirements.txt
 
-# Install Ansible development tools and verify installation
-RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
+# Install build dependencies, Ansible development tools, then cleanup
+# hadolint ignore=DL3008
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+  gcc \
+  g++ \
+  make \
+  libc6-dev \
+  libonig-dev && \
+  pip install --no-cache-dir -r /tmp/requirements.txt && \
   ansible-navigator --version && \
   ansible-lint --version && \
+  apt-get purge -y gcc g++ make libc6-dev libonig-dev && \
+  apt-get autoremove -y && \
+  rm -rf /var/lib/apt/lists/* && \
   rm -f /tmp/requirements.txt
 
 # OCI metadata labels

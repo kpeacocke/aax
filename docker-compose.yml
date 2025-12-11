@@ -1,0 +1,119 @@
+services:
+  ee-base:
+    build:
+      context: ./images/ee-base
+      args:
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+        VERSION: ${VERSION:-dev}
+    image: aax/ee-base:${VERSION:-dev}
+    working_dir: /workspace
+    volumes:
+      - workspace:/workspace:rw
+    environment:
+      ANSIBLE_NOCOWS: "1"
+    networks:
+      - ansible
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "1"
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import ansible; import ansible_runner"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    command: ["sleep", "infinity"]
+
+  ee-builder:
+    build:
+      context: ./images/ee-builder
+      args:
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+        VERSION: ${VERSION:-dev}
+        BASE_IMAGE: aax/ee-base:${VERSION:-dev}
+    image: aax/ee-builder:${VERSION:-dev}
+    depends_on:
+      ee-base:
+        condition: service_healthy
+    working_dir: /workspace
+    volumes:
+      - ./ee_definitions:/workspace:rw
+      - ee_builds:/builds:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      ANSIBLE_NOCOWS: "1"
+    networks:
+      - ansible
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "1"
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "ansible-builder", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    command: ["sleep", "infinity"]
+
+  dev-tools:
+    build:
+      context: ./images/dev-tools
+      args:
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+        VERSION: ${VERSION:-dev}
+        BASE_IMAGE: aax/ee-base:${VERSION:-dev}
+    image: aax/dev-tools:${VERSION:-dev}
+    depends_on:
+      ee-base:
+        condition: service_healthy
+    working_dir: /workspace
+    volumes:
+      - ./project:/workspace:rw
+      - ${HOME}/.ssh:/home/ansible/.ssh:ro
+    environment:
+      ANSIBLE_NOCOWS: "1"
+      PAGER: ""
+    networks:
+      - ansible
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "1"
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "ansible-navigator", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    command: ["sleep", "infinity"]
+
+networks:
+  ansible:
+    driver: bridge
+    labels:
+      com.aax.description: "Network for Ansible Automation eXecution environments"
+
+volumes:
+  workspace:
+    labels:
+      com.aax.description: "Shared workspace for Ansible operations"
+  ee_builds:
+    labels:
+      com.aax.description: "Output directory for execution environment builds"
