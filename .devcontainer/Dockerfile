@@ -68,6 +68,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
   && npm install -g "markdownlint-cli@${MARKDOWNLINT_VERSION}" \
   && npm cache clean --force
 
+# Add vscode user to docker group for socket access
+RUN groupadd -f docker && usermod -aG docker vscode
+
 # Switch to non-root user for security
 USER vscode
 WORKDIR /workspace
