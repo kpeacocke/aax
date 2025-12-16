@@ -49,7 +49,7 @@ Please provide as much information as possible:
 Subject: AAX Security - Authentication Bypass in AWX Integration
 
 Description:
-An authentication bypass vulnerability exists in the AWX integration 
+An authentication bypass vulnerability exists in the AWX integration
 component that allows unauthorized access to administrative functions.
 
 Steps to Reproduce:
@@ -58,7 +58,7 @@ Steps to Reproduce:
 3. Access is granted without valid credentials
 
 Impact:
-Attackers can gain administrative access to the AWX instance, 
+Attackers can gain administrative access to the AWX instance,
 potentially compromising all automation workflows and credentials.
 
 Affected Versions:
@@ -111,12 +111,12 @@ SECRET_KEY=<strong-random-key>
 server {
     listen 443 ssl http2;
     server_name aax.example.com;
-    
+
     ssl_certificate /path/to/cert.pem;
     ssl_certificate_key /path/to/key.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
-    
+
     location / {
         proxy_pass http://localhost:8080;
         proxy_set_header Host $host;

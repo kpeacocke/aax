@@ -12,9 +12,6 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG HADOLINT_VERSION=2.12.0
 ARG HADOLINT_SHA256=56de6d5e5ec427e17b74fa48d51271c7fc0d61244bf5c90e828aab8362d55010
 ARG MARKDOWNLINT_VERSION=0.39.0
-ARG YAMLLINT_VERSION=1.35.1
-ARG PRECOMMIT_VERSION=3.6.2
-ARG COMMITIZEN_VERSION=3.18.0
 
 # Install base system dependencies (changes infrequently - good for caching)
 # hadolint ignore=DL3008
@@ -39,6 +36,17 @@ RUN install -m 0755 -d /etc/apt/keyrings \
   && apt-get install -y --no-install-recommends \
   docker-ce-cli \
   docker-compose-plugin \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install kubectl for Kubernetes testing and management
+# hadolint ignore=DL3008
+RUN curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg \
+  && chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg \
+  && echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /" \
+  | tee /etc/apt/sources.list.d/kubernetes.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends kubectl \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
@@ -75,6 +83,9 @@ RUN groupadd -f docker && usermod -aG docker vscode
 USER vscode
 WORKDIR /workspace
 
+# Copy Python requirements for installation
+COPY --chown=vscode:vscode .devcontainer/requirements.txt /tmp/requirements.txt
+
 # Install hadolint with checksum verification
 RUN mkdir -p /home/vscode/.local/bin \
   && curl -sL -o /home/vscode/.local/bin/hadolint \
@@ -84,18 +95,16 @@ RUN mkdir -p /home/vscode/.local/bin \
 
 # Install Python-based tools in user space
 # Ubuntu 24.04 has Python 3.12+ with pip that supports --break-system-packages
-RUN pip3 install --user --no-cache-dir --break-system-packages \
-  "yamllint==${YAMLLINT_VERSION}" \
-  "pre-commit==${PRECOMMIT_VERSION}" \
-  "commitizen==${COMMITIZEN_VERSION}"
+RUN pip3 install --user --no-cache-dir --break-system-packages -r /tmp/requirements.txt \
+  && rm /tmp/requirements.txt
 
 # Update PATH for user-installed tools
 ENV PATH="/home/vscode/.local/bin:${PATH}"
 
 # Create verification script for runtime health checks instead of build-time failures
 RUN printf '#!/bin/bash\nset -e\necho "Verifying tool installations..."\n' > /home/vscode/.local/bin/verify-tools \
-  && printf 'docker --version\ndocker compose version\nhadolint --version\nshellcheck --version\n' >> /home/vscode/.local/bin/verify-tools \
-  && printf 'yamllint --version\nmarkdownlint --version\npre-commit --version\ncz version\n' >> /home/vscode/.local/bin/verify-tools \
+  && printf 'docker --version\ndocker compose version\nkubectl version --client\nhadolint --version\nshellcheck --version\n' >> /home/vscode/.local/bin/verify-tools \
+  && printf 'yamllint --version\nmarkdownlint --version\npre-commit --version\ncz version\npytest --version\n' >> /home/vscode/.local/bin/verify-tools \
   && printf 'echo "All tools verified successfully!"\n' >> /home/vscode/.local/bin/verify-tools \
   && chmod +x /home/vscode/.local/bin/verify-tools
 
