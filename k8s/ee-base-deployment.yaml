@@ -1,0 +1,97 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ee-base
+  namespace: aax
+  labels:
+    app: ee-base
+    app.kubernetes.io/name: ee-base
+    app.kubernetes.io/component: execution-environment
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ee-base
+  template:
+    metadata:
+      labels:
+        app: ee-base
+        app.kubernetes.io/name: ee-base
+        app.kubernetes.io/component: execution-environment
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: ee-base
+          image: aax/ee-base:latest
+          imagePullPolicy: IfNotPresent
+          command: ["sleep", "infinity"]
+          workingDir: /workspace
+          envFrom:
+            - configMapRef:
+                name: aax-config
+          resources:
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          livenessProbe:
+            exec:
+              command:
+                - python3
+                - -c
+                - "import ansible; import ansible_runner"
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - python3
+                - -c
+                - "import ansible; import ansible_runner"
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 3
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: workspace
+      securityContext:
+        fsGroup: 1000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ee-base
+  namespace: aax
+  labels:
+    app: ee-base
+    app.kubernetes.io/name: ee-base
+    app.kubernetes.io/component: execution-environment
+    app.kubernetes.io/part-of: aax
+spec:
+  selector:
+    app: ee-base
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP

@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aax-config
+  namespace: aax
+  labels:
+    app.kubernetes.io/name: aax-config
+    app.kubernetes.io/part-of: aax
+data:
+  ANSIBLE_NOCOWS: "1"
+  PYTHONUNBUFFERED: "1"
+  PIP_NO_CACHE_DIR: "1"
+  PIP_ROOT_USER_ACTION: "ignore"

@@ -1,5 +1,4 @@
 {
-  // Editor settings
   "files.eol": "\n",
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
@@ -12,7 +11,6 @@
   "editor.trimAutoWhitespace": true,
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
-  // Language-specific formatting
   "[yaml]": {
     "editor.defaultFormatter": "redhat.vscode-yaml",
     "editor.tabSize": 2
@@ -31,10 +29,8 @@
     "editor.insertSpaces": false,
     "editor.tabSize": 4
   },
-  // Docker extension
   "docker.dockerComposeBuild": true,
   "docker.dockerComposeDetached": true,
-  // YAML extension
   "yaml.schemas": {
     "https://json.schemastore.org/github-workflow.json": [
       ".github/workflows/*.yml",
@@ -58,22 +54,18 @@
   },
   "yaml.format.enable": true,
   "yaml.validate": true,
-  // Markdown linting
   "markdownlint.config": {
     "extends": ".markdownlint.json"
   },
-  // Git settings
   "git.enableCommitSigning": false,
   "git.inputValidation": true,
   "git.inputValidationLength": 72,
   "git.inputValidationSubjectLength": 50,
-  // Terminal
   "terminal.integrated.defaultProfile.linux": "zsh",
   "terminal.integrated.defaultProfile.osx": "zsh",
   "terminal.integrated.shellIntegration.enabled": true,
   "terminal.integrated.shellIntegration.decorationsEnabled": "both",
   "terminal.integrated.shellIntegration.history": 100,
-  // File associations
   "files.associations": {
     "*.yml": "yaml",
     "*.yaml": "yaml",
@@ -83,7 +75,6 @@
     ".gitattributes": "properties",
     "Makefile": "makefile"
   },
-  // Spell checker dictionary
   "cSpell.words": [
     "Buildx",
     "davidanson",
@@ -118,7 +109,6 @@
   ],
   "containers.composeBuild": true,
   "containers.composeDetached": true,
-  // Makefile Tools configuration
   "makefile.configurations": [
     {
       "name": "Default",
@@ -128,5 +118,14 @@
   "makefile.buildTarget": "build",
   "makefile.makefilePath": "${workspaceFolder}/Makefile",
   "makefile.makePath": "make",
-  "makefile.buildLog": "${workspaceFolder}/.vscode/build.log"
+  "makefile.buildLog": "${workspaceFolder}/.vscode/build.log",
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": [
+    "tests",
+    "-v",
+    "--tb=short"
+  ],
+  "python.testing.cwd": "${workspaceFolder}",
+  "python.testing.autoTestDiscoverOnSaveEnabled": true
 }

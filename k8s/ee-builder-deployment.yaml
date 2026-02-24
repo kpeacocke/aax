@@ -1,0 +1,106 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ee-builder
+  namespace: aax
+  labels:
+    app: ee-builder
+    app.kubernetes.io/name: ee-builder
+    app.kubernetes.io/component: builder
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ee-builder
+  template:
+    metadata:
+      labels:
+        app: ee-builder
+        app.kubernetes.io/name: ee-builder
+        app.kubernetes.io/component: builder
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: ee-builder
+          image: aax/ee-builder:latest
+          imagePullPolicy: IfNotPresent
+          command: ["sleep", "infinity"]
+          workingDir: /workspace
+          envFrom:
+            - configMapRef:
+                name: aax-config
+          resources:
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          volumeMounts:
+            - name: ee-definitions
+              mountPath: /workspace
+            - name: ee-builds
+              mountPath: /builds
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+          livenessProbe:
+            exec:
+              command:
+                - ansible-builder
+                - --version
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - ansible-builder
+                - --version
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 3
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+      volumes:
+        - name: ee-definitions
+          persistentVolumeClaim:
+            claimName: ee-definitions
+        - name: ee-builds
+          persistentVolumeClaim:
+            claimName: ee-builds
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
+      securityContext:
+        fsGroup: 1000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ee-builder
+  namespace: aax
+  labels:
+    app: ee-builder
+    app.kubernetes.io/name: ee-builder
+    app.kubernetes.io/component: builder
+    app.kubernetes.io/part-of: aax
+spec:
+  selector:
+    app: ee-builder
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP

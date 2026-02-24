@@ -1,0 +1,143 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build ee-base Image",
+            "type": "shell",
+            "command": "make build-ee-base",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": true
+            }
+        },
+        {
+            "label": "Test ee-base Image",
+            "type": "shell",
+            "command": "make test-ee-base",
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": true
+            },
+            "dependsOn": []
+        },
+        {
+            "label": "Build and Test ee-base",
+            "type": "shell",
+            "command": "make test-ee-base",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Lint All Dockerfiles",
+            "type": "shell",
+            "command": "make lint-dockerfiles",
+            "problemMatcher": {
+                "owner": "hadolint",
+                "fileLocation": [
+                    "relative",
+                    "${workspaceFolder}"
+                ],
+                "pattern": {
+                    "regexp": "^(.+):(\\d+)\\s+(DL\\d+)\\s+(error|warning|info|style):\\s+(.+)$",
+                    "file": 1,
+                    "line": 2,
+                    "code": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Build All Images",
+            "type": "shell",
+            "command": "make build-images",
+            "problemMatcher": [],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Run Hadolint on Current Dockerfile",
+            "type": "shell",
+            "command": "hadolint ${file}",
+            "problemMatcher": {
+                "owner": "hadolint",
+                "fileLocation": "absolute",
+                "pattern": {
+                    "regexp": "^(.+):(\\d+)\\s+(DL\\d+)\\s+(error|warning|info|style):\\s+(.+)$",
+                    "file": 1,
+                    "line": 2,
+                    "code": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "focus": false
+            }
+        },
+        {
+            "label": "Docker: Build Current Dockerfile",
+            "type": "shell",
+            "command": "docker build -t test:latest -f ${file} ${fileDirname}",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Run All Tests",
+            "type": "shell",
+            "command": "pytest tests/ -v",
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+                "isDefault": false
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Run Tests for ee-base Image",
+            "type": "shell",
+            "command": "pytest tests/test_images.py::TestEEBaseImage -v",
+            "problemMatcher": [],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        }
+    ]
+}
