@@ -1,0 +1,185 @@
+services:
+  awx-postgres:
+    image: postgres:15
+    container_name: awx-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-awx}
+      POSTGRES_USER: ${POSTGRES_USER:-awx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-awxpass}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    volumes:
+      - awx_postgres_data:/var/lib/postgresql/data
+    networks:
+      - awx-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U awx"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  awx-redis:
+    image: redis:7
+    container_name: awx-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - awx_redis_data:/data
+    networks:
+      - awx-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  awx-web:
+    build:
+      context: ./images/awx
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE}
+        VCS_REF: ${VCS_REF}
+    image: aax/awx:latest
+    container_name: awx-web
+    hostname: awxweb
+    user: "0"
+    environment:
+      # Database configuration
+      DATABASE_USER: ${DATABASE_USER:-awx}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-awxpass}
+      DATABASE_NAME: ${DATABASE_NAME:-awx}
+      DATABASE_PORT: ${DATABASE_PORT:-5432}
+      DATABASE_HOST: ${DATABASE_HOST:-awx-postgres}
+
+      # Redis configuration
+      REDIS_HOST: ${REDIS_HOST:-awx-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+
+      # AWX configuration
+      AWX_ADMIN_USER: ${AWX_ADMIN_USER:-admin}
+      AWX_ADMIN_PASSWORD: ${AWX_ADMIN_PASSWORD:-password}
+      SECRET_KEY: ${SECRET_KEY:-awxsecret}
+
+      # Receptor configuration
+      RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-true}
+
+      # Use our custom execution environment
+      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-aax/ee-base:latest}
+    ports:
+      - "${AWX_WEB_PORT:-8080}:8052"
+    volumes:
+      - awx_projects:/var/lib/awx/projects
+      - awx_rsyslog:/var/log/tower
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - awx-network
+    depends_on:
+      awx-postgres:
+        condition: service_healthy
+      awx-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8052/api/v2/ping/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  awx-task:
+    build:
+      context: ./images/awx
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE}
+        VCS_REF: ${VCS_REF}
+    image: aax/awx:latest
+    container_name: awx-task
+    hostname: awx
+    user: "0"
+    entrypoint: ["/usr/local/bin/entrypoint-task.sh"]
+    environment:
+      # Database configuration
+      DATABASE_USER: ${DATABASE_USER:-awx}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-awxpass}
+      DATABASE_NAME: ${DATABASE_NAME:-awx}
+      DATABASE_PORT: ${DATABASE_PORT:-5432}
+      DATABASE_HOST: ${DATABASE_HOST:-awx-postgres}
+
+      # Redis configuration
+      REDIS_HOST: ${REDIS_HOST:-awx-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+
+      # AWX configuration
+      SECRET_KEY: ${SECRET_KEY:-awxsecret}
+      AWX_SKIP_MIGRATIONS: ${AWX_SKIP_MIGRATIONS:-false}
+
+      # Receptor configuration
+      RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-true}
+
+      # Use our custom execution environment
+      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-aax/ee-base:latest}
+    volumes:
+      - awx_projects:/var/lib/awx/projects
+      - awx_rsyslog:/var/log/tower
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - awx-network
+    depends_on:
+      awx-postgres:
+        condition: service_healthy
+      awx-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "awx-manage check || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  awx-receptor:
+    image: quay.io/ansible/receptor:1.4.7
+    container_name: awx-receptor
+    hostname: receptor
+    command:
+      - receptor
+      - --config
+      - /etc/receptor/receptor.conf
+    volumes:
+      - ./images/receptor/receptor.conf:/etc/receptor/receptor.conf:ro
+      - receptor_data:/var/lib/receptor
+    networks:
+      - awx-network
+    ports:
+      - "${AWX_RECEPTOR_PORT:-8888}:8888"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "receptorctl",
+          "--socket",
+          "/var/lib/receptor/receptor.sock",
+          "status",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  awx-network:
+    name: awx-network
+    driver: bridge
+
+volumes:
+  awx_postgres_data:
+    name: awx_postgres_data
+  awx_redis_data:
+    name: awx_redis_data
+  awx_projects:
+    name: awx_projects
+  awx_rsyslog:
+    name: awx_rsyslog
+  receptor_data:
+    name: receptor_data

@@ -73,6 +73,12 @@ test-fast: ## Run pytest tests without rebuilding images
 	@echo "Running pytest tests (skipping builds)..."
 	pytest tests/ -v --no-cov
 
+.PHONY: build-awx
+build-awx: ## Build AWX controller image from source
+	@echo "Building AWX controller image..."
+	docker build $(BUILD_ARGS) -t $(REGISTRY)/awx:$(VERSION) -t $(REGISTRY)/awx:latest images/awx/
+	@echo "Built $(REGISTRY)/awx:$(VERSION)"
+
 .PHONY: build-images
 build-images: build-ee-base build-ee-builder build-dev-tools ## Build all images
 	@echo "All images built successfully"
@@ -170,3 +176,43 @@ k8s-restart: ## Restart all Kubernetes deployments
 	@echo "Restarting Kubernetes deployments..."
 	kubectl rollout restart deployment -n aax
 	@echo "✓ Deployments restarted"
+
+# Controller Stack Targets
+
+.PHONY: controller-up
+controller-up: build-images build-awx ## Start AWX controller stack
+	@echo "Starting AWX controller stack..."
+	docker compose -f docker-compose.controller.yml up -d
+	@echo "✓ Controller stack started"
+	@echo ""
+	@echo "Access AWX at: http://localhost:8080"
+	@echo "Username: admin"
+	@echo "Password: password"
+	@echo ""
+	@echo "Wait 2-3 minutes for initialization..."
+
+.PHONY: controller-down
+controller-down: ## Stop AWX controller stack
+	@echo "Stopping AWX controller stack..."
+	docker compose -f docker-compose.controller.yml down
+	@echo "✓ Controller stack stopped"
+
+.PHONY: controller-logs
+controller-logs: ## View AWX controller logs
+	docker compose -f docker-compose.controller.yml logs -f
+
+.PHONY: controller-status
+controller-status: ## Show AWX controller status
+	docker compose -f docker-compose.controller.yml ps
+
+.PHONY: controller-clean
+controller-clean: ## Stop controller and remove all data
+	@echo "⚠️  WARNING: This will remove all AWX data!"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		docker compose -f docker-compose.controller.yml down -v; \
+		echo "✓ Controller stack and data removed"; \
+	else \
+		echo "✗ Cancelled"; \
+	fi
