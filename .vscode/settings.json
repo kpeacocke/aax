@@ -4,10 +4,7 @@
   "editor.codeActionsOnSave": {
     "source.fixAll": "explicit"
   },
-  "editor.rulers": [
-    80,
-    120
-  ],
+  "editor.rulers": [80, 120],
   "editor.trimAutoWhitespace": true,
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
@@ -121,11 +118,8 @@
   "makefile.buildLog": "${workspaceFolder}/.vscode/build.log",
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
-  "python.testing.pytestArgs": [
-    "tests",
-    "-v",
-    "--tb=short"
-  ],
+  "python.testing.pytestArgs": ["tests", "-v", "--tb=short"],
   "python.testing.cwd": "${workspaceFolder}",
-  "python.testing.autoTestDiscoverOnSaveEnabled": true
+  "python.testing.autoTestDiscoverOnSaveEnabled": true,
+  "snyk.advanced.autoSelectOrganization": true
 }

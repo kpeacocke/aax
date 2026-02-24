@@ -393,6 +393,46 @@ For production deployments:
 
 See [k8s/README.md](k8s/README.md) for detailed Kubernetes deployment documentation.
 
+## AWX Controller Stack
+
+The AAX project includes a complete AWX (Ansible Automation Platform controller) deployment with Receptor mesh networking.
+
+### Controller Quick Start
+
+```bash
+# Start the controller stack (includes PostgreSQL, Redis, AWX, and Receptor)
+make controller-up
+
+# Access AWX at http://localhost:8080
+# Username: admin
+# Password: password
+```
+
+### Features
+
+- **AWX 24.6.1** - Full automation controller with web UI and API
+- **Receptor Mesh** - Distributed execution network
+- **Pre-configured** - Uses `aax/ee-base:latest` as default execution environment
+- **PostgreSQL** - Persistent database backend
+- **Redis** - Message broker and cache
+
+### Management Commands
+
+```bash
+make controller-status  # Show container status
+make controller-logs    # View logs
+make controller-down    # Stop services
+make controller-clean   # Remove all data (destructive)
+```
+
+See [controller/README.md](controller/README.md) for detailed controller documentation including:
+
+- Running your first job
+- API access examples  
+- Receptor mesh configuration
+- Backup and restore procedures
+- Production deployment considerations
+
 ### Updating Components
 
 To update to latest upstream versions:
