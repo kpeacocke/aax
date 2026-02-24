@@ -216,3 +216,103 @@ controller-clean: ## Stop controller and remove all data
 	else \
 		echo "✗ Cancelled"; \
 	fi
+
+# Private Automation Hub Targets
+
+.PHONY: build-pulp
+build-pulp: ## Build Pulp content management image
+	@echo "Building Pulp image..."
+	docker build $(BUILD_ARGS) -f images/pulp/Dockerfile.pulp -t $(REGISTRY)/pulp:$(VERSION) -t $(REGISTRY)/pulp:latest images/pulp/
+	@echo "Built $(REGISTRY)/pulp:$(VERSION)"
+
+.PHONY: build-galaxy-ng
+build-galaxy-ng: ## Build Galaxy NG image
+	@echo "Building Galaxy NG image..."
+	docker build $(BUILD_ARGS) -t $(REGISTRY)/galaxy-ng:$(VERSION) -t $(REGISTRY)/galaxy-ng:latest images/galaxy-ng/
+	@echo "Built $(REGISTRY)/galaxy-ng:$(VERSION)"
+
+.PHONY: build-hub
+build-hub: build-pulp build-galaxy-ng ## Build all hub images
+	@echo "All hub images built successfully"
+
+.PHONY: hub-up
+hub-up: build-hub ## Start Private Automation Hub stack
+	@echo "Starting Private Automation Hub stack..."
+	docker compose -f docker-compose.hub.yml up -d
+	@echo "✓ Hub stack started"
+	@echo ""
+	@echo "Access Galaxy NG at: http://localhost:5001"
+	@echo "Pulp API at: http://localhost:24817/pulp/api/v3/"
+	@echo "Content at: http://localhost:24816"
+	@echo ""
+	@echo "Username: admin"
+	@echo "Password: changeme (or value of HUB_ADMIN_PASSWORD)"
+	@echo ""
+	@echo "Wait 2-3 minutes for initialization..."
+
+.PHONY: hub-down
+hub-down: ## Stop Private Automation Hub stack
+	@echo "Stopping Hub stack..."
+	docker compose -f docker-compose.hub.yml down
+	@echo "✓ Hub stack stopped"
+
+.PHONY: hub-logs
+hub-logs: ## View Hub stack logs
+	docker compose -f docker-compose.hub.yml logs -f
+
+.PHONY: hub-status
+hub-status: ## Show Hub stack status
+	docker compose -f docker-compose.hub.yml ps
+
+.PHONY: hub-restart
+hub-restart: ## Restart Hub stack
+	@echo "Restarting Hub stack..."
+	docker compose -f docker-compose.hub.yml restart
+	@echo "✓ Hub stack restarted"
+
+.PHONY: hub-clean
+hub-clean: ## Stop hub and remove all data
+	@echo "⚠️  WARNING: This will remove all Hub data including collections!"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		docker compose -f docker-compose.hub.yml down -v; \
+		echo "✓ Hub stack and data removed"; \
+	else \
+		echo "✗ Cancelled"; \
+	fi
+
+.PHONY: hub-test
+hub-test: ## Test Hub API endpoints
+	@echo "Testing Hub API endpoints..."
+	@echo "Testing Galaxy NG API..."
+	@curl -f http://localhost:5001/api/galaxy/ || echo "Galaxy NG API not ready"
+	@echo ""
+	@echo "Testing Pulp API..."
+	@curl -f http://localhost:24817/pulp/api/v3/status/ || echo "Pulp API not ready"
+	@echo ""
+	@echo "Testing Content delivery..."
+	@curl -f http://localhost:24816/pulp/content/ || echo "Content delivery not ready"
+	@echo ""
+	@echo "✓ Hub tests complete"
+
+# Combined Stack Targets
+
+.PHONY: all-up
+all-up: compose-up controller-up hub-up ## Start all stacks (EE + Controller + Hub)
+	@echo "✓ All services started"
+	@echo ""
+	@echo "Services available:"
+	@echo "  - AWX Controller: http://localhost:8080"
+	@echo "  - Galaxy NG Hub: http://localhost:5001"
+	@echo "  - Pulp API: http://localhost:24817/pulp/api/v3/"
+	@echo ""
+
+.PHONY: all-down
+all-down: hub-down controller-down compose-down ## Stop all stacks
+	@echo "✓ All services stopped"
+
+.PHONY: all-clean
+all-clean: hub-clean controller-clean ## Clean all data from all stacks
+	docker compose down -v
+	@echo "✓ All data removed"

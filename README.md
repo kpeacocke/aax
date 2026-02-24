@@ -18,6 +18,8 @@ The platform consists of the following containerized services:
 - **Redis** - Message broker for task distribution
 - **Receptor** - Overlay network for distributed automation execution
 - **Execution Environments** - Container images for running Ansible playbooks
+- **Private Automation Hub** - Galaxy NG and Pulp for hosting Ansible collections and execution environments
+- **Event-Driven Ansible** - ansible-rulebook and EDA server for automated event responses (coming soon)
 
 ## Prerequisites
 
@@ -441,6 +443,92 @@ To update to latest upstream versions:
 2. Rebuild images: `docker-compose build --no-cache`
 3. Run migration: `docker-compose exec awx_web awx-manage migrate`
 4. Test thoroughly in staging environment
+
+## Private Automation Hub
+
+The AAX project includes a complete Private Automation Hub implementation using Galaxy NG and Pulp for hosting Ansible collections and execution environment container images.
+
+### Hub Quick Start
+
+```bash
+# Start the hub stack
+make hub-up
+
+# Or manually:
+docker compose -f docker-compose.hub.yml up -d
+```
+
+**Access the Hub:**
+- Galaxy NG UI: <http://localhost:5001>
+- Pulp API: <http://localhost:24817/pulp/api/v3/>
+- Content Delivery: <http://localhost:24816>
+
+Default credentials: `admin` / `changeme`
+
+### Hub Features
+
+1. **Collection Management** - Host and distribute private Ansible collections
+2. **Content Approval Workflow** - Review and approve collections before publishing
+3. **Execution Environment Registry** - Store custom EE container images
+4. **Content Signing** - GPG signing for collections and containers
+5. **RBAC** - Role-based access control for content management
+6. **API Access** - Full REST API for automation
+
+### Publishing Collections
+
+#### Using ansible-galaxy CLI
+
+```bash
+# Configure ansible-galaxy
+cat >> ~/.ansible.cfg << EOF
+[galaxy]
+server_list = private_hub
+
+[galaxy_server.private_hub]
+url=http://localhost:5001/api/galaxy/
+token=<your-api-token>
+EOF
+
+# Build and publish
+ansible-galaxy collection build
+ansible-galaxy collection publish namespace-collection-1.0.0.tar.gz
+```
+
+#### Using the UI
+
+1. Navigate to <http://localhost:5001>
+2. Log in with admin credentials
+3. Go to "Collections" → "Upload Collection"
+4. Upload your `.tar.gz` file
+
+### Integration with AWX
+
+Configure AWX to use your private hub:
+
+1. In AWX UI, create Galaxy/Hub API Token credential
+2. Set Galaxy Server URL: `http://galaxy-ng:5001/api/galaxy/`
+3. Add token from Hub UI
+4. Use credential in projects with `requirements.yml`
+
+### Hub Management Commands
+
+```bash
+make hub-status   # Show container status
+make hub-logs     # View logs
+make hub-restart  # Restart services
+make hub-down     # Stop services
+make hub-clean    # Remove all data (destructive)
+make hub-test     # Test API endpoints
+```
+
+See [hub/README.md](hub/README.md) for detailed hub documentation including:
+
+- Content approval workflows
+- Collection signing setup
+- Container registry usage
+- API examples
+- Backup and restore procedures
+- Production deployment considerations
 
 ## Troubleshooting
 

@@ -1,0 +1,273 @@
+services:
+  hub-postgres:
+    image: postgres:16-alpine
+    container_name: aax-hub-postgres
+    environment:
+      POSTGRES_USER: galaxy
+      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:-hubpassword}
+      POSTGRES_DB: hub
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    volumes:
+      - hub_postgres_data:/var/lib/postgresql/data
+    networks:
+      - hub-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U galaxy -d hub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  hub-redis:
+    image: redis:7-alpine
+    container_name: aax-hub-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - hub_redis_data:/data
+    networks:
+      - hub-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  pulp-api:
+    build:
+      context: ./images/pulp
+      dockerfile: Dockerfile.pulp
+      args:
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+        VERSION: ${VERSION:-dev}
+    image: aax/pulp:${VERSION:-dev}
+    container_name: aax-pulp-api
+    command: ["pulpcore-api"]
+    environment:
+      POSTGRES_HOST: hub-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: galaxy
+      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:-hubpassword}
+      POSTGRES_DB: hub
+      REDIS_HOST: hub-redis
+      REDIS_PORT: 6379
+      PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://localhost:24816}
+      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:5001}
+      PULP_SETTINGS: /etc/pulp/settings.py
+      DJANGO_SETTINGS_MODULE: pulpcore.app.settings
+      PULP_WORKERS: ${PULP_WORKERS:-2}
+    volumes:
+      - hub_pulp_storage:/var/lib/pulp
+      - ./images/pulp/settings.py:/etc/pulp/settings.py:ro
+    networks:
+      - hub-network
+    depends_on:
+      hub-postgres:
+        condition: service_healthy
+      hub-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:24817/pulp/api/v3/status/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    ports:
+      - "${PULP_API_PORT:-24817}:24817"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "1"
+          memory: 1G
+
+  pulp-content:
+    image: aax/pulp:${VERSION:-dev}
+    container_name: aax-pulp-content
+    command: ["pulpcore-content"]
+    environment:
+      POSTGRES_HOST: hub-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: galaxy
+      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:-hubpassword}
+      POSTGRES_DB: hub
+      REDIS_HOST: hub-redis
+      REDIS_PORT: 6379
+      PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://localhost:24816}
+      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:5001}
+      PULP_SETTINGS: /etc/pulp/settings.py
+      DJANGO_SETTINGS_MODULE: pulpcore.app.settings
+    volumes:
+      - hub_pulp_storage:/var/lib/pulp
+      - ./images/pulp/settings.py:/etc/pulp/settings.py:ro
+    networks:
+      - hub-network
+    depends_on:
+      pulp-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:24816/pulp/content/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    ports:
+      - "${PULP_CONTENT_PORT:-24816}:24816"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  pulp-worker:
+    image: aax/pulp:${VERSION:-dev}
+    container_name: aax-pulp-worker
+    command: ["pulpcore-worker"]
+    environment:
+      POSTGRES_HOST: hub-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: galaxy
+      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:-hubpassword}
+      POSTGRES_DB: hub
+      REDIS_HOST: hub-redis
+      REDIS_PORT: 6379
+      PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://localhost:24816}
+      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:5001}
+      PULP_SETTINGS: /etc/pulp/settings.py
+      DJANGO_SETTINGS_MODULE: pulpcore.app.settings
+    volumes:
+      - hub_pulp_storage:/var/lib/pulp
+      - ./images/pulp/settings.py:/etc/pulp/settings.py:ro
+    networks:
+      - hub-network
+    depends_on:
+      pulp-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "pulpcore-worker"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "1"
+          memory: 1G
+
+  galaxy-ng:
+    build:
+      context: ./images/galaxy-ng
+      args:
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+        VERSION: ${VERSION:-dev}
+    image: aax/galaxy-ng:${VERSION:-dev}
+    container_name: aax-galaxy-ng
+    environment:
+      POSTGRES_HOST: hub-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: galaxy
+      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:-hubpassword}
+      POSTGRES_DB: hub
+      REDIS_HOST: hub-redis
+      REDIS_PORT: 6379
+      
+      # Pulp integration
+      PULP_API_ROOT: http://pulp-api:24817
+      PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://localhost:24816}
+      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:5001}
+      
+      # Galaxy NG settings
+      GALAXY_ADMIN_USERNAME: ${GALAXY_ADMIN_USERNAME:-admin}
+      GALAXY_ADMIN_PASSWORD: ${HUB_ADMIN_PASSWORD:-changeme}
+      GALAXY_ADMIN_EMAIL: ${GALAXY_ADMIN_EMAIL:-admin@example.com}
+      GALAXY_SECRET_KEY: ${GALAXY_SECRET_KEY:-change-me-to-a-long-random-string}
+      GALAXY_ALLOWED_HOSTS: ${GALAXY_ALLOWED_HOSTS:-*}
+      GALAXY_SIGNATURE_UPLOAD_ENABLED: ${GALAXY_SIGNATURE_UPLOAD_ENABLED:-false}
+      GALAXY_REQUIRE_CONTENT_APPROVAL: ${GALAXY_REQUIRE_CONTENT_APPROVAL:-true}
+      GALAXY_AUTO_SIGN_COLLECTIONS: ${GALAXY_AUTO_SIGN_COLLECTIONS:-false}
+      GALAXY_COLLECTION_SIGNING_SERVICE: ${GALAXY_COLLECTION_SIGNING_SERVICE:-}
+      GALAXY_CONTAINER_SIGNING_SERVICE: ${GALAXY_CONTAINER_SIGNING_SERVICE:-}
+      
+      # Django settings
+      DJANGO_SETTINGS_MODULE: galaxy_ng.app.settings
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+      
+      # Logging
+      PULP_LOGGING_LEVEL: ${PULP_LOGGING_LEVEL:-INFO}
+    volumes:
+      - hub_pulp_storage:/var/lib/pulp
+      - hub_assets:/app/static
+    networks:
+      - hub-network
+    depends_on:
+      pulp-api:
+        condition: service_healthy
+      pulp-content:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/galaxy/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    ports:
+      - "${GALAXY_PORT:-5001}:8000"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "1"
+          memory: 1G
+
+networks:
+  hub-network:
+    driver: bridge
+    labels:
+      com.aax.description: "Network for Private Automation Hub services"
+  # Allow communication with AWX stack if both running
+  ansible:
+    external: true
+    name: aax_ansible
+
+volumes:
+  hub_postgres_data:
+    labels:
+      com.aax.description: "PostgreSQL database for Private Automation Hub"
+  hub_redis_data:
+    labels:
+      com.aax.description: "Redis cache and message broker for Hub"
+  hub_pulp_storage:
+    labels:
+      com.aax.description: "Pulp artifact and content storage"
+  hub_assets:
+    labels:
+      com.aax.description: "Static assets for Galaxy NG UI"
