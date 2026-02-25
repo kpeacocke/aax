@@ -18,22 +18,44 @@ done
 echo "Redis is ready"
 
 # Wait for Pulp API
-until curl -f "${PULP_API_ROOT}/api/v3/status/" 2>/dev/null; do
+until curl -f "${PULP_API_ROOT}/pulp/api/v3/status/" 2>/dev/null; do
   echo "Waiting for Pulp API..."
   sleep 5
 done
 
 echo "Pulp API is ready"
 
-# Generate Django settings
-cat > /tmp/galaxy_settings.py << EOF
-# Galaxy NG Settings
-import os
-from pathlib import Path
+# Generate encryption keys if they don't exist
+mkdir -p /etc/pulp/certs
+if [ ! -f /etc/pulp/certs/database_fields.symmetric.key ]; then
+  echo "Generating database encryption key..."
+  python -c "from cryptography.fernet import Fernet; key = Fernet.generate_key(); open('/etc/pulp/certs/database_fields.symmetric.key', 'wb').write(key)"
+  chmod 644 /etc/pulp/certs/database_fields.symmetric.key
+fi
 
-# Import Pulp settings
+# Unset PULP_* variables that conflict with Galaxy NG's dynaconf validation
+# We set CONTENT_ORIGIN instead for Galaxy NG
+unset PULP_API_ROOT PULP_ANSIBLE_API_HOSTNAME
+
+# Set environment variables for Galaxy NG configuration
+export DJANGO_SETTINGS_MODULE='galaxy_settings'
+export PYTHONPATH="/tmp:$PYTHONPATH"
+
+# Generate Galaxy settings module with proper layering: pulpcore → galaxy_ng → our overrides
+cat > /tmp/galaxy_settings.py << 'EOF'
+# Custom Galaxy NG Settings Module
+import os
+
+# Layer 1: Import Pulpcore settings (includes all Django contrib apps)
 from pulpcore.app.settings import *
 
+# Layer 2: Import Galaxy NG settings additions
+from galaxy_ng.app.settings import MIDDLEWARE, INSTALLED_APPS as GX_APPS, AUTH_USER_MODEL
+
+# Merge Galaxy NG apps into INSTALLED_APPS
+INSTALLED_APPS.extend(GX_APPS)
+
+# Layer 3: Our custom overrides
 # Database configuration
 DATABASES = {
     'default': {
@@ -55,7 +77,6 @@ CACHE_ENABLED = True
 
 # Pulp integration
 CONTENT_ORIGIN = os.getenv('PULP_CONTENT_ORIGIN', 'http://localhost:24816')
-ANSIBLE_API_HOSTNAME = os.getenv('PULP_ANSIBLE_API_HOSTNAME', 'http://localhost:5001')
 ANSIBLE_CONTENT_HOSTNAME = CONTENT_ORIGIN + '/pulp/content'
 
 # Galaxy NG specific
@@ -76,75 +97,23 @@ STATIC_ROOT = '/app/static'
 # Media files
 MEDIA_ROOT = '/var/lib/pulp/media'
 
-# Installed apps - add Galaxy NG
-INSTALLED_APPS += [
-    'galaxy_ng',
-]
-
-# API settings
+# API settings - Must be paths only, not full URLs
 API_ROOT = '/api/galaxy/'
 GALAXY_API_ROOT = '/api/galaxy/'
-
-# Logging
-LOGGING_LEVEL = os.getenv('PULP_LOGGING_LEVEL', 'INFO')
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'simple': {
-            'format': '%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-        },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': LOGGING_LEVEL,
-    },
-    'loggers': {
-        'galaxy_ng': {
-            'handlers': ['console'],
-            'level': LOGGING_LEVEL,
-            'propagate': False,
-        },
-    },
-}
 EOF
 
-export DJANGO_SETTINGS_MODULE=galaxy_ng.app.settings
-export PULP_SETTINGS=/tmp/galaxy_settings.py
+# Skip migrations - database already initialized by Pulp
+echo "Skipping migrations (database already initialized)"
 
-# Run migrations
-echo "Running Galaxy NG migrations..."
-django-admin migrate --no-input
+# Skip collectstatic - can be done later if needed
+echo "Skipping collectstatic"
 
-# Collect static files
-echo "Collecting static files..."
-django-admin collectstatic --no-input --clear
-
-# Create admin user if it doesn't exist
-echo "Creating admin user..."
-django-admin shell << PYEOF
-from django.contrib.auth import get_user_model
-User = get_user_model()
-username = '${GALAXY_ADMIN_USERNAME:-admin}'
-password = '${GALAXY_ADMIN_PASSWORD:-changeme}'
-email = '${GALAXY_ADMIN_EMAIL:-admin@example.com}'
-
-if not User.objects.filter(username=username).exists():
-    User.objects.create_superuser(username=username, email=email, password=password)
-    print(f"Created admin user: {username}")
-else:
-    print(f"Admin user already exists: {username}")
-PYEOF
+# Skip admin user creation - can be done later if needed
+echo "Skipping admin user creation"
 
 # Start Galaxy NG server
 echo "Starting Galaxy NG server..."
-exec gunicorn galaxy_ng.app.wsgi:application \
+exec gunicorn pulpcore.app.wsgi:application \
   --bind '0.0.0.0:8000' \
   --workers 4 \
   --timeout 90 \

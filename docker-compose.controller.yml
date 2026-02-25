@@ -2,6 +2,8 @@ services:
   awx-postgres:
     image: postgres:15
     container_name: awx-postgres
+    profiles:
+      - controller
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-awx}
       POSTGRES_USER: ${POSTGRES_USER:-awx}
@@ -23,6 +25,8 @@ services:
     image: redis:7
     container_name: awx-redis
     command: redis-server --appendonly yes
+    profiles:
+      - controller
     volumes:
       - awx_redis_data:/data
     networks:
@@ -34,33 +38,34 @@ services:
       retries: 5
 
   awx-web:
-    build:
-      context: ./images/awx
-      dockerfile: Dockerfile
-      args:
-        VERSION: ${VERSION:-latest}
-        BUILD_DATE: ${BUILD_DATE}
-        VCS_REF: ${VCS_REF}
-    image: aax/awx:latest
+    profiles:
+      - controller
+    image: ${AWX_IMAGE:-aax/awx:latest}
     container_name: awx-web
-    hostname: awxweb
+    hostname: awx
     user: "0"
+    entrypoint:
+      [
+        "/bin/bash",
+        "-c",
+        "mkdir -p /etc/tower /etc/nginx/conf.d\ncat > /etc/tower/settings.py << 'PYEOF'\nimport os\nDATABASES = {\n    'default': {\n        'ENGINE': 'django.db.backends.postgresql',\n        'NAME': os.getenv('POSTGRES_NAME', 'awx'),\n        'USER': os.getenv('POSTGRES_USER', 'awx'),\n        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'awxpass'),\n        'HOST': os.getenv('POSTGRES_SERVICE_HOST', 'awx-postgres'),\n        'PORT': int(os.getenv('POSTGRES_SERVICE_PORT', 5432)),\n        'ATOMIC_REQUESTS': True,\n        'CONN_MAX_AGE': 0,\n    }\n}\nSECRET_KEY = os.getenv('SECRET_KEY', 'awxsecret_change_me')\nALLOWED_HOSTS = ['*']\nDEBUG = False\nCSRF_TRUSTED_ORIGINS = ['http://localhost:8080', 'http://localhost', 'http://127.0.0.1:8080']\nSESSION_COOKIE_SECURE = False\nCSRF_COOKIE_SECURE = False\nSESSION_COOKIE_SAMESITE = 'Lax'\nCSRF_COOKIE_SAMESITE = 'Lax'\nREDIS_HOST = os.getenv('REDIS_SERVICE_HOST', 'awx-redis')\nREDIS_PORT = int(os.getenv('REDIS_SERVICE_PORT', 6379))\nCHANNELS = {\n    'default': {\n        'BACKEND': 'channels_redis.core.RedisChannelLayer',\n        'CONFIG': {'hosts': [(REDIS_HOST, REDIS_PORT)]},\n    },\n}\nPYEOF\ncat > /etc/nginx/conf.d/awx.conf << 'NGEOF'\nserver {\n    listen 8052 default_server;\n    listen [::]:8052 default_server;\n    server_name _;\n    client_max_body_size 0;\n\n    location /static/ {\n        alias /var/lib/awx/public/static/;\n        expires 1h;\n        add_header Cache-Control \"public\";\n    }\n\n    location /media/ {\n        alias /var/lib/awx/public/media/;\n        expires 1h;\n        add_header Cache-Control \"public\";\n    }\n\n    location / {\n        include uwsgi_params;\n        uwsgi_pass 127.0.0.1:8050;\n        uwsgi_read_timeout 120s;\n        uwsgi_send_timeout 120s;\n    }\n}\nNGEOF\nsed -i 's/autostart=true/autostart=false/g' /etc/supervisord_web.conf\nsed -i 's/programs=nginx,uwsgi,daphne,awx-cache-clear,ws-heartbeat/programs=nginx,uwsgi,awx-cache-clear/g' /etc/supervisord_web.conf\nsed -i '/\\[program:daphne\\]/a autostart=false' /etc/supervisord_web.conf\nsed -i '/\\[program:ws-heartbeat\\]/a autostart=false' /etc/supervisord_web.conf\n/usr/bin/launch_awx_web.sh",
+      ]
     environment:
-      # Database configuration
-      DATABASE_USER: ${DATABASE_USER:-awx}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-awxpass}
-      DATABASE_NAME: ${DATABASE_NAME:-awx}
-      DATABASE_PORT: ${DATABASE_PORT:-5432}
-      DATABASE_HOST: ${DATABASE_HOST:-awx-postgres}
+      # PostgreSQL configuration
+      POSTGRES_SERVICE_HOST: ${DATABASE_HOST:-awx-postgres}
+      POSTGRES_SERVICE_PORT: ${DATABASE_PORT:-5432}
+      POSTGRES_NAME: ${DATABASE_NAME:-awx}
+      POSTGRES_USER: ${DATABASE_USER:-awx}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-awxpass}
 
       # Redis configuration
-      REDIS_HOST: ${REDIS_HOST:-awx-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_SERVICE_PORT: ${REDIS_PORT:-6379}
+      REDIS_SERVICE_HOST: ${REDIS_HOST:-awx-redis}
 
       # AWX configuration
       AWX_ADMIN_USER: ${AWX_ADMIN_USER:-admin}
       AWX_ADMIN_PASSWORD: ${AWX_ADMIN_PASSWORD:-password}
-      SECRET_KEY: ${SECRET_KEY:-awxsecret}
+      SECRET_KEY: ${SECRET_KEY:-awxsecret_change_me}
 
       # Receptor configuration
       RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-true}
@@ -88,18 +93,18 @@ services:
       start_period: 60s
 
   awx-task:
-    build:
-      context: ./images/awx
-      dockerfile: Dockerfile
-      args:
-        VERSION: ${VERSION:-latest}
-        BUILD_DATE: ${BUILD_DATE}
-        VCS_REF: ${VCS_REF}
-    image: aax/awx:latest
+    profiles:
+      - controller
+    image: ${AWX_IMAGE:-aax/awx:latest}
     container_name: awx-task
     hostname: awx
     user: "0"
-    entrypoint: ["/usr/local/bin/entrypoint-task.sh"]
+    entrypoint:
+      [
+        "/bin/bash",
+        "-c",
+        "mkdir -p /etc/tower && cat > /etc/tower/settings.py << 'PYEOF'\nimport os\nDATABASES = {'default': {'ENGINE': 'django.db.backends.postgresql', 'NAME': os.getenv('DATABASE_NAME', 'awx'), 'USER': os.getenv('DATABASE_USER', 'awx'), 'PASSWORD': os.getenv('DATABASE_PASSWORD', 'awxpass'), 'HOST': os.getenv('DATABASE_HOST', 'awx-postgres'), 'PORT': int(os.getenv('DATABASE_PORT', 5432))}}\nSECRET_KEY = os.getenv('SECRET_KEY', 'awxsecret')\nDEBUG = False\nALLOWED_HOSTS = ['*']\nBROADCAST_WEBSOCKET_SECRET = os.getenv('SECRET_KEY', 'awxsecret')\nPYEOF\nexec /usr/local/bin/dumb-init -- /usr/bin/launch_awx_task.sh",
+      ]
     environment:
       # Database configuration
       DATABASE_USER: ${DATABASE_USER:-awx}
@@ -115,6 +120,9 @@ services:
       # AWX configuration
       SECRET_KEY: ${SECRET_KEY:-awxsecret}
       AWX_SKIP_MIGRATIONS: ${AWX_SKIP_MIGRATIONS:-false}
+      # Use built-in settings module instead of external file
+      DJANGO_SETTINGS_MODULE: awx.settings.production
+      AWX_SETTINGS_FILE: /dev/null
 
       # Receptor configuration
       RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-true}
@@ -140,15 +148,51 @@ services:
       start_period: 120s
 
   awx-receptor:
-    image: quay.io/ansible/receptor:1.4.7
+    image: ${RECEPTOR_IMAGE:-quay.io/ansible/receptor:latest}
     container_name: awx-receptor
+    profiles:
+      - controller
     hostname: receptor
+    user: "0"
+    environment:
+      RECEPTOR_CONFIG: |
+        ---
+        # Receptor node configuration for AWX execution
+
+        # Node configuration
+        - node:
+            id: receptor-node
+
+        # Control socket for receptorctl
+        - control-service:
+            service: control
+            filename: /var/lib/receptor/receptor.sock
+            permissions: "0660"
+
+        # TCP listener for mesh communication
+        - tcp-listener:
+            port: 8888
+            bindaddr: 0.0.0.0
+
+        # Work command configuration for Ansible execution
+        - work-command:
+            worktype: ansible-runner
+            command: ansible-runner
+            params: worker
+            allowruntimeparams: true
+
+        # Logging configuration
+        - log-level:
+            level: info
     command:
-      - receptor
-      - --config
-      - /etc/receptor/receptor.conf
+      - sh
+      - -c
+      - |
+        set -e
+        mkdir -p /etc/receptor
+        printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
+        receptor --config /etc/receptor/receptor.conf
     volumes:
-      - ./images/receptor/receptor.conf:/etc/receptor/receptor.conf:ro
       - receptor_data:/var/lib/receptor
     networks:
       - awx-network

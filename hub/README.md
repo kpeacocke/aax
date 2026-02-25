@@ -34,7 +34,7 @@ This hub stack builds Galaxy NG from the official Ansible repository (`github.co
 ## Prerequisites
 
 1. Docker Engine 20.10 or later
-2. Docker Compose 2.0 or later
+2. Docker Compose 5.1.0 or later
 3. Minimum 4GB RAM allocated to Docker
 4. AAX core services running (optional for standalone use)
 
@@ -43,7 +43,7 @@ This hub stack builds Galaxy NG from the official Ansible repository (`github.co
 ### 1. Configure Environment Variables (Optional)
 
 ```bash
-cd /workspaces/AAX
+cd /workspaces/aax
 cp .env.example .env
 # Edit .env with your specific configuration
 ```
@@ -71,10 +71,7 @@ export PULP_ANSIBLE_API_HOSTNAME=http://localhost:5001
 
 ```bash
 # From the AAX root directory
-docker compose -f docker-compose.hub.yml up -d
-
-# Or using make
-make hub-up
+docker compose --profile hub up -d
 ```
 
 ### 3. Access the Hub Interface
@@ -85,6 +82,7 @@ make hub-up
 - **Content Delivery**: <http://localhost:24816>
 
 Default credentials:
+
 - Username: `admin`
 - Password: (set via `HUB_ADMIN_PASSWORD` or default: `changeme`)
 
@@ -92,10 +90,10 @@ Default credentials:
 
 ```bash
 # Check service health
-docker compose -f docker-compose.hub.yml ps
+docker compose --profile hub ps
 
 # View logs
-docker compose -f docker-compose.hub.yml logs -f
+docker compose --profile hub logs -f
 
 # Test API access
 curl http://localhost:5001/api/galaxy/
@@ -176,7 +174,7 @@ docker pull localhost:5001/ee-base:latest
 
 To configure AWX to use your private hub:
 
-### 1. Add Organization Galaxy Credentials
+### 1. Add Organisation Galaxy Credentials
 
 In AWX UI:
 
@@ -210,7 +208,7 @@ To connect AWX and Hub stacks:
 
 ```bash
 # Start both stacks on the same network
-docker compose -f docker-compose.hub.yml -f docker-compose.controller.yml up -d
+docker compose --profile controller --profile hub up -d
 ```
 
 Or modify `docker-compose.controller.yml` to include:
@@ -241,8 +239,8 @@ curl http://localhost:5001/api/galaxy/v3/collections/namespace/collection/
 ```bash
 # Get auth token first
 TOKEN=$(curl -X POST http://localhost:5001/api/galaxy/v3/auth/token/ \
-  -d '{"username":"admin","password":"changeme"}' \
-  -H "Content-Type: application/json" | jq -r .token)
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"changeme"}' | jq -r .token) # pragma: allowlist secret
 
 # Upload collection
 curl -X POST http://localhost:5001/api/galaxy/v3/artifacts/collections/ \
@@ -264,22 +262,22 @@ curl http://localhost:24817/pulp/api/v3/content/ansible/collection_versions/
 
 ```bash
 # Start hub services
-make hub-up
+docker compose --profile hub up -d
 
 # Stop hub services
-make hub-down
+docker compose --profile hub down
 
 # View logs
-make hub-logs
+docker compose --profile hub logs -f
 
 # Check status
-make hub-status
+docker compose --profile hub ps
 
 # Restart services
-make hub-restart
+docker compose --profile hub restart
 
 # Clean all hub data (destructive!)
-make hub-clean
+docker compose --profile hub down -v
 ```
 
 ## Database Migrations
@@ -288,10 +286,10 @@ When updating Galaxy NG or Pulp:
 
 ```bash
 # Run Galaxy NG migrations
-docker compose -f docker-compose.hub.yml exec galaxy-ng django-admin migrate --no-input
+docker compose --profile hub exec galaxy-ng django-admin migrate --no-input
 
 # Run Pulp migrations
-docker compose -f docker-compose.hub.yml exec pulp-api pulpcore-manager migrate --no-input
+docker compose --profile hub exec pulp-api pulpcore-manager migrate --no-input
 ```
 
 ## Backup and Restore
@@ -300,7 +298,7 @@ docker compose -f docker-compose.hub.yml exec pulp-api pulpcore-manager migrate 
 
 ```bash
 # Backup database
-docker compose -f docker-compose.hub.yml exec hub-postgres pg_dump -U galaxy hub > hub_backup.sql
+docker compose --profile hub exec hub-postgres pg_dump -U galaxy hub > hub_backup.sql
 
 # Backup uploaded content
 docker run --rm -v aax_hub_pulp_storage:/data -v $(pwd):/backup \
@@ -311,7 +309,7 @@ docker run --rm -v aax_hub_pulp_storage:/data -v $(pwd):/backup \
 
 ```bash
 # Restore database
-cat hub_backup.sql | docker compose -f docker-compose.hub.yml exec -T hub-postgres psql -U galaxy hub
+cat hub_backup.sql | docker compose --profile hub exec -T hub-postgres psql -U galaxy hub
 
 # Restore content
 docker run --rm -v aax_hub_pulp_storage:/data -v $(pwd):/backup \
@@ -325,9 +323,10 @@ docker run --rm -v aax_hub_pulp_storage:/data -v $(pwd):/backup \
 **Problem**: Error when uploading collections
 
 **Solutions**:
+
 1. Check disk space: `df -h`
-2. Verify pulp-worker is running: `docker compose -f docker-compose.hub.yml ps`
-3. Check pulp-worker logs: `docker compose -f docker-compose.hub.yml logs pulp-worker`
+2. Verify pulp-worker is running: `docker compose --profile hub ps`
+3. Check pulp-worker logs: `docker compose --profile hub logs pulp-worker`
 4. Ensure collection tarball is valid: `ansible-galaxy collection build --force`
 
 ### Content Not Appearing
@@ -335,15 +334,17 @@ docker run --rm -v aax_hub_pulp_storage:/data -v $(pwd):/backup \
 **Problem**: Uploaded content doesn't show in UI
 
 **Solutions**:
+
 1. Wait for pulp-worker to process (check logs)
 2. Verify repository sync: Check Pulp API
-3. Clear Redis cache: `docker compose -f docker-compose.hub.yml restart hub-redis`
+3. Clear Redis cache: `docker compose --profile hub restart hub-redis`
 
 ### Cannot Connect from AWX
 
 **Problem**: AWX can't reach the hub
 
 **Solutions**:
+
 1. Ensure both stacks use the same Docker network
 2. Use service name (`galaxy-ng`) not `localhost` in AWX
 3. Check network connectivity: `docker compose exec awx_web ping galaxy-ng`
@@ -351,6 +352,7 @@ docker run --rm -v aax_hub_pulp_storage:/data -v $(pwd):/backup \
 ### Performance Issues
 
 **Solutions**:
+
 1. Increase pulp-worker replicas in compose file
 2. Allocate more memory to PostgreSQL
 3. Use external S3-compatible storage for artifacts

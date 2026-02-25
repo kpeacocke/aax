@@ -20,7 +20,7 @@ This controller stack builds AWX from the official Ansible AWX source repository
 
 1. **Consistency** - Matches the pattern used for execution environments (ee-base, ee-builder, dev-tools)
 2. **Transparency** - Full visibility into what's running in your automation platform
-3. **Customization** - Ability to modify AWX behavior if needed
+3. **Customisation** - Ability to modify AWX behaviour if needed
 4. **No Registry Dependencies** - Removes dependency on external Docker registries (Docker Hub, Quay.io)
 
 **Trade-offs:**
@@ -34,15 +34,14 @@ The `images/awx/Dockerfile` builds AWX 24.6.1 from source, installs all Python d
 ## Prerequisites
 
 1. Docker Engine 20.10 or later
-2. Docker Compose 2.0 or later
+2. Docker Compose 5.1.0 or later
 3. Minimum 4GB RAM allocated to Docker
 4. AAX execution environment images built:
 
-   ```bash
-   cd /workspaces/AAX
-   make build-images
-   # Or: docker compose build
-   ```
+  ```bash
+  cd /workspaces/aax
+  docker compose build
+  ```
 
 ## Quick Start
 
@@ -51,12 +50,12 @@ The `images/awx/Dockerfile` builds AWX 24.6.1 from source, installs all Python d
 The controller stack uses environment variables for configuration. A `.env.example` file is provided in the root directory:
 
 ```bash
-cd /workspaces/AAX
+cd /workspaces/aax
 cp .env.example .env
 # Edit .env with your specific configuration
 ```
 
-Key variables you may want to customize:
+Key variables you may want to customise:
 
 - `POSTGRES_PASSWORD` - PostgreSQL database password
 - `AWX_ADMIN_PASSWORD` - AWX admin user password
@@ -69,17 +68,17 @@ If you don't create a `.env` file, the stack will use default values.
 ### 2. Start the Controller Stack
 
 ```bash
-cd /workspaces/AAX
-docker compose -f docker-compose.controller.yml up -d
+cd /workspaces/aax
+docker compose --profile controller up -d
 ```
 
-### 3. Wait for Services to Initialize
+### 3. Wait for Services to Initialise
 
-AWX takes 2-3 minutes to initialize on first startup:
+AWX takes 2-3 minutes to initialise on first startup:
 
 ```bash
 # Watch the logs
-docker compose -f docker-compose.controller.yml logs -f awx-task
+docker compose --profile controller logs -f awx-task
 
 # Wait for this message:
 # "System is ready"
@@ -199,8 +198,6 @@ AWX_ADMIN_PASSWORD=your-secure-password
 SECRET_KEY=your-secret-key
 ```
 
-Alternatively, you can edit `docker-compose.controller.yml` directly:
-
 ```yaml
 environment:
   AWX_ADMIN_USER: ${AWX_ADMIN_USER:-admin}
@@ -213,7 +210,6 @@ environment:
 For production, update the PostgreSQL credentials in your `.env` file:
 
 ```bash
-POSTGRES_PASSWORD=your-secure-db-password
 DATABASE_PASSWORD=your-secure-db-password
 ```
 
@@ -258,7 +254,7 @@ services:
     id: execution-node-1
 
 - tcp-peer:
-    address: awx-receptor:8888
+  address: awx-receptor:8888
 
 - work-command:
     worktype: ansible-runner
@@ -272,36 +268,36 @@ services:
 ### View Status
 
 ```bash
-docker compose -f docker-compose.controller.yml ps
+docker compose --profile controller ps
 ```
 
 ### View Logs
 
 ```bash
 # All services
-docker compose -f docker-compose.controller.yml logs -f
+docker compose --profile controller logs -f
 
 # Specific service
-docker compose -f docker-compose.controller.yml logs -f awx-web
-docker compose -f docker-compose.controller.yml logs -f awx-task
+docker compose --profile controller logs -f awx-web
+docker compose --profile controller logs -f awx-task
 ```
 
 ### Stop Services
 
 ```bash
-docker compose -f docker-compose.controller.yml down
+docker compose --profile controller down
 ```
 
 ### Stop and Remove Data
 
 ```bash
-docker compose -f docker-compose.controller.yml down -v
+docker compose --profile controller down -v
 ```
 
 ### Restart Services
 
 ```bash
-docker compose -f docker-compose.controller.yml restart
+docker compose --profile controller restart
 ```
 
 ## Troubleshooting
@@ -311,7 +307,7 @@ docker compose -f docker-compose.controller.yml restart
 Check the task container logs:
 
 ```bash
-docker compose -f docker-compose.controller.yml logs awx-task
+docker compose --profile controller logs awx-task
 ```
 
 Common issues:
@@ -326,7 +322,7 @@ Common issues:
 2. Reset password:
 
 ```bash
-docker compose -f docker-compose.controller.yml exec awx-task awx-manage changepassword admin
+docker compose --profile controller exec awx-task awx-manage changepassword admin
 ```
 
 ### Jobs Not Running
@@ -340,7 +336,7 @@ docker images | grep aax/ee-base
 1. Check receptor status:
 
 ```bash
-docker compose -f docker-compose.controller.yml exec awx-receptor receptorctl --socket /var/lib/receptor/receptor.sock status
+docker compose --profile controller exec awx-receptor receptorctl --socket /var/lib/receptor/receptor.sock status
 ```
 
 1. Ensure Docker socket is mounted and accessible
@@ -350,7 +346,7 @@ docker compose -f docker-compose.controller.yml exec awx-receptor receptorctl --
 Verify PostgreSQL is running and healthy:
 
 ```bash
-docker compose -f docker-compose.controller.yml exec awx-postgres pg_isready -U awx
+docker compose --profile controller exec awx-postgres pg_isready -U awx
 ```
 
 ## API Access
@@ -376,7 +372,7 @@ curl -X POST -u admin:password \
 
 ```bash
 # Backup database
-docker compose -f docker-compose.controller.yml exec awx-postgres \
+docker compose --profile controller exec awx-postgres \
   pg_dump -U awx awx > awx-backup-$(date +%Y%m%d).sql
 
 # Backup volumes
@@ -390,7 +386,7 @@ docker run --rm \
 
 ```bash
 # Restore database
-docker compose -f docker-compose.controller.yml exec -T awx-postgres \
+docker compose --profile controller exec -T awx-postgres \
   psql -U awx awx < awx-backup-20231215.sql
 ```
 

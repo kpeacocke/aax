@@ -17,6 +17,15 @@ done
 
 echo "Redis is ready"
 
+# Generate DB encryption key if it doesn't exist
+DB_KEY_FILE="${DB_ENCRYPTION_KEY:-/var/lib/pulp/db-encryption.key}"
+if [ ! -f "$DB_KEY_FILE" ]; then
+  echo "Generating database encryption key..."
+  mkdir -p "$(dirname "$DB_KEY_FILE")"
+  python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" > "$DB_KEY_FILE"
+  chmod 600 "$DB_KEY_FILE"
+fi
+
 # Run migrations on first startup (only for API service)
 if [ "$1" = "pulpcore-api" ]; then
   echo "Running database migrations..."
@@ -44,6 +53,7 @@ case "$1" in
     echo "Starting Pulp content server..."
     exec gunicorn pulpcore.content:server \
       --bind '0.0.0.0:24816' \
+      --worker-class aiohttp.GunicornWebWorker \
       --workers 2 \
       --timeout 90 \
       --access-logfile - \

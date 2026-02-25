@@ -80,7 +80,7 @@ pylintrc
 
 # Development dependencies
 requirements-dev.txt
-Makefile
+
 pyproject.toml
 setup.py
 setup.cfg

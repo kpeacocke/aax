@@ -4,9 +4,13 @@ These tests verify that services start correctly, dependencies work, and health 
 """
 import subprocess
 import time
+from pathlib import Path
 from typing import Any
 
 import pytest
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture(scope="module")
@@ -17,7 +21,7 @@ def compose_up():
         ["docker", "compose", "up", "-d"],
         capture_output=True,
         text=True,
-        cwd="/workspaces/AAX"
+        cwd=str(REPO_ROOT)
     )
     assert result.returncode == 0, f"Failed to start services: {result.stderr}"
 
@@ -30,7 +34,7 @@ def compose_up():
     subprocess.run(
         ["docker", "compose", "down"],
         capture_output=True,
-        cwd="/workspaces/AAX"
+        cwd=str(REPO_ROOT)
     )
 
 
@@ -43,7 +47,7 @@ class TestDockerCompose:
             ["docker", "compose", "config"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0, f"Invalid compose config: {result.stderr}"
 
@@ -53,7 +57,7 @@ class TestDockerCompose:
             ["docker", "compose", "build"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0, f"Build failed: {result.stderr}"
 
@@ -63,7 +67,7 @@ class TestDockerCompose:
             ["docker", "compose", "config", "--services"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
         services = result.stdout.strip().split("\n")
@@ -81,7 +85,7 @@ class TestServiceOrchestration:
             ["docker", "compose", "ps", "--format", "json"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
         # Check that services are running
@@ -97,7 +101,7 @@ class TestServiceOrchestration:
                 ["docker", "compose", "ps", "ee-base", "--format", "{{.Health}}"],
                 capture_output=True,
                 text=True,
-                cwd="/workspaces/AAX"
+                cwd=str(REPO_ROOT)
             )
             if "healthy" in result.stdout.lower():
                 break
@@ -111,7 +115,7 @@ class TestServiceOrchestration:
             ["docker", "compose", "ps", "ee-builder", "--format", "{{.State}}"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
         assert "running" in result.stdout.lower() or "exited" in result.stdout.lower()
@@ -122,7 +126,7 @@ class TestServiceOrchestration:
             ["docker", "compose", "ps", "dev-tools", "--format", "{{.State}}"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
         assert "running" in result.stdout.lower() or "exited" in result.stdout.lower()
@@ -160,7 +164,7 @@ class TestServiceFunctionality:
             ["docker", "compose", "exec", "-T", "ee-base", "ansible", "--version"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
         assert "ansible [core 2.20.0]" in result.stdout
@@ -171,7 +175,7 @@ class TestServiceFunctionality:
             ["docker", "compose", "exec", "-T", "ee-builder", "ansible-builder", "--version"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
         assert "3.1" in result.stdout
@@ -182,7 +186,7 @@ class TestServiceFunctionality:
             ["docker", "compose", "exec", "-T", "dev-tools", "ansible-navigator", "--version"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
         assert "24.2.0" in result.stdout
@@ -193,7 +197,7 @@ class TestServiceFunctionality:
             ["docker", "compose", "exec", "-T", "dev-tools", "ansible-lint", "--version"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
         assert "25.12.1" in result.stdout
@@ -206,7 +210,7 @@ class TestServiceFunctionality:
              "import socket; socket.gethostbyname('ee-base')"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0, "Services cannot communicate on shared network"
 
@@ -220,7 +224,7 @@ class TestResourceLimits:
             ["docker", "compose", "config"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
         config = result.stdout
@@ -234,7 +238,7 @@ class TestResourceLimits:
             ["docker", "compose", "config"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
         config = result.stdout
@@ -252,7 +256,7 @@ class TestEnvironmentVariables:
                 ["docker", "compose", "exec", "-T", service, "printenv", "ANSIBLE_NOCOWS"],
                 capture_output=True,
                 text=True,
-                cwd="/workspaces/AAX"
+                cwd=str(REPO_ROOT)
             )
             assert result.returncode == 0
             assert result.stdout.strip() == "1"
@@ -263,7 +267,7 @@ class TestEnvironmentVariables:
             ["docker", "compose", "exec", "-T", "dev-tools", "printenv", "PAGER"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
         assert result.stdout.strip() == ""

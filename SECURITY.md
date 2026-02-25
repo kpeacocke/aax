@@ -74,7 +74,7 @@ researcher@example.com
 
 ### What to Expect
 
-1. **Acknowledgment**: Within 24 hours of your report
+1. **Acknowledgement**: Within 24 hours of your report
 2. **Initial Assessment**: Within 72 hours
 3. **Regular Updates**: At least weekly on our progress
 4. **Coordinated Disclosure**: We'll work with you on timing
@@ -82,7 +82,7 @@ researcher@example.com
 
 ### Response Timeline
 
-- **24 hours**: Acknowledgment of receipt
+- **24 hours**: Acknowledgement of receipt
 - **72 hours**: Initial assessment and severity classification
 - **7 days**: Regular status updates
 - **30-90 days**: Target resolution timeframe (depending on severity)
@@ -164,8 +164,8 @@ Configure external authentication in AWX:
 
 ```bash
 # Update container images regularly
-docker-compose pull
-docker-compose up -d
+docker compose pull
+docker compose up -d
 
 # Subscribe to security advisories
 # Watch this repository for updates
@@ -222,7 +222,7 @@ firewall-cmd --reload
 # Test restore procedures regularly
 
 # Example backup script
-docker-compose exec postgres pg_dump -U awx awx | \
+docker compose exec postgres pg_dump -U awx awx | \
   gpg --encrypt --recipient admin@example.com > \
   backup-$(date +%Y%m%d).sql.gpg
 ```
@@ -321,7 +321,7 @@ We perform:
 
 We currently do not have a formal bug bounty program, but we recognize and credit security researchers who responsibly disclose vulnerabilities:
 
-- Public acknowledgment (with permission)
+- Public acknowledgement (with permission)
 - Credit in security advisories
 - Listed in our security hall of fame
 

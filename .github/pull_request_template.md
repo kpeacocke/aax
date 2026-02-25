@@ -52,7 +52,7 @@ Related to #
 
 ```bash
 # Example
-docker-compose up -d
+docker compose up -d
 # Tested scenarios...
 ```
 
@@ -119,6 +119,6 @@ docker-compose up -d
 
 <!--
 By submitting this pull request, I confirm that my contribution is made under
-the terms of the Apache 2.0 license and I have read and agree to the project's
+the terms of the Apache License 2.0 and I have read and agree to the project's
 Code of Conduct.
 -->

@@ -3,7 +3,33 @@ Tests for Docker images in the AAX project.
 These tests verify that images build correctly and function as expected.
 """
 import subprocess
+from pathlib import Path
 import pytest
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def build_image(tag, dockerfile, context, build_args=None):
+    command = [
+        "docker",
+        "build",
+        "-f",
+        str(REPO_ROOT / dockerfile),
+        "-t",
+        tag,
+    ]
+    if build_args:
+        for key, value in build_args.items():
+            command.extend(["--build-arg", f"{key}={value}"])
+    command.append(str(REPO_ROOT / context))
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        cwd=str(REPO_ROOT),
+    )
+    return result
 
 
 class TestEEBaseImage:
@@ -13,11 +39,10 @@ class TestEEBaseImage:
 
     def test_image_builds(self):
         """Test that the ee-base image builds successfully."""
-        result = subprocess.run(
-            ["make", "build-ee-base"],
-            capture_output=True,
-            text=True,
-            cwd="/workspaces/AAX"
+        result = build_image(
+            self.IMAGE_NAME,
+            "images/ee-base/Dockerfile",
+            "images/ee-base",
         )
         assert result.returncode == 0, f"Build failed: {result.stderr}"
 
@@ -111,11 +136,17 @@ class TestEEBuilderImage:
 
     def test_image_builds(self):
         """Test that the ee-builder image builds successfully."""
-        result = subprocess.run(
-            ["make", "build-ee-builder"],
-            capture_output=True,
-            text=True,
-            cwd="/workspaces/AAX"
+        base_result = build_image(
+            "aax/ee-base:latest",
+            "images/ee-base/Dockerfile",
+            "images/ee-base",
+        )
+        assert base_result.returncode == 0, f"Build failed: {base_result.stderr}"
+        result = build_image(
+            self.IMAGE_NAME,
+            "images/ee-builder/Dockerfile",
+            "images/ee-builder",
+            build_args={"BASE_IMAGE": "aax/ee-base:latest"},
         )
         assert result.returncode == 0, f"Build failed: {result.stderr}"
 
@@ -186,11 +217,17 @@ class TestDevToolsImage:
 
     def test_image_builds(self):
         """Test that the dev-tools image builds successfully."""
-        result = subprocess.run(
-            ["make", "build-dev-tools"],
-            capture_output=True,
-            text=True,
-            cwd="/workspaces/AAX"
+        base_result = build_image(
+            "aax/ee-base:latest",
+            "images/ee-base/Dockerfile",
+            "images/ee-base",
+        )
+        assert base_result.returncode == 0, f"Build failed: {base_result.stderr}"
+        result = build_image(
+            self.IMAGE_NAME,
+            "images/dev-tools/Dockerfile",
+            "images/dev-tools",
+            build_args={"BASE_IMAGE": "aax/ee-base:latest"},
         )
         assert result.returncode == 0, f"Build failed: {result.stderr}"
 

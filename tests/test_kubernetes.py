@@ -9,9 +9,13 @@ another cluster configured and accessible.
 import shutil
 import subprocess
 import time
+from pathlib import Path
 from typing import Any
 
 import pytest
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 # Check if kubectl is available and can connect to a cluster
@@ -44,7 +48,7 @@ def k8s_deployed():
         ["kubectl", "apply", "-k", "k8s/"],
         capture_output=True,
         text=True,
-        cwd="/workspaces/AAX"
+        cwd=str(REPO_ROOT)
     )
     assert result.returncode == 0, f"Failed to deploy: {result.stderr}"
 
@@ -57,7 +61,7 @@ def k8s_deployed():
     subprocess.run(
         ["kubectl", "delete", "namespace", "aax"],
         capture_output=True,
-        cwd="/workspaces/AAX"
+        cwd=str(REPO_ROOT)
     )
 
 
@@ -70,7 +74,7 @@ class TestKubernetesManifests:
             ["kubectl", "kustomize", "k8s/"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0, f"Invalid kustomize config: {result.stderr}"
 
@@ -80,7 +84,7 @@ class TestKubernetesManifests:
             ["kubectl", "kustomize", "k8s/"],
             capture_output=True,
             text=True,
-            cwd="/workspaces/AAX"
+            cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
         assert "kind: Namespace" in result.stdout
