@@ -96,16 +96,19 @@ Build custom Ansible Execution Environment images:
 
 ```bash
 # Build base execution environment
-make build-ee-base
+docker build -f images/ee-base/Dockerfile -t aax/ee-base:latest images/ee-base/
 
 # Build execution environment builder
-make build-ee-builder
+docker build -f images/ee-builder/Dockerfile -t aax/ee-builder:latest images/ee-builder/
 
 # Build development tools
-make build-dev-tools
+docker build -f images/dev-tools/Dockerfile -t aax/dev-tools:latest images/dev-tools/
 
-# Build all images
-make build-images
+# Build all images including hub
+docker build -f images/pulp/Dockerfile.pulp -t aax/pulp:latest images/pulp/
+docker build -f images/galaxy-ng/Dockerfile -t aax/galaxy-ng:latest images/galaxy-ng/
+docker build -f images/awx/Dockerfile -t aax/awx:latest images/awx/
+docker build -f images/receptor/Dockerfile -t aax/receptor:latest images/receptor/
 ```
 
 ### Using Docker Compose for Local Development
@@ -114,24 +117,19 @@ The project includes a `docker-compose.yml` for easy local development:
 
 ```bash
 # Build all images
-make compose-build
-# or: docker compose build
+docker compose build
 
 # Start all services
-make compose-up
-# or: docker compose up -d
+docker compose up -d
 
 # View service status
-make compose-ps
-# or: docker compose ps
+docker compose ps
 
 # View logs
-make compose-logs
-# or: docker compose logs -f
+docker compose logs -f
 
 # Stop all services
-make compose-down
-# or: docker compose down
+docker compose down
 ```
 
 Services include:
@@ -247,13 +245,13 @@ pip install pytest
 # Run linters
 pre-commit run --all-files
 
-# Build images
-make build-images
+# Build and test images
+docker compose build
 
 # Run tests
-make test              # Run pytest test suite
-make test-all          # Build and test all images
-make ci                # Full CI pipeline locally
+pytest tests/ -v              # Run pytest test suite
+pytest tests/test_images.py  # Test container images
+pytest tests/test_compose.py # Test docker compose
 ```
 
 ### Testing
@@ -312,15 +310,13 @@ Deploy to Kubernetes:
 
 ```bash
 # Deploy all resources
-make k8s-deploy
-# Or: kubectl apply -k k8s/
+kubectl apply -k k8s/
 
 # Check deployment status
-make k8s-status
-# Or: kubectl get all -n aax
+kubectl get all -n aax
 
 # Test the deployment
-make k8s-test
+pytest tests/test_kubernetes.py -v
 ```
 
 > **Note**: The Kubernetes test suite (`tests/test_kubernetes.py`) requires a configured Kubernetes cluster. `kubectl` is installed in the dev container, but you need to enable Kubernetes in Docker Desktop or configure another cluster for the tests to run.
@@ -339,16 +335,18 @@ The deployment creates:
 
 ```bash
 # View pod logs
-make k8s-logs
+kubectl logs -n aax -f deployment/ee-base
 
 # Execute shell in a pod
-make k8s-exec
+kubectl exec -n aax -it deployment/ee-base -- /bin/bash
 
 # Restart all deployments
-make k8s-restart
+kubectl rollout restart -n aax deployment/ee-base
+kubectl rollout restart -n aax deployment/ee-builder
+kubectl rollout restart -n aax deployment/dev-tools
 
 # Delete the deployment
-make k8s-delete
+kubectl delete -k k8s/
 ```
 
 ### Accessing Services
@@ -459,6 +457,7 @@ docker compose -f docker-compose.hub.yml up -d
 ```
 
 **Access the Hub:**
+
 - Galaxy NG UI: <http://localhost:5001>
 - Pulp API: <http://localhost:24817/pulp/api/v3/>
 - Content Delivery: <http://localhost:24816>

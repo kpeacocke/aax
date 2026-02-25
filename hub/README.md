@@ -72,9 +72,6 @@ export PULP_ANSIBLE_API_HOSTNAME=http://localhost:5001
 ```bash
 # From the AAX root directory
 docker compose -f docker-compose.hub.yml up -d
-
-# Or using make
-make hub-up
 ```
 
 ### 3. Access the Hub Interface
@@ -85,6 +82,7 @@ make hub-up
 - **Content Delivery**: <http://localhost:24816>
 
 Default credentials:
+
 - Username: `admin`
 - Password: (set via `HUB_ADMIN_PASSWORD` or default: `changeme`)
 
@@ -264,22 +262,22 @@ curl http://localhost:24817/pulp/api/v3/content/ansible/collection_versions/
 
 ```bash
 # Start hub services
-make hub-up
+docker compose -f docker-compose.hub.yml up -d
 
 # Stop hub services
-make hub-down
+docker compose -f docker-compose.hub.yml down
 
 # View logs
-make hub-logs
+docker compose -f docker-compose.hub.yml logs -f
 
 # Check status
-make hub-status
+docker compose -f docker-compose.hub.yml ps
 
 # Restart services
-make hub-restart
+docker compose -f docker-compose.hub.yml restart
 
 # Clean all hub data (destructive!)
-make hub-clean
+docker compose -f docker-compose.hub.yml down -v
 ```
 
 ## Database Migrations
@@ -325,6 +323,7 @@ docker run --rm -v aax_hub_pulp_storage:/data -v $(pwd):/backup \
 **Problem**: Error when uploading collections
 
 **Solutions**:
+
 1. Check disk space: `df -h`
 2. Verify pulp-worker is running: `docker compose -f docker-compose.hub.yml ps`
 3. Check pulp-worker logs: `docker compose -f docker-compose.hub.yml logs pulp-worker`
@@ -335,6 +334,7 @@ docker run --rm -v aax_hub_pulp_storage:/data -v $(pwd):/backup \
 **Problem**: Uploaded content doesn't show in UI
 
 **Solutions**:
+
 1. Wait for pulp-worker to process (check logs)
 2. Verify repository sync: Check Pulp API
 3. Clear Redis cache: `docker compose -f docker-compose.hub.yml restart hub-redis`
@@ -344,6 +344,7 @@ docker run --rm -v aax_hub_pulp_storage:/data -v $(pwd):/backup \
 **Problem**: AWX can't reach the hub
 
 **Solutions**:
+
 1. Ensure both stacks use the same Docker network
 2. Use service name (`galaxy-ng`) not `localhost` in AWX
 3. Check network connectivity: `docker compose exec awx_web ping galaxy-ng`
@@ -351,6 +352,7 @@ docker run --rm -v aax_hub_pulp_storage:/data -v $(pwd):/backup \
 ### Performance Issues
 
 **Solutions**:
+
 1. Increase pulp-worker replicas in compose file
 2. Allocate more memory to PostgreSQL
 3. Use external S3-compatible storage for artifacts

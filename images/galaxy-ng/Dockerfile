@@ -12,7 +12,7 @@ FROM python:3.11-slim-bookworm
 ARG VERSION
 ARG BUILD_DATE
 ARG VCS_REF
-ARG GALAXY_NG_VERSION=4.10.1
+ARG GALAXY_NG_VERSION=4.9.2
 
 # Install system dependencies
 RUN apt-get update && \
@@ -21,6 +21,8 @@ RUN apt-get update && \
     g++ \
     git \
     libpq-dev \
+    libldap2-dev \
+    libsasl2-dev \
     curl \
     gnupg \
     postgresql-client \
@@ -39,15 +41,9 @@ RUN groupadd -g 1000 galaxy && \
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir \
     galaxy-ng==${GALAXY_NG_VERSION} \
-    pulpcore==3.55.1 \
-    pulp-ansible==0.21.4 \
-    pulp-container==2.20.0 \
     gunicorn==22.0.0 \
     psycopg2-binary==2.9.9 \
-    redis==5.0.8 \
-    django-environ==0.11.2 \
-    dynaconf==3.2.6 \
-    insights-analytics-collector==0.3.8
+    django-environ==0.11.2
 
 # Copy entrypoint script
 COPY --chown=galaxy:galaxy entrypoint.sh /usr/local/bin/entrypoint.sh
@@ -55,15 +51,15 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # OCI metadata labels
 LABEL org.opencontainers.image.title="AAX Galaxy NG" \
-  org.opencontainers.image.description="Galaxy NG - Private Automation Hub for Ansible content" \
-  org.opencontainers.image.version="${VERSION}" \
-  org.opencontainers.image.created="${BUILD_DATE}" \
-  org.opencontainers.image.revision="${VCS_REF}" \
-  org.opencontainers.image.authors="kpeacocke <krpeacocke@gmail.com>" \
-  org.opencontainers.image.url="https://github.com/kpeacocke/AAX" \
-  org.opencontainers.image.source="https://github.com/kpeacocke/AAX" \
-  org.opencontainers.image.vendor="kpeacocke" \
-  org.opencontainers.image.licenses="Apache-2.0"
+    org.opencontainers.image.description="Galaxy NG - Private Automation Hub for Ansible content" \
+    org.opencontainers.image.version="${VERSION}" \
+    org.opencontainers.image.created="${BUILD_DATE}" \
+    org.opencontainers.image.revision="${VCS_REF}" \
+    org.opencontainers.image.authors="kpeacocke <krpeacocke@gmail.com>" \
+    org.opencontainers.image.url="https://github.com/kpeacocke/AAX" \
+    org.opencontainers.image.source="https://github.com/kpeacocke/AAX" \
+    org.opencontainers.image.vendor="kpeacocke" \
+    org.opencontainers.image.licenses="Apache-2.0"
 
 # Set working directory and user
 WORKDIR /app
