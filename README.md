@@ -3,28 +3,155 @@
 [![CI](https://github.com/kpeacocke/AAX/actions/workflows/ci.yml/badge.svg)](https://github.com/kpeacocke/AAX/actions/workflows/ci.yml)
 [![Release](https://github.com/kpeacocke/AAX/actions/workflows/release.yml/badge.svg)](https://github.com/kpeacocke/AAX/actions/workflows/release.yml)
 
-A containerized, open-source implementation of Ansible Automation Platform (AAP) functionality using upstream components and Docker Compose.
+A containerised, open-source implementation of Ansible Automation Platform (AAP) functionality using upstream components and Docker Compose.
 
 ## Overview
 
-This project provides a production-ready Docker Compose setup that replicates core Ansible Automation Platform capabilities using open-source components. It enables organizations to run automation workflows, manage inventories, and execute playbooks in a containerized environment.
+This project provides a production-ready Docker Compose setup that replicates core Ansible Automation Platform capabilities using open-source components. It enables organisations to run automation workflows, manage inventories, and execute playbooks in a containerised environment.
+
+## Why AAX?
+
+AAX is an open-source alternative to Red Hat's commercial Ansible Automation Platform, built entirely from upstream open-source projects. Choose AAX if you:
+
+- **Want to avoid vendor lock-in** - Full source code, no subscription required
+- **Prefer transparency** - Build all components from source, see exactly what's running
+- **Need cost-effective automation** - Run at scale without per-node licensing fees
+- **Require self-hosted control** - Complete control over your automation infrastructure
+- **Are in development/testing** - Ideal for learning, prototyping, and non-critical workloads
+- **Value open-source** - Contribute and customise freely under Apache 2.0
+
+### Project Status
+
+**AAX is suitable for:**
+
+- Development and testing environments
+- Learning and experimentation
+- Small to medium-scale deployments
+- Organisations with open-source preference
+
+**Consider Red Hat's commercial AAP if you need:**
+
+- Enterprise support contracts
+- Advanced RBAC and SSO integrations
+- Certified support for production environments
+- Fully managed SaaS offering
 
 ## Architecture
 
-The platform consists of the following containerized services:
+AAX orchestrates core Ansible Automation Platform components built entirely from upstream open-source projects.
 
-- **AWX** - Web-based UI and API for automation workflows
-- **PostgreSQL** - Database backend for AWX and automation controller
-- **Redis** - Message broker for task distribution
-- **Receptor** - Overlay network for distributed automation execution
-- **Execution Environments** - Container images for running Ansible playbooks
-- **Private Automation Hub** - Galaxy NG and Pulp for hosting Ansible collections and execution environments
-- **Event-Driven Ansible** - ansible-rulebook and EDA server for automated event responses (coming soon)
+### Automation Controller (Official AAP Component 3.2)
+
+**AWX** - Automation controller with web UI and REST API (upstream: [ansible/awx](https://github.com/ansible/awx) v24.6.1)
+
+- `awx-web` - Web interface and REST API
+- `awx-task` - Job dispatcher and execution engine
+- `awx-postgres` - PostgreSQL database backend (Official Component 3.10)
+- `awx-redis` - Redis message broker and cache
+
+### Private Automation Hub (Official AAP Component 3.3)
+
+**Galaxy NG** - ASGI application for Ansible collection and execution environment hosting (upstream: [ansible/galaxy_ng](https://github.com/ansible/galaxy_ng) v4.9.2)
+**Pulp** - Content management platform for hosting collections and container images (upstream: [pulpproject/pulp](https://github.com/pulpproject/pulp))
+
+- `galaxy-ng` - Galaxy NG web UI and API
+- `pulp-api` - Content management API
+- `pulp-content` - Content delivery service  
+- `pulp-worker` - Background task processor
+- `hub-postgres` - PostgreSQL database backend (Official Component 3.10)
+- `hub-redis` - Redis cache and message broker
+
+### Automation Execution Environments (Official AAP Component 3.7)
+
+Container images on which all automation in AAX is run, including Ansible execution engine and modules:
+
+- `ee-base` - Base execution environment with Ansible Core 2.20.0
+- `ee-builder` - EE builder with ansible-builder (upstream: [ansible/ansible-builder](https://github.com/ansible/ansible-builder) v3.1.0)
+- `dev-tools` - Development tools for content creation and testing (includes components 3.8 & 3.9)
+
+### Automation Content Navigator (Official AAP Component 3.9)
+
+Textual user interface (TUI) for content building and running automation locally:
+
+- Included in `dev-tools` image (upstream: [ansible/ansible-navigator](https://github.com/ansible/ansible-navigator) v24.2.0)
+- ansible-lint (upstream: [ansible/ansible-lint](https://github.com/ansible/ansible-lint) v25.12.1)
+
+### Automation Mesh (Official AAP Component 3.6)
+
+**Receptor** - Overlay network for distributed execution and work distribution (upstream: [ansible/receptor](https://github.com/ansible/receptor))
+
+- Enables peer-to-peer mesh communication
+- Supports distributed job execution
+- Used for automation controller → execution node communication
+
+### Event-Driven Ansible Controller (Official AAP Component 3.5) - ✅ Now Implemented
+
+**ansible-rulebook** - Event-driven automation engine for automated IT request resolution (upstream: [ansible/ansible-rulebook](https://github.com/ansible/ansible-rulebook) v1.1.3)
+
+- Enables event-driven automation with rulebooks
+- Integrates with event sources (webhooks, monitoring, APIs)
+- Triggers Automation Controller actions on events
+- Real-time event processing and automation
+- Scalable event distribution via Redis
+- PostgreSQL storage for rulebook definitions and event history
+- REST API for rulebook management (port 5000)
+- WebSocket support for real-time event streaming
+
+**Deploy EDA:**
+
+```bash
+docker compose -f docker-compose.eda.yml --profile eda up -d
+curl http://localhost:5000/health
+```
+
+**Documentation:** See [images/eda-controller/README.md](images/eda-controller/README.md) for detailed EDA usage, rulebook examples, and integration patterns.
+
+## Red Hat AAP 2.6 Components Coverage
+
+AAX implements core Ansible Automation Platform components from the official Red Hat documentation. Below is the comprehensive mapping of all official AAP components (Red Hat AAP 2.6) to their AAX implementation status.
+
+**📋 For detailed component information, see [COMPONENTS.md](COMPONENTS.md) - Complete mapping of all 10 official AAP components, design decisions, and gap analysis.**
+
+| Component                             | Official Description                                                               | AAX Status               | Upstream Project                                                                                                      | Notes                                                                                                               |
+| ------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **Ansible automation hub**            | Repository for Red Hat certified Ansible Content Collections                       | ❌ Not Implemented        | N/A                                                                                                                   | Requires Red Hat certification; AAX uses Private Automation Hub instead for custom collections                      |
+| **Automation controller**             | Enterprise framework for defining, operating, and scaling Ansible automation       | ✅ Implemented            | [ansible/awx](https://github.com/ansible/awx) (v24.6.1)                                                               | Full AWX stack with web UI, API, postgres, redis                                                                    |
+| **Private automation hub**            | On-premise solution for synchronizing and serving custom collections and EE images | ✅ Implemented            | [ansible/galaxy_ng](https://github.com/ansible/galaxy_ng) + [pulp/pulp_ansible](https://github.com/pulp/pulp_ansible) | Supports custom collections, EE image registry, CI/CD integration                                                   |
+| **High availability automation hub**  | Multi-node active-active configuration with load balancer                          | ⚠️ Partial                | N/A                                                                                                                   | Single-node Docker Compose; HA requires external load balancer (see [docs/HA-DEPLOYMENT.md](docs/HA-DEPLOYMENT.md)) |
+| **Event-Driven Ansible controller**   | Interface for event-driven automation using rulebooks                              | ✅ Implemented            | [ansible/ansible-rulebook](https://github.com/ansible/ansible-rulebook) (v1.1.3)                                      | Full EDA controller with REST API, rulebook execution, webhook support                                              |
+| **Automation mesh**                   | Overlay network for distributed work distribution and execution                    | ✅ Implemented            | [ansible/receptor](https://github.com/ansible/receptor)                                                               | Full Receptor mesh networking for execution distribution                                                            |
+| **Automation execution environments** | Container images for running all automation in AAP                                 | ✅ Implemented            | [ansible/ansible-builder](https://github.com/ansible/ansible-builder)                                                 | ee-base (Ansible 2.20.0), ee-builder, dev-tools images                                                              |
+| **Ansible Galaxy**                    | Hub for finding and reusing Ansible content                                        | ✅ Used as Content Source | [ansible/galaxy](https://github.com/ansible/galaxy)                                                                   | Private hub can pull from galaxy.ansible.com and other registries                                                   |
+| **Automation content navigator**      | TUI for content building and running automation                                    | ✅ Implemented            | [ansible/ansible-navigator](https://github.com/ansible/ansible-navigator) (v24.2.0)                                   | Included in dev-tools image; covers content building and local EE execution                                         |
+| **PostgreSQL**                        | Backend relational database for storing automation data                            | ✅ Implemented            | PostgreSQL 15                                                                                                         | Multiple instances: awx-postgres, hub-postgres, eda-postgres                                                        |
+
+### Component Implementation Summary
+
+- **Fully Implemented (8):** Automation controller, Private automation hub, Automation mesh, Automation execution environments, Event-Driven Ansible controller, Ansible Galaxy (as source), Automation content navigator, PostgreSQL
+- **Partially Implemented (1):** High availability automation hub (single-node DC; full HA requires external load balancer, see [docs/HA-DEPLOYMENT.md](docs/HA-DEPLOYMENT.md))
+- **Not Applicable (1):** Ansible automation hub (Red Hat certified content; use Private Automation Hub for custom content)
+
+### AAX vs. Red Hat Ansible Automation Platform
+
+| Feature              | Red Hat AAP                  | AAX                          |
+| -------------------- | ---------------------------- | ---------------------------- |
+| **Source**           | Proprietary                  | 100% open-source upstream    |
+| **Cost**             | Subscription (per-node)      | Free (Apache 2.0)            |
+| **Build**            | Pre-built images             | Built from source            |
+| **Support**          | Enterprise support available | Community support            |
+| **Deployment**       | Cloud/on-prem                | Docker Compose, Kubernetes   |
+| **RBAC & Auth**      | Advanced (LDAP/SAML/OAuth)   | Basic (extendable)           |
+| **Production Ready** | Yes, enterprise grade        | Yes, for self-supported use  |
+| **Vendor Lock-in**   | High                         | None                         |
+| **Customisation**    | Limited                      | Full source access           |
+| **AAP Components**   | All 10 components            | 9/10 components (HA partial) |
+
+**Disclaimer:** AAX is not affiliated with, endorsed by, or sponsored by Red Hat, Inc. or Ansible, Inc.
 
 ## Prerequisites
 
 - Docker Engine 20.10 or later
-- Docker Compose 2.0 or later
+- Docker Compose 5.1.0 or later
 - Minimum 4GB RAM allocated to Docker
 - 20GB available disk space
 - Supported platforms: macOS, Windows (WSL2), Linux
@@ -47,18 +174,18 @@ The platform consists of the following containerized services:
 
 3. **Start the services**
 
-   ```bash
-   docker-compose up -d
-   ```
+  ```bash
+  docker compose --profile controller up -d
+  ```
 
-4. **Access the web interface**
+1. **Access the web interface**
 
    - URL: <http://localhost:8080>
    - Default credentials will be output in the logs:
 
-     ```bash
-     docker-compose logs awx_web | grep "Admin password"
-     ```
+    ```bash
+    docker compose --profile controller logs awx-web | grep "Admin password"
+    ```
 
 ## Configuration
 
@@ -113,14 +240,26 @@ docker build -f images/receptor/Dockerfile -t aax/receptor:latest images/recepto
 
 ### Using Docker Compose for Local Development
 
-The project includes a `docker-compose.yml` for easy local development:
+The project includes a core `docker-compose.yml` that can include the controller and hub stacks while keeping them modular via profiles:
 
 ```bash
-# Build all images
+# Build core images
 docker compose build
 
-# Start all services
+# Build all images (core + controller + hub)
+docker compose --profile controller --profile hub build
+
+# Start core services only (default)
 docker compose up -d
+
+# Start core + controller stack
+docker compose --profile controller up -d
+
+# Start core + hub stack
+docker compose --profile hub up -d
+
+# Start everything
+docker compose --profile controller --profile hub up -d
 
 # View service status
 docker compose ps
@@ -173,10 +312,10 @@ All platform components are built from upstream open-source repositories:
 
 ```bash
 # Build all services
-docker-compose build
+docker compose --profile controller --profile hub build
 
 # Build specific service
-docker-compose build awx_web
+docker compose --profile controller build awx-web
 ```
 
 See `docker-compose.build.yml` for build configurations.
@@ -215,7 +354,7 @@ Integrate with:
 
 ```bash
 # Database backup
-docker-compose exec postgres pg_dump -U awx awx > backup.sql
+docker compose --profile controller exec postgres pg_dump -U awx awx > backup.sql
 
 # Volume backup
 docker run --rm -v aax_postgres_data:/data -v $(pwd):/backup \
@@ -226,7 +365,7 @@ docker run --rm -v aax_postgres_data:/data -v $(pwd):/backup \
 
 ```bash
 # Database restore
-docker-compose exec -T postgres psql -U awx awx < backup.sql
+docker compose --profile controller exec -T postgres psql -U awx awx < backup.sql
 
 # Volume restore
 docker run --rm -v aax_postgres_data:/data -v $(pwd):/backup \
@@ -401,7 +540,7 @@ The AAX project includes a complete AWX (Ansible Automation Platform controller)
 
 ```bash
 # Start the controller stack (includes PostgreSQL, Redis, AWX, and Receptor)
-make controller-up
+docker compose --profile controller up -d
 
 # Access AWX at http://localhost:8080
 # Username: admin
@@ -419,10 +558,10 @@ make controller-up
 ### Management Commands
 
 ```bash
-make controller-status  # Show container status
-make controller-logs    # View logs
-make controller-down    # Stop services
-make controller-clean   # Remove all data (destructive)
+docker compose --profile controller ps          # Show container status
+docker compose --profile controller logs -f     # View logs
+docker compose --profile controller down        # Stop services
+docker compose --profile controller down -v     # Remove all data (destructive)
 ```
 
 See [controller/README.md](controller/README.md) for detailed controller documentation including:
@@ -438,8 +577,8 @@ See [controller/README.md](controller/README.md) for detailed controller documen
 To update to latest upstream versions:
 
 1. Update version tags in `docker-compose.yml`
-2. Rebuild images: `docker-compose build --no-cache`
-3. Run migration: `docker-compose exec awx_web awx-manage migrate`
+2. Rebuild images: `docker compose build --no-cache`
+3. Run migration: `docker compose exec awx-web awx-manage migrate`
 4. Test thoroughly in staging environment
 
 ## Private Automation Hub
@@ -450,10 +589,7 @@ The AAX project includes a complete Private Automation Hub implementation using 
 
 ```bash
 # Start the hub stack
-make hub-up
-
-# Or manually:
-docker compose -f docker-compose.hub.yml up -d
+docker compose --profile hub up -d
 ```
 
 **Access the Hub:**
@@ -512,12 +648,11 @@ Configure AWX to use your private hub:
 ### Hub Management Commands
 
 ```bash
-make hub-status   # Show container status
-make hub-logs     # View logs
-make hub-restart  # Restart services
-make hub-down     # Stop services
-make hub-clean    # Remove all data (destructive)
-make hub-test     # Test API endpoints
+docker compose --profile hub ps         # Show container status
+docker compose --profile hub logs -f    # View logs
+docker compose --profile hub restart    # Restart services
+docker compose --profile hub down       # Stop services
+docker compose --profile hub down -v    # Remove all data (destructive)
 ```
 
 See [hub/README.md](hub/README.md) for detailed hub documentation including:
@@ -537,7 +672,7 @@ See [hub/README.md](hub/README.md) for detailed hub documentation including:
 
 ```bash
 # Check logs
-docker-compose logs
+docker compose logs
 
 # Verify resources
 docker stats
@@ -547,10 +682,10 @@ docker stats
 
 ```bash
 # Ensure PostgreSQL is healthy
-docker-compose exec postgres pg_isready
+docker compose --profile controller exec postgres pg_isready
 
 # Check network connectivity
-docker-compose exec awx_web nc -zv postgres 5432
+docker compose --profile controller exec awx-web nc -zv postgres 5432
 ```
 
 #### Permission issues on Windows/WSL2
@@ -569,11 +704,11 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - Pull request process
 - Coding standards
 
-## License
+## Licence
 
 This project is licensed under the Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
-Individual components maintain their original licenses:
+Individual components maintain their original licences:
 
 - AWX: Apache 2.0
 - Ansible: GPL 3.0
@@ -590,7 +725,7 @@ For security issues, please see our [Security Policy](SECURITY.md).
 - **Discussions**: [GitHub Discussions](https://github.com/kpeacocke/AAX/discussions)
 - **Documentation**: [Wiki](https://github.com/kpeacocke/AAX/wiki)
 
-## Acknowledgments
+## Acknowledgements
 
 Built on the shoulders of giants:
 

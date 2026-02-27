@@ -11,20 +11,34 @@ ARG VCS_REF
 WORKDIR /tmp
 
 # Install build dependencies
+# hadolint ignore=DL3008
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
-  git=1:2.43.0-1ubuntu1 \
-  gcc=4:13.2.0-1ubuntu1 \
-  python3-dev=3.12.1-1ubuntu1 \
-  libpq-dev=15.5-1ubuntu1 \
-  libffi-dev=3.4.4-2 \
-  libssl-dev=3.1.4-1ubuntu3 \
-  curl=7.87.0-1ubuntu1 \
-  xmlsec1=1.2.37-3 \
+  git \
+  gcc \
+  pkg-config \
+  python3-dev \
+  libpq-dev \
+  libffi-dev \
+  libssl-dev \
+  libldap2-dev \
+  libsasl2-dev \
+  libxml2-dev \
+  libxmlsec1-dev \
+  libxmlsec1-openssl \
+  libxslt1-dev \
+  curl \
+  xmlsec1 \
   && rm -rf /var/lib/apt/lists/*
 
 # Clone AWX at specific version
 RUN git clone --depth 1 --branch ${AWX_VERSION} https://github.com/ansible/awx.git /awx
+
+# Keep Django in sync with django-ansible-base dependency constraints
+RUN sed -i 's/^Django==4.2.10/Django==4.2.26/' /awx/requirements/requirements.txt && \
+  sed -i 's/^django==4.2.10/django==4.2.26/' /awx/requirements/requirements.txt && \
+  sed -i 's/^sqlparse==0.4.4/sqlparse==0.5.2/' /awx/requirements/requirements.txt && \
+  sed -i '/^xmlsec==/d' /awx/requirements/requirements.txt
 
 # Install Python dependencies
 WORKDIR /awx
@@ -56,16 +70,17 @@ ENV PYTHONUNBUFFERED=1 \
   AWX_LOGGING_MODE=stdout
 
 # Install runtime dependencies
+# hadolint ignore=DL3008
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
-  libpq5=15.5-1ubuntu1 \
-  postgresql-client=15.5-1ubuntu1 \
-  xmlsec1=1.2.37-3 \
-  git=1:2.43.0-1ubuntu1 \
-  curl=7.87.0-1ubuntu1 \
-  rsync=3.2.7-1ubuntu1 \
-  openssh-client=1:9.3p1-1ubuntu1 \
-  sshpass=1.10-1 \
+  libpq5 \
+  postgresql-client \
+  xmlsec1 \
+  git \
+  curl \
+  rsync \
+  openssh-client \
+  sshpass \
   && rm -rf /var/lib/apt/lists/*
 
 # Copy installed Python packages from builder

@@ -72,7 +72,7 @@ body:
     attributes:
       label: Use Case
       description: Describe your use case for this feature
-      placeholder: In my organization, we need to...
+      placeholder: In my organisation, we need to...
     validations:
       required: true
 

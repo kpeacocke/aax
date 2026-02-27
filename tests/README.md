@@ -33,13 +33,6 @@ pytest -v tests/
 pytest --cov=tests/ tests/
 ```
 
-### Using Make
-
-```bash
-# Run all tests (when implemented in Makefile)
-make test
-```
-
 ## Test Structure
 
 - `test_images.py` - Tests for all Docker images
@@ -59,10 +52,18 @@ class TestNewImage:
     def test_image_builds(self):
         """Test that the image builds successfully."""
         result = subprocess.run(
-            ["make", "build-new-image"],
-            capture_output=True,
-            text=True,
-            cwd="/workspaces/AAX"
+          [
+            "docker",
+            "build",
+            "-f",
+            "images/new-image/Dockerfile",
+            "-t",
+            "aax/new-image:latest",
+            "images/new-image",
+          ],
+          capture_output=True,
+          text=True,
+          cwd="/workspaces/aax"
         )
         assert result.returncode == 0, f"Build failed: {result.stderr}"
 
@@ -73,7 +74,7 @@ class TestNewImage:
 
 - pytest >= 7.0
 - Docker (for running container tests)
-- Make (for build commands)
+- Docker Compose 5.1.0 or later
 
 ## CI/CD Integration
 

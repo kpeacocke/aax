@@ -13,7 +13,7 @@ This document describes the CI/CD pipeline for the AAX project.
 │ Push → ci.yml:                                                   │
 │   ├─ Lint Code (pre-commit)                                     │
 │   ├─ Lint Dockerfiles (hadolint)                                │
-│   ├─ Test Images (pytest + make test)                           │
+│   ├─ Test Images (pytest image tests)                           │
 │   └─ Security Scan (develop branch only)                        │
 └─────────────────────────────────────────────────────────────────┘
                                  ↓
@@ -40,7 +40,7 @@ This document describes the CI/CD pipeline for the AAX project.
 │      ├─ Lint Dockerfiles (fail-fast)                            │
 │      ├─ Build all images                                        │
 │      ├─ Run pytest test suite                                   │
-│      └─ Run make tests                                          │
+│      └─ Run image smoke tests                                   │
 │                                                                  │
 │   2. Security Scan                                               │
 │      ├─ Trivy scan (HIGH/CRITICAL only)                         │
@@ -68,13 +68,13 @@ This document describes the CI/CD pipeline for the AAX project.
 
 - Push to: develop, feature/*, bugfix/*, hotfix/*, release/*
 - Pull requests to: main, develop
-- Only on changes to: images/, tests/, Makefile, pyproject.toml
+- Only on changes to: images/, tests/, pyproject.toml
 
 **Jobs:**
 
 1. **Lint Code** - Pre-commit hooks (YAML, shell, etc.)
 2. **Lint Dockerfiles** - Hadolint validation (fail on warning)
-3. **Test Images** - Build + pytest + make test (matrix strategy)
+3. **Test Images** - Build + pytest image tests (matrix strategy)
 4. **Security Scan** - Trivy scan (develop branch only, informational)
 
 **Purpose:** Fast feedback during development and PR review
@@ -97,30 +97,34 @@ This document describes the CI/CD pipeline for the AAX project.
 **Jobs (sequential):**
 
 1. **Pre-Release Tests** (fail-fast: true)
-   - Lint all Dockerfiles
-   - Build all images
-   - Run full pytest test suite
-   - Run make tests
-   - **Blocks release if any test fails**
 
-2. **Security Scan** (fail-fast: false)
-   - Trivy scan for HIGH/CRITICAL vulnerabilities
-   - **Blocks release if vulnerabilities found**
-   - Uploads results to GitHub Security tab
+- Lint all Dockerfiles
+- Build all images
+- Run full pytest test suite
+- Run image smoke tests
+- **Blocks release if any test fails**
 
-3. **Create Release** (depends on: tests + security)
-   - Uses release-please for semantic versioning
-   - Generates CHANGELOG from conventional commits
-   - Creates GitHub Release with notes
-   - Tags version
+1. **Security Scan** (fail-fast: false)
 
-4. **Build and Push** (only if release created)
-   - Builds images with version metadata
-   - Pushes to GitHub Container Registry:
-     - `ghcr.io/kpeacocke/aax-IMAGE:VERSION`
-     - `ghcr.io/kpeacocke/aax-IMAGE:latest`
-   - Generates release artifact manifest
-   - Uploads to release assets
+- Trivy scan for HIGH/CRITICAL vulnerabilities
+- **Blocks release if vulnerabilities found**
+- Uploads results to GitHub Security tab
+
+1. **Create Release** (depends on: tests + security)
+
+- Uses release-please for semantic versioning
+- Generates CHANGELOG from conventional commits
+- Creates GitHub Release with notes
+- Tags version
+
+1. **Build and Push** (only if release created)
+
+- Builds images with version metadata
+- Pushes to GitHub Container Registry:
+  - `ghcr.io/kpeacocke/aax-IMAGE:VERSION`
+  - `ghcr.io/kpeacocke/aax-IMAGE:latest`
+- Generates release artifact manifest
+- Uploads to release assets
 
 **Purpose:** Automated, tested releases with semantic versioning
 
@@ -143,17 +147,16 @@ The workflows are designed with clear separation:
 Simulate CI pipeline locally:
 
 ```bash
-# Full CI pipeline
-make ci
+# Lint Dockerfiles
+hadolint images/*/Dockerfile
 
-# Individual steps
-make lint-dockerfiles      # Lint Dockerfiles
-make build-images          # Build all images
-make test                  # Run pytest tests
-make test-all              # Build + test all images
+# Build all images
+docker compose build
+
+# Run full test suite
+pytest tests/ -v
 
 # Test specific image
-make test-ee-base
 pytest tests/test_images.py::TestEEBaseImage -v
 ```
 
@@ -173,19 +176,7 @@ strategy:
       - your-new-image  # Add here
 ```
 
-### 2. Add Makefile Targets
-
-```makefile
-.PHONY: build-your-new-image
-build-your-new-image: ## Build your-new-image
- docker build $(BUILD_ARGS) -t $(REGISTRY)/your-new-image:$(VERSION) images/your-new-image/
-
-.PHONY: test-your-new-image
-test-your-new-image: build-your-new-image ## Test your-new-image
- docker run --rm $(REGISTRY)/your-new-image:latest --version
-```
-
-### 3. Add pytest Test Class
+### 2. Add pytest Test Class
 
 In [tests/test_images.py](../tests/test_images.py):
 
@@ -197,24 +188,29 @@ class TestYourNewImage:
     def test_image_builds(self):
         """Test that the image builds successfully."""
         result = subprocess.run(
-            ["make", "build-your-new-image"],
-            capture_output=True,
-            text=True,
-            cwd="/workspaces/AAX"
+          [
+            "docker",
+            "build",
+            "-f",
+            "images/your-new-image/Dockerfile",
+            "-t",
+            "aax/your-new-image:latest",
+            "images/your-new-image",
+          ],
+          capture_output=True,
+          text=True
         )
         assert result.returncode == 0
 
     # Add more tests...
 ```
 
-### 4. Update build-images Target
+### 3. Update Compose Build
 
-In Makefile:
+Ensure the image builds via Compose:
 
-```makefile
-.PHONY: build-images
-build-images: build-ee-base build-your-new-image ## Build all images
- @echo "All images built successfully"
+```bash
+docker compose build your-new-image
 ```
 
 ## GitHub Configuration
@@ -261,7 +257,7 @@ Add to README.md:
 - Check Python/Docker versions match
 - Verify all dependencies installed
 - Review full workflow logs
-- Test with `make ci` locally
+- Test with `pytest tests/ -v` locally
 
 ### Release not creating
 

@@ -2,6 +2,8 @@ services:
   hub-postgres:
     image: postgres:16-alpine
     container_name: aax-hub-postgres
+    profiles:
+      - hub
     environment:
       POSTGRES_USER: galaxy
       POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:-hubpassword}
@@ -29,6 +31,8 @@ services:
   hub-redis:
     image: redis:7-alpine
     container_name: aax-hub-redis
+    profiles:
+      - hub
     command: redis-server --appendonly yes
     volumes:
       - hub_redis_data:/data
@@ -50,6 +54,8 @@ services:
           memory: 256M
 
   pulp-api:
+    profiles:
+      - hub
     build:
       context: ./images/pulp
       dockerfile: Dockerfile.pulp
@@ -75,7 +81,6 @@ services:
       PULP_WORKERS: ${PULP_WORKERS:-2}
     volumes:
       - hub_pulp_storage:/var/lib/pulp
-      - ./images/pulp/settings.py:/etc/pulp/settings.py:ro
     networks:
       - hub-network
     depends_on:
@@ -101,6 +106,8 @@ services:
           memory: 1G
 
   pulp-content:
+    profiles:
+      - hub
     image: aax/pulp:${VERSION:-dev}
     container_name: aax-pulp-content
     command: ["pulpcore-content"]
@@ -118,7 +125,6 @@ services:
       DJANGO_SETTINGS_MODULE: pulpcore.app.settings
     volumes:
       - hub_pulp_storage:/var/lib/pulp
-      - ./images/pulp/settings.py:/etc/pulp/settings.py:ro
     networks:
       - hub-network
     depends_on:
@@ -142,6 +148,8 @@ services:
           memory: 512M
 
   pulp-worker:
+    profiles:
+      - hub
     image: aax/pulp:${VERSION:-dev}
     container_name: aax-pulp-worker
     command: ["pulpcore-worker"]
@@ -159,7 +167,6 @@ services:
       DJANGO_SETTINGS_MODULE: pulpcore.app.settings
     volumes:
       - hub_pulp_storage:/var/lib/pulp
-      - ./images/pulp/settings.py:/etc/pulp/settings.py:ro
     networks:
       - hub-network
     depends_on:
@@ -181,6 +188,8 @@ services:
           memory: 1G
 
   galaxy-ng:
+    profiles:
+      - hub
     build:
       context: ./images/galaxy-ng
       args:

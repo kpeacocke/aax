@@ -1,3 +1,8 @@
+name: aax
+include:
+  - docker-compose.controller.yml
+  - docker-compose.hub.yml
+
 services:
   ee-base:
     build:

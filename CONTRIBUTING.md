@@ -15,7 +15,7 @@ Before creating bug reports, please check the existing issues to avoid duplicate
 - **Use a clear and descriptive title**
 - **Describe the exact steps to reproduce the problem**
 - **Provide specific examples** (configuration files, commands, etc.)
-- **Describe the behavior you observed** and what you expected
+- **Describe the behaviour you observed** and what you expected
 - **Include logs and screenshots** if applicable
 - **Specify your environment:**
   - OS (macOS, Windows, Linux distribution)
@@ -34,16 +34,16 @@ A clear description of the bug
 2. Step two
 3. Step three
 
-**Expected Behavior:**
+**Expected Behaviour:**
 What you expected to happen
 
-**Actual Behavior:**
+**Actual Behaviour:**
 What actually happened
 
 **Environment:**
 - OS: [e.g., macOS 13.0, Ubuntu 22.04]
 - Docker: [e.g., 24.0.5]
-- Docker Compose: [e.g., 2.20.0]
+- Docker Compose: [e.g., 5.1.0]
 - AAX Version: [e.g., v1.0.0, commit abc123]
 
 **Logs:**
@@ -81,9 +81,8 @@ We actively welcome your pull requests:
 
 ### Prerequisites
 
-- Docker Desktop (macOS/Windows) or Docker Engine + Docker Compose (Linux)
+- Docker Desktop (macOS/Windows) or Docker Engine + Docker Compose 5.1.0 (Linux)
 - Git
-- Make (optional, for convenience commands)
 
 ### Setting Up Development Environment
 
@@ -105,20 +104,20 @@ pre-commit install
 cp .env.example .env
 
 # Start development environment
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Running Tests
 
 ```bash
 # Run all tests
-make test
+pytest tests/ -v
 
-# Or manually
-docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+# Run specific test file
+pytest tests/test_images.py -v
 
 # Run linters
-make lint
+pre-commit run --all-files
 
 # Or manually
 flake8 .
@@ -131,13 +130,13 @@ yamllint .
 
 ```bash
 # Build all images
-docker-compose build
+docker compose build
 
-# Build specific service
-docker-compose build awx_web
+# Build specific service (controller stack)
+docker compose --profile controller build awx-web
 
 # Build without cache
-docker-compose build --no-cache
+docker compose build --no-cache
 ```
 
 ## Coding Standards
@@ -296,7 +295,7 @@ Releases are automated using [release-please](https://github.com/googleapis/rele
    - Follows [Semantic Versioning](https://semver.org/)
 
 3. **Triggers** - Only code changes trigger releases:
-   - ✅ docker-compose files, Dockerfiles, scripts, configs, Makefile
+   - ✅ docker-compose files, Dockerfiles, scripts, configs
    - ❌ Documentation (*.md), LICENSE, templates, editor configs
 
 **Note:** Documentation-only changes do NOT create releases
@@ -313,7 +312,7 @@ Contributors are recognized in:
 
 - CHANGELOG.md for each release
 - GitHub contributors page
-- Special acknowledgments for significant contributions
+- Special acknowledgements for significant contributions
 
 ## Questions?
 
@@ -324,7 +323,7 @@ If you have questions about contributing:
 - Ask in GitHub Discussions
 - Open a new issue with the "question" label
 
-## License
+## Licence
 
 By contributing to AAX, you agree that your contributions will be licensed under the Apache License 2.0.
 

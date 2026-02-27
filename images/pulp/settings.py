@@ -48,6 +48,15 @@ ANSIBLE_CONTENT_HOSTNAME = CONTENT_ORIGIN + '/pulp/content'
 
 # API settings
 API_ROOT = '/pulp/'
+
+# Database field encryption
+# Generate or use a persistent encryption key
+DB_ENCRYPTION_KEY = os.getenv('DB_ENCRYPTION_KEY', '/var/lib/pulp/db-encryption.key')
+
+# Security settings
+SECRET_KEY = os.getenv('SECRET_KEY', 'not-a-secure-secret-key-change-this')
+ALLOWED_HOSTS = ['*']
+DEBUG = False
 CONTENT_PATH_PREFIX = '/pulp/content/'
 
 # Security settings

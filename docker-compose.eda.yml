@@ -1,0 +1,96 @@
+services:
+  eda-postgres:
+    image: postgres:15
+    container_name: eda-postgres
+    profiles:
+      - eda
+    environment:
+      POSTGRES_DB: ${EDA_DB_NAME:-eda}
+      POSTGRES_USER: ${EDA_DB_USER:-eda}
+      POSTGRES_PASSWORD: ${EDA_DB_PASSWORD:-edapass}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    volumes:
+      - eda_postgres_data:/var/lib/postgresql/data
+    networks:
+      - eda-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eda"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  eda-redis:
+    image: redis:7
+    container_name: eda-redis
+    command: redis-server --appendonly yes
+    profiles:
+      - eda
+    volumes:
+      - eda_redis_data:/data
+    networks:
+      - eda-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  eda-controller:
+    build:
+      context: images/eda-controller
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-dev}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+        VCS_REF: ${VCS_REF:-unknown}
+        EDA_VERSION: 1.1.3
+    container_name: eda-controller
+    profiles:
+      - eda
+    environment:
+      # Database Configuration
+      EDA_DB_HOST: eda-postgres
+      EDA_DB_PORT: 5432
+      EDA_DB_NAME: ${EDA_DB_NAME:-eda}
+      EDA_DB_USER: ${EDA_DB_USER:-eda}
+      EDA_DB_PASSWORD: ${EDA_DB_PASSWORD:-edapass}
+      # Redis Configuration
+      EDA_REDIS_HOST: eda-redis
+      EDA_REDIS_PORT: 6379
+      # Server Configuration
+      EDA_PORT: 5000
+      EDA_HOST: 0.0.0.0
+      # Logging
+      EDA_LOG_LEVEL: ${EDA_LOG_LEVEL:-INFO}
+      # Disable initial DB wait if needed
+      EDA_SKIP_DB_WAIT: ${EDA_SKIP_DB_WAIT:-false}
+    depends_on:
+      eda-postgres:
+        condition: service_healthy
+      eda-redis:
+        condition: service_healthy
+    volumes:
+      - eda_projects:/home/eda/projects
+      - eda_logs:/var/log/eda
+    ports:
+      - "5001:5000"
+    networks:
+      - eda-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  eda_postgres_data:
+  eda_redis_data:
+  eda_projects:
+  eda_logs:
+
+networks:
+  eda-network:
+    driver: bridge

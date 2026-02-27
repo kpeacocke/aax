@@ -47,14 +47,14 @@ Must all pass ✅ before merge allowed
 
 ## What tests run where?
 
-| Test Type            | Feature Branch | Develop Branch | PR to Main | Main Branch (Release)       |
-| -------------------- | -------------- | -------------- | ---------- | --------------------------- |
-| **Pre-commit hooks** | ✅ ci.yml       | ✅ ci.yml       | ✅ ci.yml   | ❌ Not needed                |
-| **Hadolint**         | ✅ ci.yml       | ✅ ci.yml       | ✅ ci.yml   | ✅ release.yml (blocking)    |
-| **Pytest suite**     | ✅ ci.yml       | ✅ ci.yml       | ✅ ci.yml   | ✅ release.yml (blocking)    |
-| **Make tests**       | ✅ ci.yml       | ✅ ci.yml       | ✅ ci.yml   | ✅ release.yml (blocking)    |
-| **Security scan**    | ❌              | ℹ️ ci.yml       | ❌          | ✅ release.yml (blocking)    |
-| **Push images**      | ❌              | ❌              | ❌          | ✅ release.yml (if released) |
+| Test Type             | Feature Branch | Develop Branch | PR to Main | Main Branch (Release)       |
+| --------------------- | -------------- | -------------- | ---------- | --------------------------- |
+| **Pre-commit hooks**  | ✅ ci.yml       | ✅ ci.yml       | ✅ ci.yml   | ❌ Not needed                |
+| **Hadolint**          | ✅ ci.yml       | ✅ ci.yml       | ✅ ci.yml   | ✅ release.yml (blocking)    |
+| **Pytest suite**      | ✅ ci.yml       | ✅ ci.yml       | ✅ ci.yml   | ✅ release.yml (blocking)    |
+| **Image smoke tests** | ✅ ci.yml       | ✅ ci.yml       | ✅ ci.yml   | ✅ release.yml (blocking)    |
+| **Security scan**     | ❌              | ℹ️ ci.yml       | ❌          | ✅ release.yml (blocking)    |
+| **Push images**       | ❌              | ❌              | ❌          | ✅ release.yml (if released) |
 
 ## Decision: Should I run tests?
 
@@ -62,7 +62,7 @@ Must all pass ✅ before merge allowed
 Are you working on:
     ├─ New feature/bugfix?
     │   └─→ Tests run automatically on push (ci.yml)
-    │       Run locally first: make test-ee-base
+    │       Run locally first: pytest tests/test_images.py::TestEEBaseImage -v
     │
     ├─ PR review?
     │   └─→ Tests run automatically (ci.yml + enforce)
