@@ -42,9 +42,11 @@ RUN sed -i 's/^Django==4.2.10/Django==4.2.26/' /awx/requirements/requirements.tx
 
 # Install Python dependencies
 WORKDIR /awx
-RUN pip install --no-cache-dir --prefix=/install \
+RUN python3 -m pip install --no-cache-dir --prefix=/install \
   -r requirements/requirements.txt \
-  -r requirements/requirements_git.txt
+  -r requirements/requirements_git.txt \
+  gunicorn==22.0.0 \
+  psycopg2-binary==2.9.9
 
 # Final stage
 FROM python:3.11-slim
@@ -62,7 +64,10 @@ LABEL org.opencontainers.image.title="AAX AWX Controller" \
   org.opencontainers.image.created="${BUILD_DATE}" \
   org.opencontainers.image.revision="${VCS_REF}" \
   org.opencontainers.image.authors="kpeacocke <krpeacocke@gmail.com>" \
-  org.opencontainers.image.source="https://github.com/kpeacocke/AAX"
+  org.opencontainers.image.url="https://github.com/kpeacocke/AAX" \
+  org.opencontainers.image.source="https://github.com/kpeacocke/AAX" \
+  org.opencontainers.image.vendor="kpeacocke" \
+  org.opencontainers.image.licenses="Apache-2.0"
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -111,6 +116,9 @@ EXPOSE 8052
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8052/api/v2/ping/ || exit 1
+
+# Switch to non-root user
+USER awx
 
 # Default to web entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint-web.sh"]

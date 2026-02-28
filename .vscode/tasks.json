@@ -4,7 +4,7 @@
         {
             "label": "Build ee-base Image",
             "type": "shell",
-            "command": "make build-ee-base",
+            "command": "docker build -f images/ee-base/Dockerfile -t aax/ee-base:latest images/ee-base",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
@@ -19,7 +19,7 @@
         {
             "label": "Test ee-base Image",
             "type": "shell",
-            "command": "make test-ee-base",
+            "command": "pytest tests/test_images.py::TestEEBaseImage -v",
             "problemMatcher": [],
             "group": {
                 "kind": "test",
@@ -35,7 +35,7 @@
         {
             "label": "Build and Test ee-base",
             "type": "shell",
-            "command": "make test-ee-base",
+            "command": "docker build -f images/ee-base/Dockerfile -t aax/ee-base:latest images/ee-base && pytest tests/test_images.py::TestEEBaseImage -v",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
@@ -49,7 +49,7 @@
         {
             "label": "Lint All Dockerfiles",
             "type": "shell",
-            "command": "make lint-dockerfiles",
+            "command": "find images -name 'Dockerfile*' -print0 | xargs -0 hadolint",
             "problemMatcher": {
                 "owner": "hadolint",
                 "fileLocation": [
@@ -74,7 +74,7 @@
         {
             "label": "Build All Images",
             "type": "shell",
-            "command": "make build-images",
+            "command": "docker compose --profile controller --profile hub build",
             "problemMatcher": [],
             "group": "build",
             "presentation": {

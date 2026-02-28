@@ -224,6 +224,30 @@ All deployments enforce:
 - Dropped capabilities
 - Security context constraints
 
+### Docker Socket Mounting (ee-builder)
+
+⚠️ **Security Consideration**: The `ee-builder` deployment mounts the Docker daemon socket at `/var/run/docker.sock` to enable container image building within the pod. This is a privileged operation that grants container-level access to the Docker daemon.
+
+**Risks**:
+
+- Container escape vulnerabilities could lead to host compromise
+- Allows arbitrary Docker operations (not just image building)
+- Circumvents normal container isolation
+
+**Mitigation strategies**:
+
+1. **Restrict to trusted networks**: Use NetworkPolicies to limit access to ee-builder
+2. **Monitor socket usage**: Audit Docker API calls
+3. **Use container registries**: Push prebuilt images instead of building in-cluster
+4. **Rootless Docker**: Consider rootless Docker daemon for additional isolation
+5. **Pod Security Standards**: Run only trusted code in ee-builder
+
+**For production environments**, consider:
+
+- Using a dedicated image builder outside the cluster
+- Implementing Kaniko or BuildKit for rootless builds
+- Running ee-builder in a separate, isolated cluster
+
 ### Network Policies
 
 To add network policies for isolation:

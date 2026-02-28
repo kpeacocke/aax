@@ -262,9 +262,8 @@ networks:
     driver: bridge
     labels:
       com.aax.description: "Network for Private Automation Hub services"
-  # Allow communication with AWX stack if both running
+  # Allow communication with other AAX services
   ansible:
-    external: true
     name: aax_ansible
 
 volumes:

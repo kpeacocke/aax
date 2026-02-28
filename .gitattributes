@@ -75,11 +75,6 @@ appveyor.yml text eol=lf
 *.jenkinsfile text eol=lf
 Jenkinsfile text eol=lf
 
-# Makefiles
-Makefile text eol=lf
-*.mk text eol=lf
-*.make text eol=lf
-
 # Windows-specific files
 *.bat text eol=crlf
 *.cmd text eol=crlf
@@ -180,4 +175,3 @@ tests/* linguist-vendored=false
 .pre-commit-config.yaml export-ignore
 tests/ export-ignore
 *.test.py export-ignore
-Makefile export-ignore

@@ -2,19 +2,19 @@
 
 # Galaxy NG - Ansible content server and Private Automation Hub UI
 # Built from upstream galaxy_ng
+# Multi-stage build: separates build dependencies from runtime
 
 ARG VERSION=dev
 ARG BUILD_DATE
 ARG VCS_REF
-
-FROM python:3.11-slim-bookworm
-
-ARG VERSION
-ARG BUILD_DATE
-ARG VCS_REF
 ARG GALAXY_NG_VERSION=4.9.2
 
-# Install system dependencies
+# Stage 1: Builder
+FROM python:3.11-slim-bookworm AS builder
+
+ARG GALAXY_NG_VERSION
+
+# Install build dependencies only
 # hadolint ignore=DL3008
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
@@ -24,6 +24,30 @@ RUN apt-get update && \
   libpq-dev \
   libldap2-dev \
   libsasl2-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment and install Python dependencies
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN pip install --no-cache-dir --upgrade pip==24.0 setuptools==69.1.1 wheel==0.42.0 && \
+  pip install --no-cache-dir \
+  galaxy-ng==${GALAXY_NG_VERSION} \
+  gunicorn==22.0.0 \
+  psycopg2-binary==2.9.9 \
+  django-environ==0.11.2
+
+# Stage 2: Runtime
+FROM python:3.11-slim-bookworm
+
+ARG VERSION
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Install runtime dependencies only
+# hadolint ignore=DL3008
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
   curl \
   gnupg \
   postgresql-client \
@@ -40,28 +64,24 @@ RUN groupadd -g 1000 galaxy && \
   mkdir -p /etc/pulp/certs && \
   chown -R galaxy:galaxy /app /var/lib/pulp
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip==24.0 setuptools==69.1.1 wheel==0.42.0 && \
-  pip install --no-cache-dir \
-  galaxy-ng==${GALAXY_NG_VERSION} \
-  gunicorn==22.0.0 \
-  psycopg2-binary==2.9.9 \
-  django-environ==0.11.2
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Patch Galaxy NG settings to fix LOGGING version issue
 # hadolint ignore=DL3059
 RUN python -c "import re; \
-  f = open('/usr/local/lib/python3.11/site-packages/galaxy_ng/app/settings.py', 'r'); \
+  f = open('/opt/venv/lib/python3.11/site-packages/galaxy_ng/app/settings.py', 'r'); \
   content = f.read(); f.close(); \
   content = content.replace('LOGGING = {', 'LOGGING = {\\n    \"version\": 1,\\n    \"disable_existing_loggers\": False,\\n    \"formatters\": {\\n        \"simple\": {\\n            \"format\": \"%(asctime)s %(name)-12s %(levelname)-8s %(message)s\",\\n        },\\n    },'); \
   content = content.replace(\"    'dynaconf_merge',\\n\", ''); \
   content = content.replace('    \\\"dynaconf_merge\\\": True,', ''); \
-  f = open('/usr/local/lib/python3.11/site-packages/galaxy_ng/app/settings.py', 'w'); \
+  f = open('/opt/venv/lib/python3.11/site-packages/galaxy_ng/app/settings.py', 'w'); \
   f.write(content); f.close()"
 
 # Patch ruamel.yaml metadata to remove clib dependency (same as in Pulp)
 # hadolint ignore=DL3059
-RUN find /usr/local/lib/python3.11/site-packages/ruamel.yaml-*.dist-info -name METADATA -exec \
+RUN find /opt/venv/lib/python3.11/site-packages/ruamel.yaml-*.dist-info -name METADATA -exec \
   sed -i 's/Requires-Dist: ruamel\.yaml\.clib.*//' {} \;
 
 # Copy entrypoint script

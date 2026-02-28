@@ -4,7 +4,10 @@
   "editor.codeActionsOnSave": {
     "source.fixAll": "explicit"
   },
-  "editor.rulers": [80, 120],
+  "editor.rulers": [
+    80,
+    120
+  ],
   "editor.trimAutoWhitespace": true,
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
@@ -21,10 +24,6 @@
   },
   "[shellscript]": {
     "editor.tabSize": 2
-  },
-  "[makefile]": {
-    "editor.insertSpaces": false,
-    "editor.tabSize": 4
   },
   "docker.dockerComposeBuild": true,
   "docker.dockerComposeDetached": true,
@@ -69,8 +68,7 @@
     "Dockerfile*": "dockerfile",
     ".dockerignore": "ignore",
     ".gitignore": "ignore",
-    ".gitattributes": "properties",
-    "Makefile": "makefile"
+    ".gitattributes": "properties"
   },
   "cSpell.words": [
     "Buildx",
@@ -106,19 +104,13 @@
   ],
   "containers.composeBuild": true,
   "containers.composeDetached": true,
-  "makefile.configurations": [
-    {
-      "name": "Default",
-      "buildTarget": "build"
-    }
-  ],
-  "makefile.buildTarget": "build",
-  "makefile.makefilePath": "${workspaceFolder}/Makefile",
-  "makefile.makePath": "make",
-  "makefile.buildLog": "${workspaceFolder}/.vscode/build.log",
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
-  "python.testing.pytestArgs": ["tests", "-v", "--tb=short"],
+  "python.testing.pytestArgs": [
+    "tests",
+    "-v",
+    "--tb=short"
+  ],
   "python.testing.cwd": "${workspaceFolder}",
   "python.testing.autoTestDiscoverOnSaveEnabled": true,
   "snyk.advanced.autoSelectOrganization": true,

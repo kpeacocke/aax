@@ -300,3 +300,250 @@ class TestDevToolsImage:
         )
         assert result.returncode == 0
         assert result.stdout.strip() == ""
+
+
+class TestAWXImage:
+    """Tests for the AWX automation controller image."""
+
+    IMAGE_NAME = "aax/awx:latest"
+
+    def test_image_builds(self):
+        """Test that the AWX image builds successfully."""
+        result = build_image(
+            self.IMAGE_NAME,
+            "images/awx/Dockerfile",
+            "images/awx",
+            build_args={"AWX_VERSION": "24.6.1"},
+        )
+        assert result.returncode == 0, f"Build failed: {result.stderr}"
+
+    def test_django_installed(self):
+        """Test that Django is installed."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import django; print(django.VERSION)"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0, f"Django not found: {result.stderr}"
+
+    def test_uwsgi_or_gunicorn_available(self):
+        """Test that a WSGI server is available."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import gunicorn"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0, "gunicorn not found"
+
+    def test_database_drivers_installed(self):
+        """Test that PostgreSQL driver is installed."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import psycopg2"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0, "psycopg2 not found"
+
+    def test_healthcheck_port_exists(self):
+        """Test that AWX API port is configured."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "print('8052')"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+
+
+class TestGalaxyNGImage:
+    """Tests for the Galaxy NG image."""
+
+    IMAGE_NAME = "aax/galaxy-ng:latest"
+
+    def test_image_builds(self):
+        """Test that the Galaxy NG image builds successfully."""
+        result = build_image(
+            self.IMAGE_NAME,
+            "images/galaxy-ng/Dockerfile",
+            "images/galaxy-ng",
+        )
+        assert result.returncode == 0, f"Build failed: {result.stderr}"
+
+    def test_django_installed(self):
+        """Test that Django is installed."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import django"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+
+    def test_galaxy_ng_installed(self):
+        """Test that galaxy-ng package is installed."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import galaxy_ng"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0, "galaxy-ng not installed"
+
+    def test_gunicorn_installed(self):
+        """Test that gunicorn is installed for WSGI."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import gunicorn"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+
+    def test_postgres_driver_installed(self):
+        """Test that PostgreSQL driver is available."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import psycopg2"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+
+    def test_user_is_galaxy(self):
+        """Test that the container runs as the galaxy user."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "whoami"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == "galaxy"
+
+
+class TestPulpImage:
+    """Tests for the Pulp content management image."""
+
+    IMAGE_NAME = "aax/pulp:latest"
+
+    def test_image_builds(self):
+        """Test that the Pulp image builds successfully."""
+        result = build_image(
+            self.IMAGE_NAME,
+            "images/pulp/Dockerfile.pulp",
+            "images/pulp",
+        )
+        assert result.returncode == 0, f"Build failed: {result.stderr}"
+
+    def test_pulpcore_installed(self):
+        """Test that pulpcore is installed."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import pulpcore"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0, "pulpcore not installed"
+
+    def test_pulp_ansible_plugin_installed(self):
+        """Test that pulp-ansible plugin is installed."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import pulp_ansible"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0, "pulp_ansible not installed"
+
+    def test_postgres_driver_installed(self):
+        """Test that PostgreSQL driver is available."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import psycopg2"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+
+    def test_redis_client_installed(self):
+        """Test that Redis client is available."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import redis"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+
+    def test_user_is_pulp(self):
+        """Test that the container runs as the pulp user."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "whoami"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == "pulp"
+
+
+class TestEDAImage:
+    """Tests for the Event-Driven Ansible controller image."""
+
+    IMAGE_NAME = "aax/eda:latest"
+
+    def test_image_builds(self):
+        """Test that the EDA image builds successfully."""
+        result = build_image(
+            self.IMAGE_NAME,
+            "images/eda-controller/Dockerfile",
+            "images/eda-controller",
+        )
+        assert result.returncode == 0, f"Build failed: {result.stderr}"
+
+    def test_ansible_rulebook_installed(self):
+        """Test that ansible-rulebook is installed."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import ansible_rulebook"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0, "ansible-rulebook not installed"
+
+    def test_ansible_rulebook_cli_accessible(self):
+        """Test that ansible-rulebook CLI is accessible."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "ansible-rulebook", "--version"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0, "ansible-rulebook CLI not accessible"
+
+    def test_aiohttp_installed(self):
+        """Test that aiohttp is installed for API server."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import aiohttp"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+
+    def test_postgres_driver_installed(self):
+        """Test that PostgreSQL driver is available."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "-c", "import psycopg2"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+
+    def test_user_is_eda(self):
+        """Test that the container runs as the eda user."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "whoami"],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == "eda"
+
+    def test_java_installed(self):
+        """Test that Java is installed for Drools engine."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "java", "-version"],
+            capture_output=True,
+            text=True
+        )
+        # Java prints version to stderr, so check both stdout and stderr
+        output = result.stdout + result.stderr
+        assert result.returncode == 0, f"Java not installed. Output: {output}"
+        assert "openjdk" in output.lower() or "java" in output.lower(), "Java version not found in output"

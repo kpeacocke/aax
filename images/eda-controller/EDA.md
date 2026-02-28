@@ -464,7 +464,7 @@ async def main(
 
 - [Event-Driven Ansible Documentation](https://ansible.readthedocs.io/projects/rulebook/)
 - [ansible-rulebook GitHub](https://github.com/ansible/ansible-rulebook)
-- [AWX Integration Guide](../controller/README.md)
+- [AWX Integration Guide](../../controller/CONTROLLER.md)
 - [Ansible Content Collections](https://galaxy.ansible.com/)
 
 ---

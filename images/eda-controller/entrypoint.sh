@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Allow command override for testing
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
+
 # Event-Driven Ansible Controller Entrypoint
 # Starts the ansible-rulebook engine in server mode
 

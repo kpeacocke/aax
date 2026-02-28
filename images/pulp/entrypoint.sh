@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Allow command override for testing
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
+
 # Wait for PostgreSQL
 until PGPASSWORD="${POSTGRES_PASSWORD}" psql -h "${POSTGRES_HOST}" -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c '\q' 2>/dev/null; do
   echo "Waiting for PostgreSQL..."

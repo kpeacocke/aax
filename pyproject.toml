@@ -8,12 +8,45 @@ addopts = [
     "-v",
     "--strict-markers",
     "--tb=short",
-    "--color=yes"
+    "--color=yes",
+    "--cov=.",
+    "--cov-report=term-missing:skip-covered",
+    "--cov-report=html:htmlcov",
+    "--cov-report=xml",
+    "--cov-branch"
 ]
 markers = [
     "slow: marks tests as slow",
     "docker: marks tests that require Docker"
 ]
+
+[tool.coverage.run]
+branch = true
+source = ["tests", "images"]
+omit = [
+    "*/tests/*",
+    "*/site-packages/*",
+    "*/.venv/*",
+    "*/__pycache__/*"
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+    "@abstract"
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 [tool.black]
 line-length = 100

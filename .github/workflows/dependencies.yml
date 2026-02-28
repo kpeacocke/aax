@@ -1,0 +1,107 @@
+name: Dependency Management
+
+on:
+  schedule:
+    # Run weekly on Monday at 9am UTC
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  check-updates:
+    name: Check for Updates
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Set up Python
+        uses: actions/setup-python@39cd14951b08e74b54015e9e001cdefcf80e669f # v5.1.1
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install pip-audit safety
+
+      - name: Audit Python dependencies
+        id: audit
+        continue-on-error: true
+        run: |
+          pip-audit -r images/ee-base/requirements.txt --format json > audit-results.json || true
+          if [ -s audit-results.json ]; then
+            echo "vulnerabilities=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create issue for vulnerabilities
+        if: steps.audit.outputs.vulnerabilities == 'true'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const fs = require('fs');
+            const audit = JSON.parse(fs.readFileSync('audit-results.json', 'utf8'));
+
+            const body = `## 🔒 Security Vulnerabilities Detected
+
+            Automated scan found vulnerabilities in Python dependencies.
+
+            \`\`\`json
+            ${JSON.stringify(audit, null, 2)}
+            \`\`\`
+
+            Please review and update affected packages.`;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🔒 Security: Vulnerable dependencies detected',
+              body: body,
+              labels: ['security', 'dependencies']
+            });
+
+  update-base-images:
+    name: Check Base Image Updates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Check for base image updates
+        run: |
+          # Check if python:3.12-slim has updates
+          echo "Checking for Python base image updates..."
+          CURRENT_DIGEST=$(docker pull python:3.12-slim --quiet)
+          echo "Current digest: $CURRENT_DIGEST"
+
+          # This would create a PR if digest changed
+          # Implementation depends on your base image tracking strategy
+
+  stale-management:
+    name: Manage Stale Issues and PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Stale bot
+        uses: actions/stale@28ca1036281a5e5922ead5184a1bbf96e5fc984e # v9.0.0
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          stale-issue-message: "This issue has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs. Thank you for your contributions."
+          stale-pr-message: "This PR has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs."
+          close-issue-message: "This issue was automatically closed due to inactivity."
+          close-pr-message: "This PR was automatically closed due to inactivity."
+          days-before-stale: 60
+          days-before-close: 14
+          stale-issue-label: "stale"
+          stale-pr-label: "stale"
+          exempt-issue-labels: "pinned,security,roadmap"
+          exempt-pr-labels: "pinned,security"

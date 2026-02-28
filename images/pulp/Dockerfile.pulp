@@ -2,18 +2,16 @@
 
 # Pulp - Content management backend for Galaxy NG
 # Built from upstream pulpcore and pulp_ansible
+# Multi-stage build: separates build dependencies from runtime
 
 ARG VERSION=dev
 ARG BUILD_DATE
 ARG VCS_REF
 
-FROM python:3.11-slim-bookworm
+# Stage 1: Builder
+FROM python:3.11-slim-bookworm AS builder
 
-ARG VERSION
-ARG BUILD_DATE
-ARG VCS_REF
-
-# Install system dependencies
+# Install build dependencies only
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -21,20 +19,12 @@ RUN apt-get update && \
     g++ \
     git \
     libpq-dev \
-    curl \
-    gnupg \
-    postgresql-client \
-    redis-tools && \
-    rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
-# Create pulp user and directories
-RUN groupadd -g 1000 pulp && \
-    useradd -u 1000 -g pulp -m -d /var/lib/pulp -s /bin/bash pulp && \
-    mkdir -p /var/lib/pulp/media /var/lib/pulp/assets /var/lib/pulp/tmp && \
-    mkdir -p /etc/pulp && \
-    chown -R pulp:pulp /var/lib/pulp /etc/pulp
+# Create virtual environment and install Pulp components
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Install Pulp components
 # hadolint ignore=DL3013
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir \
@@ -50,12 +40,11 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     "aiohttp>=3.8.0"
 
 # Fix ruamel.yaml pkg_resources metadata name normalization issue
-# The package is installed as 'ruamel-yaml' but pkg_resources expects 'ruamel.yaml'
 RUN python - <<'PY'
 import glob
 import os
 
-matches = glob.glob("/usr/local/lib/python3.11/site-packages/ruamel*yaml*.dist-info")
+matches = glob.glob("/opt/venv/lib/python3.11/site-packages/ruamel*yaml*.dist-info")
 if not matches:
     raise SystemExit(0)
 
@@ -76,6 +65,34 @@ try:
 except FileNotFoundError:
     pass
 PY
+
+# Stage 2: Runtime
+FROM python:3.11-slim-bookworm
+
+ARG VERSION
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Install runtime dependencies only
+# hadolint ignore=DL3008
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    gnupg \
+    postgresql-client \
+    redis-tools && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create pulp user and directories
+RUN groupadd -g 1000 pulp && \
+    useradd -u 1000 -g pulp -m -d /var/lib/pulp -s /bin/bash pulp && \
+    mkdir -p /var/lib/pulp/media /var/lib/pulp/assets /var/lib/pulp/tmp && \
+    mkdir -p /etc/pulp && \
+    chown -R pulp:pulp /var/lib/pulp /etc/pulp
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy entrypoint and settings
 COPY --chown=pulp:pulp entrypoint.sh /usr/local/bin/entrypoint.sh

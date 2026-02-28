@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
+
 # Wait for database
 echo "Waiting for database..."
 until PGPASSWORD=$DATABASE_PASSWORD psql -h "$DATABASE_HOST" -U "$DATABASE_USER" -d "$DATABASE_NAME" -c '\q' 2>/dev/null; do

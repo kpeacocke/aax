@@ -1,0 +1,38 @@
+# Configuration for auto-labeling PRs based on changed files
+
+"area: images":
+  - changed-files:
+      - any-glob-to-any-file: "images/**/*"
+
+"area: tests":
+  - changed-files:
+      - any-glob-to-any-file: "tests/**/*"
+
+"area: docs":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "docs/**/*"
+
+"area: ci/cd":
+  - changed-files:
+      - any-glob-to-any-file: ".github/**/*"
+
+"area: docker":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/Dockerfile*"
+          - "docker-compose*.yml"
+
+"area: kubernetes":
+  - changed-files:
+      - any-glob-to-any-file: "k8s/**/*"
+
+"dependencies":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/requirements.txt"
+          - "pyproject.toml"
+
+"security":
+  - head-branch: ["^hotfix/", "^security/"]

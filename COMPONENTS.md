@@ -152,7 +152,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
   - Real-time event streaming via WebSocket
 - **Deployment:** Docker Compose (`docker-compose.eda.yml`) with `--profile eda`
 - **Access:** REST API on `http://localhost:5000`
-- **Documentation:** [images/eda-controller/README.md](./images/eda-controller/README.md) with rulebook examples and AWX integration patterns
+- **Documentation:** [images/eda-controller/EDA.md](./images/eda-controller/EDA.md) with rulebook examples and AWX integration patterns
 
 ---
 

@@ -71,7 +71,7 @@ We actively welcome your pull requests:
 
 1. **Fork the repository** and create your branch from `develop` (or `main` for hotfixes)
 2. **Follow the gitflow branching strategy** (see below)
-3. **Make your changes** following our coding standards
+3. **Apply your changes** following our coding standards
 4. **Ensure Docker Compose configuration is valid**
 5. **Update documentation** as needed
 6. **Write conventional commit messages** (see below)

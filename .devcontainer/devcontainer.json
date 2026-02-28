@@ -26,8 +26,7 @@
         "yzhang.markdown-all-in-one",
         "eamodio.gitlens",
         "github.vscode-pull-request-github",
-        "editorconfig.editorconfig",
-        "ms-vscode.makefile-tools"
+        "editorconfig.editorconfig"
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "zsh",

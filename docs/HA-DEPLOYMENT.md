@@ -463,7 +463,7 @@ sudo apt-get install nfs-common
 sudo mkdir -p /mnt/aax-content
 sudo mount -t nfs nfs-server:/var/lib/aax/content /mnt/aax-content
 
-# Make persistent
+# Persist the mount
 sudo bash -c 'echo "nfs-server:/var/lib/aax/content /mnt/aax-content nfs defaults 0 0" >> /etc/fstab'
 
 # Update docker-compose to use mounted path

@@ -38,14 +38,16 @@ RUN mkdir -p /etc/ansible && \
   chmod +x /usr/local/bin/entrypoint.sh
 
 # OCI metadata labels
-LABEL org.opencontainers.image.title="Ansible Execution Environment" \
+LABEL org.opencontainers.image.title="AAX Ansible Execution Environment" \
   org.opencontainers.image.description="Base execution environment for Ansible automation" \
   org.opencontainers.image.version="${VERSION}" \
   org.opencontainers.image.created="${BUILD_DATE}" \
   org.opencontainers.image.revision="${VCS_REF}" \
   org.opencontainers.image.authors="kpeacocke <krpeacocke@gmail.com>" \
+  org.opencontainers.image.url="https://github.com/kpeacocke/AAX" \
   org.opencontainers.image.source="https://github.com/kpeacocke/AAX" \
-  org.opencontainers.image.url="https://github.com/kpeacocke/AAX"
+  org.opencontainers.image.vendor="kpeacocke" \
+  org.opencontainers.image.licenses="Apache-2.0"
 
 # Health check to verify Ansible installation
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

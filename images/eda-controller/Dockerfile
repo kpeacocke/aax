@@ -2,38 +2,32 @@
 
 # Event-Driven Ansible Controller
 # Provides event-driven automation interface with ansible-rulebook
+# Multi-stage build: separates build dependencies from runtime
 
 ARG VERSION=dev
 ARG BUILD_DATE
 ARG VCS_REF
 ARG EDA_VERSION=1.1.3
 
-FROM python:3.11-slim-bookworm
+# Stage 1: Builder
+FROM python:3.11-slim-bookworm AS builder
 
-ARG VERSION
-ARG BUILD_DATE
-ARG VCS_REF
 ARG EDA_VERSION
 
-# Install system dependencies (including Java for Drools engine)
+# Install build dependencies only
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     git \
-    libpq-dev \
     libssl-dev \
-    curl \
-    jq \
-    openjdk-17-jre-headless && \
-    rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
-# Create eda user and home directory
-RUN groupadd -g 1001 eda && \
-    useradd -u 1001 -g eda -m -d /home/eda -s /bin/bash eda
+# Create virtual environment and install Python dependencies
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip==24.0 setuptools==69.1.1 wheel==0.42.0 && \
     pip install --no-cache-dir \
     ansible-rulebook==${EDA_VERSION} \
@@ -43,6 +37,30 @@ RUN pip install --no-cache-dir --upgrade pip==24.0 setuptools==69.1.1 wheel==0.4
     pyyaml==6.0.1 \
     requests==2.31.0 \
     python-daemon==3.0.1
+
+# Stage 2: Runtime
+FROM python:3.11-slim-bookworm
+
+ARG VERSION
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Install runtime dependencies only (including Java for Drools engine)
+# hadolint ignore=DL3008
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    jq \
+    openjdk-17-jre-headless && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create eda user and home directory
+RUN groupadd -g 1001 eda && \
+    useradd -u 1001 -g eda -m -d /home/eda -s /bin/bash eda
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
 # Create configuration directory
 RUN mkdir -p /etc/eda /var/log/eda && \
