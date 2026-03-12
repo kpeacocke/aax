@@ -262,9 +262,6 @@ networks:
     driver: bridge
     labels:
       com.aax.description: "Network for Private Automation Hub services"
-  # Allow communication with other AAX services
-  ansible:
-    name: aax_ansible
 
 volumes:
   hub_postgres_data:
