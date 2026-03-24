@@ -54,8 +54,14 @@ API_ROOT = '/pulp/'
 DB_ENCRYPTION_KEY = os.getenv('DB_ENCRYPTION_KEY', '/var/lib/pulp/db-encryption.key')
 
 # Security settings
-SECRET_KEY = os.getenv('GALAXY_SECRET_KEY', 'change-me-to-a-long-random-string')
-ALLOWED_HOSTS = ['*']  # Restrict in production
+SECRET_KEY = os.getenv('PULP_SECRET_KEY', os.getenv('SECRET_KEY', 'change-me-to-a-long-random-string'))
+# Parse ALLOWED_HOSTS from environment, defaulting to localhost-only for safety
+_allowed_hosts_env = os.getenv('PULP_ALLOWED_HOSTS', os.getenv('ALLOWED_HOSTS', ''))
+if _allowed_hosts_env:
+    ALLOWED_HOSTS = [host.strip() for host in _allowed_hosts_env.split(',') if host.strip()]
+else:
+    # Default to localhost-only for safety when no explicit configuration is provided
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
 DEBUG = os.getenv('DJANGO_DEBUG', 'false').lower() == 'true'
 CONTENT_PATH_PREFIX = '/pulp/content/'
 
