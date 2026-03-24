@@ -1,5 +1,4 @@
 """Pytest configuration for AAX image tests."""
-import pytest
 
 
 def pytest_configure(config):

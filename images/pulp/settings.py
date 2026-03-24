@@ -54,15 +54,21 @@ API_ROOT = '/pulp/'
 DB_ENCRYPTION_KEY = os.getenv('DB_ENCRYPTION_KEY', '/var/lib/pulp/db-encryption.key')
 
 # Security settings
-SECRET_KEY = os.getenv('SECRET_KEY', 'not-a-secure-secret-key-change-this')
-ALLOWED_HOSTS = ['*']
-DEBUG = False
-CONTENT_PATH_PREFIX = '/pulp/content/'
-
-# Security settings
-SECRET_KEY = os.getenv('GALAXY_SECRET_KEY', 'change-me-to-a-long-random-string')
-ALLOWED_HOSTS = ['*']  # Restrict in production
+SECRET_KEY = os.getenv('PULP_SECRET_KEY', os.getenv('SECRET_KEY', 'change-me-to-a-long-random-string'))
+DEFAULT_ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
+# Parse ALLOWED_HOSTS from environment, defaulting to localhost-only for safety.
+_allowed_hosts_env = os.getenv('PULP_ALLOWED_HOSTS', os.getenv('ALLOWED_HOSTS', '')).strip()
+if _allowed_hosts_env:
+    _parsed_allowed_hosts = [host.strip() for host in _allowed_hosts_env.split(',') if host.strip()]
+    if _parsed_allowed_hosts:
+        ALLOWED_HOSTS = _parsed_allowed_hosts
+    else:
+        ALLOWED_HOSTS = DEFAULT_ALLOWED_HOSTS
+else:
+    # Default to localhost-only for safety when no explicit configuration is provided.
+    ALLOWED_HOSTS = DEFAULT_ALLOWED_HOSTS
 DEBUG = os.getenv('DJANGO_DEBUG', 'false').lower() == 'true'
+CONTENT_PATH_PREFIX = '/pulp/content/'
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
