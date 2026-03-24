@@ -7,6 +7,8 @@
 
 A containerised, open-source alternative to Red Hat Ansible Automation Platform, built from upstream projects and run with Docker Compose.
 
+The project now uses a single, flattened [docker-compose.yml](docker-compose.yml) for all services, with Compose profiles for the controller, hub, and EDA stacks.
+
 ## Why AAX
 
 - Full control over your automation stack
@@ -64,6 +66,27 @@ docker compose logs -f
 # Stop everything
 docker compose down
 ```
+
+## Portainer Deployment (Synology/NAS)
+
+Use Portainer's **Git repository** stack mode so Docker build contexts (for `images/*`) are available.
+
+1. Stack source:
+
+- Repository URL: your AAX fork/repo
+- Compose path: `docker-compose.yml`
+
+1. Environment variables:
+
+- `COMPOSE_PROFILES=controller` (or `controller,hub,eda`)
+- `AWX_CSRF_TRUSTED_ORIGINS=http://<nas-ip>:8080,https://<your-domain>`
+
+1. Deploy and monitor:
+
+- Portainer will build local images from source during stack deployment.
+- Redeploy after changes to rebuild and run updated services.
+
+If you use a reverse proxy, include the external URL in `AWX_CSRF_TRUSTED_ORIGINS` to avoid AWX login/API CSRF failures.
 
 ## Requirements
 

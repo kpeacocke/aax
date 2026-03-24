@@ -7,8 +7,8 @@
 ARG BASE_IMAGE=aax/ee-base:latest
 
 # Stage 1: Builder
-# hadolint ignore=DL3007
-FROM ${BASE_IMAGE}:latest AS builder
+# hadolint ignore=DL3006,DL3007
+FROM ${BASE_IMAGE} AS builder
 
 # Build arguments for metadata
 ARG VERSION=dev
@@ -47,8 +47,8 @@ RUN apt-get update && \
   chown -R ansible:ansible /home/ansible/.ansible
 
 # Stage 2: Runtime
-# hadolint ignore=DL3007
-FROM ${BASE_IMAGE}:latest
+# hadolint ignore=DL3006,DL3007
+FROM ${BASE_IMAGE}
 
 # Build arguments for metadata
 ARG VERSION=dev

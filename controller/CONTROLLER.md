@@ -1,6 +1,6 @@
 # AWX Controller Stack
 
-This directory contains the Docker Compose configuration for running AWX (Ansible Automation Platform controller) with Receptor mesh networking.
+This stack is defined in the root [docker-compose.yml](../docker-compose.yml) using the `controller` profile and runs AWX (Ansible Automation Platform controller) with Receptor mesh networking.
 
 ## Architecture
 
@@ -29,7 +29,7 @@ This controller stack builds AWX from the official Ansible AWX source repository
 - **Maintenance** - Updates require rebuilding the image with a new AWX version tag
 - **Complexity** - More moving parts than using pre-built images
 
-The `images/awx/Dockerfile` builds AWX 24.6.1 from source, installs all Python dependencies, and creates custom entrypoint scripts for the web and task services.
+The root compose file builds `awx-web` and `awx-task` from `images/awx/Dockerfile` (tagged as `${AWX_IMAGE:-aax/awx:latest}`), installing all Python dependencies and using custom entrypoint scripts for the web and task services.
 
 ## Prerequisites
 
@@ -318,7 +318,7 @@ Common issues:
 
 ### Cannot Login
 
-1. Check admin password in docker-compose.controller.yml
+1. Check admin password in your `.env` file (`AWX_ADMIN_PASSWORD`) or use the default value if unchanged
 2. Reset password:
 
 ```bash

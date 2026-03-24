@@ -52,14 +52,14 @@ jobs:
           echo "Source: $SOURCE_BRANCH → Target: $TARGET_BRANCH"
 
           # Gitflow rules:
-          # feature/* and bugfix/* → develop
+          # feature/* and bugfix/* → develop (or main for direct PRs)
           # release/* → main
           # hotfix/* → main (and should also merge to develop)
           # develop → main (for releases)
 
           VALID=false
 
-          if [[ "$SOURCE_BRANCH" =~ ^(feature|bugfix)/ ]] && [[ "$TARGET_BRANCH" == "develop" ]]; then
+          if [[ "$SOURCE_BRANCH" =~ ^(feature|bugfix)/ ]] && [[ "$TARGET_BRANCH" =~ ^(develop|main)$ ]]; then
             VALID=true
           elif [[ "$SOURCE_BRANCH" =~ ^(hotfix|release)/ ]] && [[ "$TARGET_BRANCH" == "main" ]]; then
             VALID=true
@@ -74,7 +74,7 @@ jobs:
             echo "✗ Invalid PR target branch for gitflow"
             echo ""
             echo "Gitflow merge rules:"
-            echo "  feature/* or bugfix/* → develop"
+            echo "  feature/* or bugfix/* → develop or main"
             echo "  release/* or hotfix/*  → main"
             echo "  develop               → main (for releases)"
             echo ""

@@ -22,7 +22,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
   - Project synchronization (Git integration)
   - Workflow orchestration
   - Execution history and logging
-- **Deployment:** Docker Compose (`docker-compose.controller.yml`)
+- **Deployment:** Docker Compose (`docker-compose.yml`, `controller` profile)
 - **Access:** `http://localhost:8080`
 
 #### 3.3. Private Automation Hub
@@ -38,8 +38,8 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
   - Support for multiple content sources
   - API for programmatic access
   - Web UI for content discovery
-- **Deployment:** Docker Compose (`docker-compose.hub.yml`)
-- **Access:** `http://localhost:8081`
+- **Deployment:** Docker Compose (`docker-compose.yml`, `hub` profile)
+- **Access:** `http://localhost:5001`
 - **Content Sources:** Can pull from galaxy.ansible.com, GitHub, or other registries
 
 #### 3.6. Automation Mesh
@@ -150,7 +150,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
   - Event history and logging
   - Webhook endpoint for external event submission
   - Real-time event streaming via WebSocket
-- **Deployment:** Docker Compose (`docker-compose.eda.yml`) with `--profile eda`
+- **Deployment:** Docker Compose (`docker-compose.yml`, `eda` profile)
 - **Access:** REST API on `http://localhost:5000`
 - **Documentation:** [images/eda-controller/EDA.md](./images/eda-controller/EDA.md) with rulebook examples and AWX integration patterns
 
