@@ -61,7 +61,7 @@ if _allowed_hosts_env:
     ALLOWED_HOSTS = [host.strip() for host in _allowed_hosts_env.split(',') if host.strip()]
 else:
     # Default to localhost-only for safety when no explicit configuration is provided
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '::1']
 DEBUG = os.getenv('DJANGO_DEBUG', 'false').lower() == 'true'
 CONTENT_PATH_PREFIX = '/pulp/content/'
 
