@@ -4,7 +4,6 @@ These tests verify that images build correctly and function as expected.
 """
 import subprocess
 from pathlib import Path
-import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

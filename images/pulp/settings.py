@@ -54,15 +54,10 @@ API_ROOT = '/pulp/'
 DB_ENCRYPTION_KEY = os.getenv('DB_ENCRYPTION_KEY', '/var/lib/pulp/db-encryption.key')
 
 # Security settings
-SECRET_KEY = os.getenv('SECRET_KEY', 'not-a-secure-secret-key-change-this')
-ALLOWED_HOSTS = ['*']
-DEBUG = False
-CONTENT_PATH_PREFIX = '/pulp/content/'
-
-# Security settings
 SECRET_KEY = os.getenv('GALAXY_SECRET_KEY', 'change-me-to-a-long-random-string')
 ALLOWED_HOSTS = ['*']  # Restrict in production
 DEBUG = os.getenv('DJANGO_DEBUG', 'false').lower() == 'true'
+CONTENT_PATH_PREFIX = '/pulp/content/'
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
