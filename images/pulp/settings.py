@@ -55,7 +55,7 @@ DB_ENCRYPTION_KEY = os.getenv('DB_ENCRYPTION_KEY', '/var/lib/pulp/db-encryption.
 
 # Security settings
 SECRET_KEY = os.getenv('PULP_SECRET_KEY', os.getenv('SECRET_KEY', 'change-me-to-a-long-random-string'))
-DEFAULT_ALLOWED_HOSTS = ['localhost', '127.0.0.1', '::1']
+DEFAULT_ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
 # Parse ALLOWED_HOSTS from environment, defaulting to localhost-only for safety.
 _allowed_hosts_env = os.getenv('PULP_ALLOWED_HOSTS', os.getenv('ALLOWED_HOSTS', '')).strip()
 if _allowed_hosts_env:
