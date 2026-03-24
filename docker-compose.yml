@@ -389,7 +389,7 @@ services:
       POSTGRES_DB: hub
       REDIS_HOST: hub-redis
       REDIS_PORT: 6379
-      PULP_SECRET_KEY: ${PULP_SECRET_KEY}
+      PULP_SECRET_KEY: "${PULP_SECRET_KEY:?PULP_SECRET_KEY must be set (non-empty) in .env or environment}"
       PULP_ALLOWED_HOSTS: ${PULP_ALLOWED_HOSTS:-localhost,127.0.0.1,::1,pulp-api,pulp-content}
       PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://localhost:24816}
       PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:5001}
@@ -436,7 +436,7 @@ services:
       POSTGRES_DB: hub
       REDIS_HOST: hub-redis
       REDIS_PORT: 6379
-      PULP_SECRET_KEY: ${PULP_SECRET_KEY}
+      PULP_SECRET_KEY: "${PULP_SECRET_KEY:?PULP_SECRET_KEY must be set (non-empty) in .env or environment}"
       PULP_ALLOWED_HOSTS: ${PULP_ALLOWED_HOSTS:-localhost,127.0.0.1,::1,pulp-api,pulp-content}
       PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://localhost:24816}
       PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:5001}
@@ -480,7 +480,7 @@ services:
       POSTGRES_DB: hub
       REDIS_HOST: hub-redis
       REDIS_PORT: 6379
-      PULP_SECRET_KEY: ${PULP_SECRET_KEY}
+      PULP_SECRET_KEY: "${PULP_SECRET_KEY:?PULP_SECRET_KEY must be set (non-empty) in .env or environment}"
       PULP_ALLOWED_HOSTS: ${PULP_ALLOWED_HOSTS:-localhost,127.0.0.1,::1,pulp-api,pulp-content}
       PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://localhost:24816}
       PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:5001}
