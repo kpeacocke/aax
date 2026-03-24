@@ -39,7 +39,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
   - API for programmatic access
   - Web UI for content discovery
 - **Deployment:** Docker Compose (`docker-compose.yml`, `hub` profile)
-- **Access:** `http://localhost:8081`
+- **Access:** `http://localhost:5001`
 - **Content Sources:** Can pull from galaxy.ansible.com, GitHub, or other registries
 
 #### 3.6. Automation Mesh

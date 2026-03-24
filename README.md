@@ -7,7 +7,7 @@
 
 A containerised, open-source alternative to Red Hat Ansible Automation Platform, built from upstream projects and run with Docker Compose.
 
-The project now uses a single, flattened [docker-compose.yml](docker-compose.yml) for all services and profiles (controller, hub, and execution environments).
+The project now uses a single, flattened [docker-compose.yml](docker-compose.yml) for all services, with Compose profiles for the controller, hub, and EDA stacks.
 
 ## Why AAX
 

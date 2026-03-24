@@ -67,7 +67,7 @@ EOF
 
 ```bash
 # Start only EDA
-docker compose --profile eda up -d
+docker compose up -d eda-postgres eda-redis eda-controller
 
 # Or start with all services
 docker compose --profile controller --profile hub --profile eda up -d
@@ -77,7 +77,7 @@ docker compose --profile controller --profile hub --profile eda up -d
 
 ```bash
 # Check service status
-docker compose --profile eda ps
+docker compose ps eda-postgres eda-redis eda-controller
 
 # Check EDA health
 curl http://localhost:5000/health
@@ -396,11 +396,11 @@ docker compose --profile eda logs -f eda-controller
 
 ## Performance Tuning
 
-### Scale Workers
+### Restart EDA Services
 
 ```bash
-# Increase worker processes
-docker compose --profile eda up -d
+# Restart EDA stack services
+docker compose up -d eda-postgres eda-redis eda-controller
 ```
 
 ### Optimize Database

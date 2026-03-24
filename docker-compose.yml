@@ -120,7 +120,7 @@ services:
     networks:
       - awx-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U awx"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -159,7 +159,7 @@ services:
       [
         "/bin/bash",
         "-c",
-        "mkdir -p /etc/tower /etc/nginx/conf.d\ncat > /etc/tower/settings.py << 'PYEOF'\nimport os\nDATABASES = {\n    'default': {\n        'ENGINE': 'django.db.backends.postgresql',\n        'NAME': os.getenv('POSTGRES_NAME', 'awx'),\n        'USER': os.getenv('POSTGRES_USER', 'awx'),\n        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'awxpass'),\n        'HOST': os.getenv('POSTGRES_SERVICE_HOST', 'awx-postgres'),\n        'PORT': int(os.getenv('POSTGRES_SERVICE_PORT', 5432)),\n        'ATOMIC_REQUESTS': True,\n        'CONN_MAX_AGE': 0,\n    }\n}\nSECRET_KEY = os.getenv('SECRET_KEY', 'awxsecret_change_me')\nALLOWED_HOSTS = ['*']\nDEBUG = False\nCSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.getenv('AWX_CSRF_TRUSTED_ORIGINS', 'http://localhost:8080,http://localhost,http://127.0.0.1:8080').split(',') if origin.strip()]\nSESSION_COOKIE_SECURE = False\nCSRF_COOKIE_SECURE = False\nSESSION_COOKIE_SAMESITE = 'Lax'\nCSRF_COOKIE_SAMESITE = 'Lax'\nREDIS_HOST = os.getenv('REDIS_SERVICE_HOST', 'awx-redis')\nREDIS_PORT = int(os.getenv('REDIS_SERVICE_PORT', 6379))\nCHANNELS = {\n    'default': {\n        'BACKEND': 'channels_redis.core.RedisChannelLayer',\n        'CONFIG': {'hosts': [(REDIS_HOST, REDIS_PORT)]},\n    },\n}\nPYEOF\ncat > /etc/nginx/conf.d/awx.conf << 'NGEOF'\nserver {\n    listen 8052 default_server;\n    listen [::]:8052 default_server;\n    server_name _;\n    client_max_body_size 0;\n\n    location /static/ {\n        alias /var/lib/awx/public/static/;\n        expires 1h;\n        add_header Cache-Control \"public\";\n    }\n\n    location /media/ {\n        alias /var/lib/awx/public/media/;\n        expires 1h;\n        add_header Cache-Control \"public\";\n    }\n\n    location / {\n        include uwsgi_params;\n        uwsgi_pass 127.0.0.1:8050;\n        uwsgi_read_timeout 120s;\n        uwsgi_send_timeout 120s;\n    }\n}\nNGEOF\nsed -i 's/autostart=true/autostart=false/g' /etc/supervisord_web.conf\nsed -i 's/programs=nginx,uwsgi,daphne,awx-cache-clear,ws-heartbeat/programs=nginx,uwsgi,awx-cache-clear/g' /etc/supervisord_web.conf\nsed -i '/\\[program:daphne\\]/a autostart=false' /etc/supervisord_web.conf\nsed -i '/\\[program:ws-heartbeat\\]/a autostart=false' /etc/supervisord_web.conf\n/usr/bin/launch_awx_web.sh",
+        "mkdir -p /etc/tower /etc/nginx/conf.d\ncat > /etc/tower/settings.py << 'PYEOF'\nimport os\nDATABASES = {\n    'default': {\n        'ENGINE': 'django.db.backends.postgresql',\n        'NAME': os.getenv('POSTGRES_NAME', 'awx'),\n        'USER': os.getenv('POSTGRES_USER', 'awx'),\n        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'awxpass'),\n        'HOST': os.getenv('POSTGRES_SERVICE_HOST', 'awx-postgres'),\n        'PORT': int(os.getenv('POSTGRES_SERVICE_PORT', 5432)),\n        'ATOMIC_REQUESTS': True,\n        'CONN_MAX_AGE': 0,\n    }\n}\nSECRET_KEY = os.getenv('SECRET_KEY', 'awxsecret_change_me')\nALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]\nDEBUG = False\nCSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.getenv('AWX_CSRF_TRUSTED_ORIGINS', 'http://localhost:8080,http://localhost,http://127.0.0.1:8080').split(',') if origin.strip()]\nSESSION_COOKIE_SECURE = False\nCSRF_COOKIE_SECURE = False\nSESSION_COOKIE_SAMESITE = 'Lax'\nCSRF_COOKIE_SAMESITE = 'Lax'\nREDIS_HOST = os.getenv('REDIS_SERVICE_HOST', 'awx-redis')\nREDIS_PORT = int(os.getenv('REDIS_SERVICE_PORT', 6379))\nCHANNELS = {\n    'default': {\n        'BACKEND': 'channels_redis.core.RedisChannelLayer',\n        'CONFIG': {'hosts': [(REDIS_HOST, REDIS_PORT)]},\n    },\n}\nPYEOF\ncat > /etc/nginx/conf.d/awx.conf << 'NGEOF'\nserver {\n    listen 8052 default_server;\n    listen [::]:8052 default_server;\n    server_name _;\n    client_max_body_size 0;\n\n    location /static/ {\n        alias /var/lib/awx/public/static/;\n        expires 1h;\n        add_header Cache-Control \"public\";\n    }\n\n    location /media/ {\n        alias /var/lib/awx/public/media/;\n        expires 1h;\n        add_header Cache-Control \"public\";\n    }\n\n    location / {\n        include uwsgi_params;\n        uwsgi_pass 127.0.0.1:8050;\n        uwsgi_read_timeout 120s;\n        uwsgi_send_timeout 120s;\n    }\n}\nNGEOF\nsed -i 's/autostart=true/autostart=false/g' /etc/supervisord_web.conf\nsed -i 's/programs=nginx,uwsgi,daphne,awx-cache-clear,ws-heartbeat/programs=nginx,uwsgi,awx-cache-clear/g' /etc/supervisord_web.conf\nsed -i '/\\[program:daphne\\]/a autostart=false' /etc/supervisord_web.conf\nsed -i '/\\[program:ws-heartbeat\\]/a autostart=false' /etc/supervisord_web.conf\n/usr/bin/launch_awx_web.sh",
       ]
     environment:
       POSTGRES_SERVICE_HOST: ${DATABASE_HOST:-awx-postgres}
@@ -172,6 +172,7 @@ services:
       AWX_ADMIN_USER: ${AWX_ADMIN_USER:-admin}
       AWX_ADMIN_PASSWORD: ${AWX_ADMIN_PASSWORD:-password}
       SECRET_KEY: ${SECRET_KEY:-awxsecret_change_me}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
       AWX_CSRF_TRUSTED_ORIGINS: ${AWX_CSRF_TRUSTED_ORIGINS:-http://localhost:8080,http://localhost,http://127.0.0.1:8080}
       RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-true}
       DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-aax/ee-base:latest}
@@ -183,6 +184,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - awx-network
+      - hub-network
     depends_on:
       awx-postgres:
         condition: service_healthy
@@ -212,7 +214,7 @@ services:
       [
         "/bin/bash",
         "-c",
-        "mkdir -p /etc/tower && cat > /etc/tower/settings.py << 'PYEOF'\nimport os\nDATABASES = {'default': {'ENGINE': 'django.db.backends.postgresql', 'NAME': os.getenv('DATABASE_NAME', 'awx'), 'USER': os.getenv('DATABASE_USER', 'awx'), 'PASSWORD': os.getenv('DATABASE_PASSWORD', 'awxpass'), 'HOST': os.getenv('DATABASE_HOST', 'awx-postgres'), 'PORT': int(os.getenv('DATABASE_PORT', 5432))}}\nSECRET_KEY = os.getenv('SECRET_KEY', 'awxsecret')\nDEBUG = False\nALLOWED_HOSTS = ['*']\nBROADCAST_WEBSOCKET_SECRET = os.getenv('SECRET_KEY', 'awxsecret')\nPYEOF\nexec /usr/local/bin/dumb-init -- /usr/bin/launch_awx_task.sh",
+        "mkdir -p /etc/tower && cat > /etc/tower/settings.py << 'PYEOF'\nimport os\nDATABASES = {'default': {'ENGINE': 'django.db.backends.postgresql', 'NAME': os.getenv('DATABASE_NAME', 'awx'), 'USER': os.getenv('DATABASE_USER', 'awx'), 'PASSWORD': os.getenv('DATABASE_PASSWORD', 'awxpass'), 'HOST': os.getenv('DATABASE_HOST', 'awx-postgres'), 'PORT': int(os.getenv('DATABASE_PORT', 5432))}}\nSECRET_KEY = os.getenv('SECRET_KEY', 'awxsecret')\nDEBUG = False\nALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]\nBROADCAST_WEBSOCKET_SECRET = os.getenv('SECRET_KEY', 'awxsecret')\nPYEOF\nexec /usr/local/bin/dumb-init -- /usr/bin/launch_awx_task.sh",
       ]
     environment:
       DATABASE_USER: ${DATABASE_USER:-awx}
@@ -223,6 +225,7 @@ services:
       REDIS_HOST: ${REDIS_HOST:-awx-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       SECRET_KEY: ${SECRET_KEY:-awxsecret}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
       AWX_SKIP_MIGRATIONS: ${AWX_SKIP_MIGRATIONS:-false}
       DJANGO_SETTINGS_MODULE: awx.settings.production
       AWX_SETTINGS_FILE: /dev/null
@@ -234,6 +237,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - awx-network
+      - hub-network
     depends_on:
       awx-postgres:
         condition: service_healthy
@@ -576,7 +580,7 @@ services:
     networks:
       - eda-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U eda"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
       interval: 10s
       timeout: 5s
       retries: 5
