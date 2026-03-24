@@ -67,23 +67,23 @@ EOF
 
 ```bash
 # Start only EDA
-docker compose -f docker-compose.eda.yml --profile eda up -d
+docker compose --profile eda up -d
 
 # Or start with all services
-docker compose -f docker-compose.yml -f docker-compose.eda.yml --profile eda up -d
+docker compose --profile controller --profile hub --profile eda up -d
 ```
 
 ### 3. Verify Services are Running
 
 ```bash
 # Check service status
-docker compose -f docker-compose.eda.yml ps
+docker compose --profile eda ps
 
 # Check EDA health
 curl http://localhost:5000/health
 
 # View logs
-docker compose -f docker-compose.eda.yml logs -f eda-controller
+docker compose --profile eda logs -f eda-controller
 ```
 
 ### 4. Access EDA API
@@ -122,7 +122,7 @@ curl -X POST http://localhost:5000/api/v1/rulesets \
 
 ### Docker Compose Configuration
 
-Default configuration in `docker-compose.eda.yml`:
+Default profile configuration in `docker-compose.yml`:
 
 ```yaml
 eda-controller:
@@ -359,16 +359,16 @@ curl -X DELETE http://localhost:5000/api/v1/activations/1
 
 ```bash
 # EDA Controller logs
-docker compose -f docker-compose.eda.yml logs -f eda-controller
+docker compose --profile eda logs -f eda-controller
 
 # PostgreSQL logs
-docker compose -f docker-compose.eda.yml logs -f eda-postgres
+docker compose --profile eda logs -f eda-postgres
 
 # Redis logs
-docker compose -f docker-compose.eda.yml logs -f eda-redis
+docker compose --profile eda logs -f eda-redis
 
 # All services
-docker compose -f docker-compose.eda.yml logs -f
+docker compose --profile eda logs -f
 ```
 
 ### Enable Debug Logging
@@ -378,10 +378,10 @@ docker compose -f docker-compose.eda.yml logs -f
 export EDA_LOG_LEVEL=DEBUG
 
 # Restart service
-docker compose -f docker-compose.eda.yml restart eda-controller
+docker compose --profile eda restart eda-controller
 
 # View debug logs
-docker compose -f docker-compose.eda.yml logs -f eda-controller
+docker compose --profile eda logs -f eda-controller
 ```
 
 ### Common Issues
@@ -400,8 +400,7 @@ docker compose -f docker-compose.eda.yml logs -f eda-controller
 
 ```bash
 # Increase worker processes
-docker compose -f docker-compose.eda.yml up -d \
-  --scale eda-worker=3
+docker compose --profile eda up -d
 ```
 
 ### Optimize Database

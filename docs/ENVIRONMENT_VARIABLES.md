@@ -240,19 +240,19 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 
 ## Networking
 
-| Variable               | Default               | Description                          |
-| ---------------------- | --------------------- | ------------------------------------ |
-| `ALLOWED_HOSTS`        | `localhost,127.0.0.1` | Comma-separated allowed hosts        |
-| `CSRF_TRUSTED_ORIGINS` | ``                    | Comma-separated CSRF-trusted origins |
-| `AWX_HTTPS_BIND_PORT`  | `8443`                | HTTPS port                           |
-| `AWX_HTTP_BIND_PORT`   | `8080`                | HTTP port                            |
-| `AWX_BIND_ADDRESS`     | `0.0.0.0`             | AWX bind address                     |
+| Variable                   | Default               | Description                          |
+| -------------------------- | --------------------- | ------------------------------------ |
+| `ALLOWED_HOSTS`            | `localhost,127.0.0.1` | Comma-separated allowed hosts        |
+| `AWX_CSRF_TRUSTED_ORIGINS` | ``                    | Comma-separated CSRF-trusted origins |
+| `AWX_HTTPS_BIND_PORT`      | `8443`                | HTTPS port                           |
+| `AWX_HTTP_BIND_PORT`       | `8080`                | HTTP port                            |
+| `AWX_BIND_ADDRESS`         | `0.0.0.0`             | AWX bind address                     |
 
 **Example - Production HTTPS:**
 
 ```bash
 export ALLOWED_HOSTS=awx.example.com,localhost
-export CSRF_TRUSTED_ORIGINS=https://awx.example.com
+export AWX_CSRF_TRUSTED_ORIGINS=https://awx.example.com
 export AWX_HTTPS_BIND_PORT=443
 ```
 

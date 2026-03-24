@@ -1,6 +1,6 @@
 # Private Automation Hub
 
-This directory contains the Docker Compose configuration for running a Private Automation Hub using Galaxy NG (Ansible content server) and Pulp (content management backend).
+This stack is defined in the root [docker-compose.yml](../docker-compose.yml) using the `hub` profile and runs a Private Automation Hub with Galaxy NG (Ansible content server) and Pulp (content management backend).
 
 ## Architecture
 
@@ -211,7 +211,7 @@ To connect AWX and Hub stacks:
 docker compose --profile controller --profile hub up -d
 ```
 
-Or modify `docker-compose.controller.yml` to include:
+Or modify the `awx-network` block in `docker-compose.yml` to include:
 
 ```yaml
 networks:
