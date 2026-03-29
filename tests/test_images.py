@@ -478,7 +478,7 @@ class TestPulpImage:
 class TestEDAImage:
     """Tests for the Event-Driven Ansible controller image."""
 
-    IMAGE_NAME = "aax/eda:latest"
+    IMAGE_NAME = "aax/eda-controller:latest"
 
     def test_image_builds(self):
         """Test that the EDA image builds successfully."""

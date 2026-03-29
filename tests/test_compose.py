@@ -18,7 +18,7 @@ def compose_up():
     """Start docker-compose services before tests and tear down after."""
     # Start services
     result = subprocess.run(
-        ["docker", "compose", "up", "-d"],
+        ["docker", "compose", "up", "-d", "ee-base", "ee-builder", "dev-tools"],
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT)
@@ -64,16 +64,85 @@ class TestDockerCompose:
     def test_all_services_defined(self):
         """Test that expected services are defined in docker-compose.yml."""
         result = subprocess.run(
-            ["docker", "compose", "config", "--services"],
+            [
+                "docker",
+                "compose",
+                "--profile",
+                "controller",
+                "--profile",
+                "hub",
+                "--profile",
+                "eda",
+                "config",
+                "--services",
+            ],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
         services = result.stdout.strip().split("\n")
-        expected_services = ["ee-base", "ee-builder", "dev-tools"]
+        expected_services = [
+            "ee-base",
+            "ee-builder",
+            "dev-tools",
+            "awx-web",
+            "awx-task",
+            "awx-receptor",
+            "galaxy-ng",
+            "pulp-api",
+            "pulp-content",
+            "pulp-worker",
+            "eda-controller",
+        ]
         for service in expected_services:
             assert service in services, f"Service {service} not found in compose config"
+
+    def test_awx_uses_local_image_default(self):
+        """Test that AWX defaults to the locally built image tag."""
+        result = subprocess.run(
+            ["docker", "compose", "--profile", "controller", "config"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT)
+        )
+        assert result.returncode == 0
+        assert "image: aax/awx:latest" in result.stdout
+
+    def test_default_execution_environment_uses_local_image(self):
+        """Test that the controller default EE points at the local ee-base image."""
+        result = subprocess.run(
+            ["docker", "compose", "--profile", "controller", "config"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT)
+        )
+        assert result.returncode == 0
+        assert "DEFAULT_EXECUTION_ENVIRONMENT: aax/ee-base:latest" in result.stdout
+
+    def test_eda_controller_shares_awx_network(self):
+        """Test that EDA can reach AWX over a shared compose network."""
+        result = subprocess.run(
+            [
+                "docker",
+                "compose",
+                "--profile",
+                "controller",
+                "--profile",
+                "eda",
+                "config",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT)
+        )
+        assert result.returncode == 0
+        config = result.stdout
+        eda_section = config.split("eda-controller:", 1)[1]
+        assert "awx-network:" in config
+        assert "eda-network:" in config
+        assert "awx-network: null" in eda_section
+        assert "eda-network: null" in eda_section
 
 
 class TestServiceOrchestration:
@@ -215,11 +284,11 @@ class TestServiceFunctionality:
         assert result.returncode == 0, "Services cannot communicate on shared network"
 
 
-class TestResourceLimits:
-    """Tests for resource limits and reservations."""
+class TestComposeCompatibility:
+    """Tests for compose compatibility with local Docker engines."""
 
-    def test_ee_base_has_resource_limits(self):
-        """Test that ee-base has resource limits configured."""
+    def test_no_deploy_resource_limits_present(self):
+        """Test that deploy resource limits are absent for wider Docker compatibility."""
         result = subprocess.run(
             ["docker", "compose", "config"],
             capture_output=True,
@@ -228,9 +297,7 @@ class TestResourceLimits:
         )
         assert result.returncode == 0
         config = result.stdout
-        # Check for resource limits in ee-base service
-        assert "cpus:" in config
-        assert "memory:" in config
+        assert "deploy:" not in config
 
     def test_services_have_health_checks(self):
         """Test that all services have health checks configured."""
