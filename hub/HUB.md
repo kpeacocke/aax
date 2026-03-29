@@ -1,6 +1,8 @@
 # Private Automation Hub
 
-This stack is defined in the root [docker-compose.yml](../docker-compose.yml) using the `hub` profile and runs a Private Automation Hub with Galaxy NG (Ansible content server) and Pulp (content management backend).
+This stack is defined in the root [docker-compose.yml](../docker-compose.yml) using the `hub` profile and runs the AAX private content platform with Galaxy NG and Pulp.
+
+Galaxy NG plus Pulp is the correct upstream mapping for the Private Automation Hub role inside AAX. It is not the same thing as Red Hat's certified content service or the full AAP productized hub experience. For the stricter component comparison, see [COMPONENTS.md](../COMPONENTS.md).
 
 ## Architecture
 
@@ -30,6 +32,14 @@ This hub stack builds Galaxy NG from the official Ansible repository (`github.co
 - **Complexity** - Multiple services (pulp-api, pulp-content, pulp-worker)
 - **Resources** - Requires additional CPU/memory (recommend 4GB+)
 - **Maintenance** - Updates require coordinating Galaxy NG and Pulp versions
+
+### Scope Boundaries
+
+This hub stack provides private content hosting, registry workflows, and content management. It does not, by itself, provide:
+
+- Red Hat certified content
+- Red Hat subscription-backed support and synchronization rights
+- turnkey high-availability topology in the default Compose deployment
 
 ## Prerequisites
 

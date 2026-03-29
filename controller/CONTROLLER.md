@@ -1,6 +1,8 @@
 # AWX Controller Stack
 
-This stack is defined in the root [docker-compose.yml](../docker-compose.yml) using the `controller` profile and runs AWX (Ansible Automation Platform controller) with Receptor mesh networking.
+This stack is defined in the root [docker-compose.yml](../docker-compose.yml) using the `controller` profile and runs AWX as the AAX controller component, with bundled Receptor networking for execution-related traffic.
+
+AWX is the upstream open-source project that maps to the core Automation Controller role in AAP. This stack should be understood as the controller equivalent within AAX, not as a claim of full AAP controller packaging, support, or HA parity. For the stricter comparison, see [COMPONENTS.md](../COMPONENTS.md).
 
 ## Architecture
 
@@ -227,7 +229,9 @@ awx-web:
 
 ## Receptor Mesh
 
-The included Receptor node enables distributed execution. To add execution nodes:
+The included Receptor node provides the foundation for distributed execution. In the default Compose deployment, AAX runs a single Receptor node; larger mesh topologies need additional external nodes and configuration.
+
+To add execution nodes:
 
 ### Add External Execution Node
 

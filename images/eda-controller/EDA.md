@@ -2,6 +2,8 @@
 
 Event-Driven Ansible (EDA) controller provides a scalable means of integrating disparate sources of events through a single unified platform and acting on those events by using rulebooks.
 
+Within AAX, this stack is the upstream open-source mapping for the Event-Driven Ansible role in AAP. It documents the bundled EDA services and integration patterns, not a claim of full AAP packaging, support, or HA parity. For the strict comparison, see [COMPONENTS.md](../../COMPONENTS.md).
+
 This directory contains the Docker configuration for running EDA with ansible-rulebook.
 
 ## Overview
@@ -22,6 +24,8 @@ The Event-Driven Ansible controller enables:
 - **PostgreSQL** - Event data and rulebook storage
 - **Redis** - Message queuing for event processing
 - **API Server** - REST API for rulebook management and event submission
+
+In the default Compose deployment, this is a single-controller EDA topology backed by one PostgreSQL service and one Redis service.
 
 ### Event Flow
 

@@ -1,6 +1,8 @@
 # AAX Architecture
 
-AAX is built from upstream Ansible and Red Hat projects, orchestrated with Docker Compose for easy deployment and development.
+AAX is built from upstream Ansible and related open-source projects, orchestrated with Docker Compose for easy deployment and development.
+
+This document describes the AAX runtime architecture. It does not imply full product parity with Red Hat Ansible Automation Platform. For the strict component comparison, see [COMPONENTS.md](../COMPONENTS.md).
 
 ## System Architecture
 
@@ -10,7 +12,7 @@ AAX is built from upstream Ansible and Red Hat projects, orchestrated with Docke
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │         User Interface & API Gateways (Port 8080)        │   │
+│  │         User Interfaces and APIs                         │   │
 │  ├──────────────────────────────────────────────────────────┤   │
 │  │  AWX Web UI │ Galaxy NG UI │ Pulp API │ EDA Controller   │   │
 │  └──────────────────────────────────────────────────────────┘   │
@@ -39,7 +41,7 @@ AAX is built from upstream Ansible and Red Hat projects, orchestrated with Docke
 │  │     Data & Cache Layer                                   │   │
 │  ├──────────────────────────────────────────────────────────┤   │
 │  │  PostgreSQL      │    Redis         │    Volumes         │   │
-│  │  - 5 Databases   │    - Cache       │    - Storage       │   │
+│  │  - 3 Service DBs │    - Cache       │    - Storage       │   │
 │  │  - Persistence   │    - Job Queue   │    - Credentials   │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                                                                 │
@@ -131,11 +133,17 @@ AAX is built from upstream Ansible and Red Hat projects, orchestrated with Docke
 
 **Receptor** – Distributed automation network
 
-- Enables controller-to-controller communication
+- Enables controller-to-execution-node and peer-to-peer mesh communication patterns
 - Node clustering without a central broker
 - Mesh resilience and redundancy
 - Hot-standby capabilities
 - Multi-hop routing
+
+In the default Compose deployment, AAX runs a single bundled Receptor node. Multi-node mesh topologies are an extension pattern rather than the default deployment shape.
+
+### External Infrastructure
+
+AAX does not bundle a separate Automation Gateway equivalent. Unified ingress, TLS termination, external authentication front doors, and multi-service routing are expected to be handled by external reverse proxies or platform infrastructure when needed.
 
 ### Data Persistence
 
