@@ -54,8 +54,8 @@ docker compose --profile hub up -d
 ## Common Commands
 
 ```bash
-# Build images
-docker compose --profile controller --profile hub build
+# Pull images
+docker compose --profile controller --profile hub pull
 
 # View status
 docker compose ps
@@ -69,7 +69,7 @@ docker compose down
 
 ## Portainer Deployment (Synology/NAS)
 
-Use Portainer's **Git repository** stack mode so Docker build contexts (for `images/*`) are available.
+Use Portainer's **Git repository** stack mode with the single compose file.
 
 1. Stack source:
 
@@ -83,8 +83,8 @@ Use Portainer's **Git repository** stack mode so Docker build contexts (for `ima
 
 1. Deploy and monitor:
 
-- Portainer will build local images from source during stack deployment.
-- Redeploy after changes to rebuild and run updated services.
+- Portainer will pull prebuilt images from GHCR (no compose build step).
+- Redeploy or pull-and-redeploy to get updated image tags.
 
 If you use a reverse proxy, include the external URL in `AWX_CSRF_TRUSTED_ORIGINS` to avoid AWX login/API CSRF failures.
 
