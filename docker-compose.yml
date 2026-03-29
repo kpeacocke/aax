@@ -9,14 +9,6 @@ services:
       ANSIBLE_NOCOWS: "1"
     networks:
       - ansible
-    deploy:
-      resources:
-        limits:
-          cpus: "2"
-          memory: 2G
-        reservations:
-          cpus: "1"
-          memory: 1G
     healthcheck:
       test: ["CMD", "python3", "-c", "import ansible; import ansible_runner"]
       interval: 30s
@@ -39,14 +31,6 @@ services:
       ANSIBLE_NOCOWS: "1"
     networks:
       - ansible
-    deploy:
-      resources:
-        limits:
-          cpus: "2"
-          memory: 2G
-        reservations:
-          cpus: "1"
-          memory: 1G
     healthcheck:
       test: ["CMD", "ansible-builder", "--version"]
       interval: 30s
@@ -68,14 +52,6 @@ services:
       PAGER: ""
     networks:
       - ansible
-    deploy:
-      resources:
-        limits:
-          cpus: "2"
-          memory: 2G
-        reservations:
-          cpus: "1"
-          memory: 1G
     healthcheck:
       test: ["CMD", "ansible-navigator", "--version"]
       interval: 30s
@@ -302,14 +278,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    deploy:
-      resources:
-        limits:
-          cpus: "1"
-          memory: 1G
-        reservations:
-          cpus: "0.5"
-          memory: 512M
 
   hub-redis:
     image: redis:7-alpine
@@ -327,14 +295,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 512M
-        reservations:
-          cpus: "0.25"
-          memory: 256M
 
   pulp-api:
     profiles:
@@ -374,14 +334,6 @@ services:
       start_period: 60s
     ports:
       - "${PULP_API_PORT:-24817}:24817"
-    deploy:
-      resources:
-        limits:
-          cpus: "2"
-          memory: 2G
-        reservations:
-          cpus: "1"
-          memory: 1G
 
   pulp-content:
     profiles:
@@ -418,14 +370,6 @@ services:
       start_period: 30s
     ports:
       - "${PULP_CONTENT_PORT:-24816}:24816"
-    deploy:
-      resources:
-        limits:
-          cpus: "1"
-          memory: 1G
-        reservations:
-          cpus: "0.5"
-          memory: 512M
 
   pulp-worker:
     profiles:
@@ -460,14 +404,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    deploy:
-      resources:
-        limits:
-          cpus: "2"
-          memory: 2G
-        reservations:
-          cpus: "1"
-          memory: 1G
 
   galaxy-ng:
     profiles:
@@ -516,14 +452,6 @@ services:
       start_period: 90s
     ports:
       - "${GALAXY_PORT:-5001}:8000"
-    deploy:
-      resources:
-        limits:
-          cpus: "2"
-          memory: 2G
-        reservations:
-          cpus: "1"
-          memory: 1G
 
   eda-postgres:
     image: postgres:15
