@@ -1,7 +1,14 @@
 name: aax
 services:
   ee-base:
-    image: ghcr.io/kpeacocke/aax-ee-base:${VERSION:-latest}
+    build:
+      context: ./images/ee-base
+      args:
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+        VERSION: ${VERSION:-dev}
+    image: aax/ee-base:${VERSION:-dev}
+    pull_policy: build
     working_dir: /workspace
     volumes:
       - workspace:/workspace:rw
@@ -18,7 +25,15 @@ services:
     command: ["sleep", "infinity"]
 
   ee-builder:
-    image: ghcr.io/kpeacocke/aax-ee-builder:${VERSION:-latest}
+    build:
+      context: ./images/ee-builder
+      args:
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+        VERSION: ${VERSION:-dev}
+        BASE_IMAGE: aax/ee-base:${VERSION:-dev}
+    image: aax/ee-builder:${VERSION:-dev}
+    pull_policy: build
     depends_on:
       ee-base:
         condition: service_healthy
@@ -40,7 +55,15 @@ services:
     command: ["sleep", "infinity"]
 
   dev-tools:
-    image: ghcr.io/kpeacocke/aax-dev-tools:${VERSION:-latest}
+    build:
+      context: ./images/dev-tools
+      args:
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+        VERSION: ${VERSION:-dev}
+        BASE_IMAGE: aax/ee-base:${VERSION:-dev}
+    image: aax/dev-tools:${VERSION:-dev}
+    pull_policy: build
     depends_on:
       ee-base:
         condition: service_healthy
@@ -101,7 +124,14 @@ services:
   awx-web:
     profiles:
       - controller
-    image: ${AWX_IMAGE:-ghcr.io/kpeacocke/aax-awx:latest}
+    build:
+      context: ./images/awx
+      args:
+        VERSION: ${VERSION:-dev}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: ${AWX_IMAGE:-aax/awx:latest}
+    pull_policy: build
     container_name: awx-web
     hostname: awx
     user: "0"
@@ -150,7 +180,14 @@ services:
   awx-task:
     profiles:
       - controller
-    image: ${AWX_IMAGE:-ghcr.io/kpeacocke/aax-awx:latest}
+    build:
+      context: ./images/awx
+      args:
+        VERSION: ${VERSION:-dev}
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+    image: ${AWX_IMAGE:-aax/awx:latest}
+    pull_policy: build
     container_name: awx-task
     hostname: awx
     user: "0"
@@ -299,7 +336,15 @@ services:
   pulp-api:
     profiles:
       - hub
-    image: ghcr.io/kpeacocke/aax-pulp:${VERSION:-latest}
+    build:
+      context: ./images/pulp
+      dockerfile: Dockerfile.pulp
+      args:
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+        VERSION: ${VERSION:-dev}
+    image: aax/pulp:${VERSION:-dev}
+    pull_policy: build
     container_name: aax-pulp-api
     command: ["pulpcore-api"]
     environment:
@@ -338,7 +383,7 @@ services:
   pulp-content:
     profiles:
       - hub
-    image: ghcr.io/kpeacocke/aax-pulp:${VERSION:-latest}
+    image: aax/pulp:${VERSION:-dev}
     container_name: aax-pulp-content
     command: ["pulpcore-content"]
     environment:
@@ -374,7 +419,7 @@ services:
   pulp-worker:
     profiles:
       - hub
-    image: ghcr.io/kpeacocke/aax-pulp:${VERSION:-latest}
+    image: aax/pulp:${VERSION:-dev}
     container_name: aax-pulp-worker
     command: ["pulpcore-worker"]
     environment:
@@ -408,7 +453,14 @@ services:
   galaxy-ng:
     profiles:
       - hub
-    image: ghcr.io/kpeacocke/aax-galaxy-ng:${VERSION:-latest}
+    build:
+      context: ./images/galaxy-ng
+      args:
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+        VERSION: ${VERSION:-dev}
+    image: aax/galaxy-ng:${VERSION:-dev}
+    pull_policy: build
     container_name: aax-galaxy-ng
     environment:
       POSTGRES_HOST: hub-postgres
@@ -492,7 +544,15 @@ services:
       retries: 5
 
   eda-controller:
-    image: ghcr.io/kpeacocke/aax-eda-controller:${VERSION:-latest}
+    build:
+      context: images/eda-controller
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-dev}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+        VCS_REF: ${VCS_REF:-unknown}
+        EDA_VERSION: 1.1.3
+    pull_policy: build
     container_name: eda-controller
     profiles:
       - eda
