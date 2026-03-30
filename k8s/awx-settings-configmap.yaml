@@ -1,0 +1,68 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: awx-settings
+  namespace: aax
+  labels:
+    app.kubernetes.io/name: awx-settings
+    app.kubernetes.io/part-of: aax
+data:
+  settings.py: | # pragma: allowlist secret
+    import os
+
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DATABASE_NAME', 'awx'),
+            'USER': os.getenv('DATABASE_USER', 'awx'),
+            'PASSWORD': os.environ['DATABASE_PASSWORD'],
+            'HOST': os.getenv('DATABASE_HOST', 'awx-postgres'),
+            'PORT': int(os.getenv('DATABASE_PORT', 5432)),
+            'ATOMIC_REQUESTS': True,
+            'CONN_MAX_AGE': 0,
+        }
+    }
+    ALLOW_PLACEHOLDER_SECRETS = (
+        os.getenv('AAX_ALLOW_PLACEHOLDER_SECRETS', 'false').lower() == 'true'
+    )
+    if not ALLOW_PLACEHOLDER_SECRETS:
+        for _name in ('DATABASE_PASSWORD', 'SECRET_KEY', 'AWX_ADMIN_PASSWORD'):
+            _value = os.getenv(_name, '')
+            if _value.startswith('REPLACE_WITH_') or _value.startswith('CHANGE_ME_'):
+                raise RuntimeError(
+                    f'{_name} contains placeholder value; '
+                    'set AAX_ALLOW_PLACEHOLDER_SECRETS=true only for local dev'
+                )
+    SECRET_KEY = os.environ['SECRET_KEY']
+    ALLOWED_HOSTS = [
+        host.strip()
+        for host in os.getenv(
+            'ALLOWED_HOSTS',
+            'localhost,127.0.0.1,awx-web,gateway',
+        ).split(',')
+        if host.strip()
+    ]
+    DEBUG = False
+    CSRF_TRUSTED_ORIGINS = [
+        origin.strip()
+        for origin in os.getenv(
+            'AWX_CSRF_TRUSTED_ORIGINS',
+            'http://localhost:8080,http://localhost:8088,http://gateway:8080',
+        ).split(',')
+        if origin.strip()
+    ]
+    ALLOW_INSECURE_COOKIES = os.getenv('AWX_ALLOW_INSECURE_COOKIES', 'false').lower() == 'true'
+    SESSION_COOKIE_SECURE = not ALLOW_INSECURE_COOKIES
+    CSRF_COOKIE_SECURE = not ALLOW_INSECURE_COOKIES
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SAMESITE = 'Lax'
+    REDIS_HOST = os.getenv('REDIS_HOST', 'awx-redis')
+    REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
+    CHANNELS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {'hosts': [(REDIS_HOST, REDIS_PORT)]},
+        },
+    }
+    BROADCAST_WEBSOCKET_SECRET = SECRET_KEY

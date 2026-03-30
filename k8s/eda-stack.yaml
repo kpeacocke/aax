@@ -1,0 +1,252 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eda-postgres
+  namespace: aax
+  labels:
+    app: eda-postgres
+    app.kubernetes.io/name: eda-postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eda-postgres
+  template:
+    metadata:
+      labels:
+        app: eda-postgres
+        app.kubernetes.io/name: eda-postgres
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: eda-postgres
+          image: postgres:15
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_DB
+              value: eda
+            - name: POSTGRES_USER
+              value: eda
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: EDA_DB_PASSWORD
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: scram-sha-256
+            - name: POSTGRES_INITDB_ARGS
+              value: --auth-host=scram-sha-256
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - name: eda-postgres-data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U eda"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U eda"]
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - name: eda-postgres-data
+          persistentVolumeClaim:
+            claimName: eda-postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eda-postgres
+  namespace: aax
+spec:
+  selector:
+    app: eda-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eda-redis
+  namespace: aax
+  labels:
+    app: eda-redis
+    app.kubernetes.io/name: eda-redis
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eda-redis
+  template:
+    metadata:
+      labels:
+        app: eda-redis
+        app.kubernetes.io/name: eda-redis
+        app.kubernetes.io/component: cache
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: eda-redis
+          image: redis:7
+          imagePullPolicy: IfNotPresent
+          command: ["redis-server", "--appendonly", "yes"]
+          ports:
+            - containerPort: 6379
+              name: redis
+          volumeMounts:
+            - name: eda-redis-data
+              mountPath: /data
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 20
+      volumes:
+        - name: eda-redis-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eda-redis
+  namespace: aax
+spec:
+  selector:
+    app: eda-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eda-controller
+  namespace: aax
+  labels:
+    app: eda-controller
+    app.kubernetes.io/name: eda-controller
+    app.kubernetes.io/component: eda
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eda-controller
+  template:
+    metadata:
+      labels:
+        app: eda-controller
+        app.kubernetes.io/name: eda-controller
+        app.kubernetes.io/component: eda
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: eda-controller
+          image: aax/eda-controller:1.0.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: EDA_DB_HOST
+              value: eda-postgres
+            - name: EDA_DB_PORT
+              value: "5432"
+            - name: EDA_DB_NAME
+              value: eda
+            - name: EDA_DB_USER
+              value: eda
+            - name: EDA_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: EDA_DB_PASSWORD
+            - name: EDA_REDIS_HOST
+              value: eda-redis
+            - name: EDA_REDIS_PORT
+              value: "6379"
+            - name: EDA_PORT
+              value: "5000"
+            - name: EDA_HOST
+              value: 0.0.0.0
+            - name: EDA_LOG_LEVEL
+              value: INFO
+            - name: EDA_SKIP_DB_WAIT
+              value: "false"
+          ports:
+            - containerPort: 5000
+              name: http
+          volumeMounts:
+            - name: eda-projects
+              mountPath: /home/eda/projects
+            - name: eda-logs
+              mountPath: /var/log/eda
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - >-
+                  import os
+                  import socket
+                  import urllib.request
+
+                  checks = [
+                      (os.getenv('EDA_DB_HOST', 'eda-postgres'), int(os.getenv('EDA_DB_PORT', '5432'))),
+                      (os.getenv('EDA_REDIS_HOST', 'eda-redis'), int(os.getenv('EDA_REDIS_PORT', '6379'))),
+                  ]
+                  for host, port in checks:
+                      sock = socket.socket()
+                      sock.settimeout(2)
+                      try:
+                          sock.connect((host, port))
+                      finally:
+                          sock.close()
+
+                  urllib.request.urlopen(
+                      f"http://127.0.0.1:{os.getenv('EDA_PORT', '5000')}/health",
+                      timeout=2,
+                  )
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 40
+            periodSeconds: 30
+      volumes:
+        - name: eda-projects
+          persistentVolumeClaim:
+            claimName: eda-projects
+        - name: eda-logs
+          persistentVolumeClaim:
+            claimName: eda-logs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eda-controller
+  namespace: aax
+spec:
+  selector:
+    app: eda-controller
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000

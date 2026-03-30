@@ -6,14 +6,18 @@ services:
       args:
         BUILD_DATE: ${BUILD_DATE:-}
         VCS_REF: ${VCS_REF:-}
-        VERSION: ${VERSION:-dev}
-    image: aax/ee-base:${VERSION:-dev}
+        VERSION: ${VERSION:-1.0.0}
+    image: aax/ee-base:${VERSION:-1.0.0}
     pull_policy: build
     working_dir: /workspace
     volumes:
       - workspace:/workspace:rw
     environment:
       ANSIBLE_NOCOWS: "1"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     networks:
       - ansible
     healthcheck:
@@ -30,9 +34,9 @@ services:
       args:
         BUILD_DATE: ${BUILD_DATE:-}
         VCS_REF: ${VCS_REF:-}
-        VERSION: ${VERSION:-dev}
-        BASE_IMAGE: aax/ee-base:${VERSION:-dev}
-    image: aax/ee-builder:${VERSION:-dev}
+        VERSION: ${VERSION:-1.0.0}
+        BASE_IMAGE: aax/ee-base:${VERSION:-1.0.0}
+    image: aax/ee-builder:${VERSION:-1.0.0}
     pull_policy: build
     depends_on:
       ee-base:
@@ -44,6 +48,10 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       ANSIBLE_NOCOWS: "1"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     networks:
       - ansible
     healthcheck:
@@ -60,9 +68,9 @@ services:
       args:
         BUILD_DATE: ${BUILD_DATE:-}
         VCS_REF: ${VCS_REF:-}
-        VERSION: ${VERSION:-dev}
-        BASE_IMAGE: aax/ee-base:${VERSION:-dev}
-    image: aax/dev-tools:${VERSION:-dev}
+        VERSION: ${VERSION:-1.0.0}
+        BASE_IMAGE: aax/ee-base:${VERSION:-1.0.0}
+    image: aax/dev-tools:${VERSION:-1.0.0}
     pull_policy: build
     depends_on:
       ee-base:
@@ -73,6 +81,10 @@ services:
     environment:
       ANSIBLE_NOCOWS: "1"
       PAGER: ""
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     networks:
       - ansible
     healthcheck:
@@ -91,7 +103,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-awx}
       POSTGRES_USER: ${POSTGRES_USER:-awx}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-awxpass}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD must be set (non-empty) in .env or environment}
       POSTGRES_HOST_AUTH_METHOD: scram-sha-256
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
     volumes:
@@ -127,41 +139,43 @@ services:
     build:
       context: ./images/awx
       args:
-        VERSION: ${VERSION:-dev}
+        VERSION: ${VERSION:-1.0.0}
         BUILD_DATE: ${BUILD_DATE:-}
         VCS_REF: ${VCS_REF:-}
-    image: ${AWX_IMAGE:-aax/awx:latest}
+    image: ${AWX_IMAGE:-aax/awx:1.0.0}
     pull_policy: build
     container_name: awx-web
     hostname: awx
     user: "0"
+    # yamllint disable rule:line-length
     entrypoint:
       [
         "/bin/bash",
         "-c",
-        "mkdir -p /etc/tower /etc/nginx/conf.d\ncat > /etc/tower/settings.py << 'PYEOF'\nimport os\nDATABASES = {\n    'default': {\n        'ENGINE': 'django.db.backends.postgresql',\n        'NAME': os.getenv('POSTGRES_NAME', 'awx'),\n        'USER': os.getenv('POSTGRES_USER', 'awx'),\n        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'awxpass'),\n        'HOST': os.getenv('POSTGRES_SERVICE_HOST', 'awx-postgres'),\n        'PORT': int(os.getenv('POSTGRES_SERVICE_PORT', 5432)),\n        'ATOMIC_REQUESTS': True,\n        'CONN_MAX_AGE': 0,\n    }\n}\nSECRET_KEY = os.getenv('SECRET_KEY', 'awxsecret_change_me')\nALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]\nDEBUG = False\nCSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.getenv('AWX_CSRF_TRUSTED_ORIGINS', 'http://localhost:8080,http://localhost,http://127.0.0.1:8080').split(',') if origin.strip()]\nSESSION_COOKIE_SECURE = False\nCSRF_COOKIE_SECURE = False\nSESSION_COOKIE_SAMESITE = 'Lax'\nCSRF_COOKIE_SAMESITE = 'Lax'\nREDIS_HOST = os.getenv('REDIS_SERVICE_HOST', 'awx-redis')\nREDIS_PORT = int(os.getenv('REDIS_SERVICE_PORT', 6379))\nCHANNELS = {\n    'default': {\n        'BACKEND': 'channels_redis.core.RedisChannelLayer',\n        'CONFIG': {'hosts': [(REDIS_HOST, REDIS_PORT)]},\n    },\n}\nPYEOF\ncat > /etc/nginx/conf.d/awx.conf << 'NGEOF'\nserver {\n    listen 8052 default_server;\n    listen [::]:8052 default_server;\n    server_name _;\n    client_max_body_size 0;\n\n    location /static/ {\n        alias /var/lib/awx/public/static/;\n        expires 1h;\n        add_header Cache-Control \"public\";\n    }\n\n    location /media/ {\n        alias /var/lib/awx/public/media/;\n        expires 1h;\n        add_header Cache-Control \"public\";\n    }\n\n    location / {\n        include uwsgi_params;\n        uwsgi_pass 127.0.0.1:8050;\n        uwsgi_read_timeout 120s;\n        uwsgi_send_timeout 120s;\n    }\n}\nNGEOF\nsed -i 's/autostart=true/autostart=false/g' /etc/supervisord_web.conf\nsed -i 's/programs=nginx,uwsgi,daphne,awx-cache-clear,ws-heartbeat/programs=nginx,uwsgi,awx-cache-clear/g' /etc/supervisord_web.conf\nsed -i '/\\[program:daphne\\]/a autostart=false' /etc/supervisord_web.conf\nsed -i '/\\[program:ws-heartbeat\\]/a autostart=false' /etc/supervisord_web.conf\n/usr/bin/launch_awx_web.sh",
+        "mkdir -p /etc/tower /etc/nginx/conf.d\ncat > /etc/tower/settings.py << 'PYEOF'\nimport os\nALLOW_PLACEHOLDER_SECRETS = os.getenv('AAX_ALLOW_PLACEHOLDER_SECRETS', 'false').lower() == 'true'\nif not ALLOW_PLACEHOLDER_SECRETS:\n    for _name in ('DATABASE_PASSWORD', 'SECRET_KEY', 'AWX_ADMIN_PASSWORD'):\n        _value = os.getenv(_name, '')\n        if _value.startswith('REPLACE_WITH_') or _value.startswith('CHANGE_ME_'):\n            raise RuntimeError(f'{_name} contains placeholder value; set AAX_ALLOW_PLACEHOLDER_SECRETS=true only for local dev')\nDATABASES = {\n    'default': {\n        'ENGINE': 'django.db.backends.postgresql',\n        'NAME': os.getenv('DATABASE_NAME', 'awx'),\n        'USER': os.getenv('DATABASE_USER', 'awx'),\n        'PASSWORD': os.environ['DATABASE_PASSWORD'],\n        'HOST': os.getenv('DATABASE_HOST', 'awx-postgres'),\n        'PORT': int(os.getenv('DATABASE_PORT', 5432)),\n        'ATOMIC_REQUESTS': True,\n        'CONN_MAX_AGE': 0,\n    }\n}\nSECRET_KEY = os.environ['SECRET_KEY']\nALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]\nDEBUG = False\nCSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.getenv('AWX_CSRF_TRUSTED_ORIGINS', 'http://localhost:8080,http://localhost,http://127.0.0.1:8080,http://localhost:8088,http://127.0.0.1:8088').split(',') if origin.strip()]\nALLOW_INSECURE_COOKIES = os.getenv('AWX_ALLOW_INSECURE_COOKIES', 'false').lower() == 'true'\nSESSION_COOKIE_SECURE = not ALLOW_INSECURE_COOKIES\nCSRF_COOKIE_SECURE = not ALLOW_INSECURE_COOKIES\nSESSION_COOKIE_SAMESITE = 'Lax'\nCSRF_COOKIE_SAMESITE = 'Lax'\nREDIS_HOST = os.getenv('REDIS_SERVICE_HOST', 'awx-redis')\nREDIS_PORT = int(os.getenv('REDIS_SERVICE_PORT', 6379))\nCHANNELS = {\n    'default': {\n        'BACKEND': 'channels_redis.core.RedisChannelLayer',\n        'CONFIG': {'hosts': [(REDIS_HOST, REDIS_PORT)]},\n    },\n}\nPYEOF\ncat > /etc/nginx/conf.d/awx.conf << 'NGEOF'\nserver {\n    listen 8052 default_server;\n    listen [::]:8052 default_server;\n    server_name _;\n    client_max_body_size 0;\n\n    location /static/ {\n        alias /var/lib/awx/public/static/;\n        expires 1h;\n        add_header Cache-Control \"public\";\n    }\n\n    location /media/ {\n        alias /var/lib/awx/public/media/;\n        expires 1h;\n        add_header Cache-Control \"public\";\n    }\n\n    location / {\n        include uwsgi_params;\n        uwsgi_pass 127.0.0.1:8050;\n        uwsgi_read_timeout 120s;\n        uwsgi_send_timeout 120s;\n    }\n}\nNGEOF\nsed -i 's/autostart=true/autostart=false/g' /etc/supervisord_web.conf\nsed -i 's/programs=nginx,uwsgi,daphne,awx-cache-clear,ws-heartbeat/programs=nginx,uwsgi,awx-cache-clear/g' /etc/supervisord_web.conf\nsed -i '/\\[program:daphne\\]/a autostart=false' /etc/supervisord_web.conf\nsed -i '/\\[program:ws-heartbeat\\]/a autostart=false' /etc/supervisord_web.conf\n/usr/bin/launch_awx_web.sh",
       ]
     environment:
-      POSTGRES_SERVICE_HOST: ${DATABASE_HOST:-awx-postgres}
-      POSTGRES_SERVICE_PORT: ${DATABASE_PORT:-5432}
-      POSTGRES_NAME: ${DATABASE_NAME:-awx}
-      POSTGRES_USER: ${DATABASE_USER:-awx}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-awxpass}
+      DATABASE_HOST: ${DATABASE_HOST:-awx-postgres}
+      DATABASE_PORT: ${DATABASE_PORT:-5432}
+      DATABASE_NAME: ${DATABASE_NAME:-awx}
+      DATABASE_USER: ${DATABASE_USER:-awx}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD must be set (non-empty) in .env or environment}
       REDIS_SERVICE_PORT: ${REDIS_PORT:-6379}
       REDIS_SERVICE_HOST: ${REDIS_HOST:-awx-redis}
       AWX_ADMIN_USER: ${AWX_ADMIN_USER:-admin}
-      AWX_ADMIN_PASSWORD: ${AWX_ADMIN_PASSWORD:-password}
-      SECRET_KEY: ${SECRET_KEY:-awxsecret_change_me}
+      AWX_ADMIN_PASSWORD: ${AWX_ADMIN_PASSWORD:?AWX_ADMIN_PASSWORD must be set (non-empty) in .env or environment}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set (non-empty) in .env or environment}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
-      AWX_CSRF_TRUSTED_ORIGINS: ${AWX_CSRF_TRUSTED_ORIGINS:-http://localhost:8080,http://localhost,http://127.0.0.1:8080}
+      AWX_CSRF_TRUSTED_ORIGINS: ${AWX_CSRF_TRUSTED_ORIGINS:-http://localhost:8080,http://localhost,http://127.0.0.1:8080,http://localhost:8088,http://127.0.0.1:8088}
+      AWX_ALLOW_INSECURE_COOKIES: ${AWX_ALLOW_INSECURE_COOKIES:-false}
+      AAX_ALLOW_PLACEHOLDER_SECRETS: ${AAX_ALLOW_PLACEHOLDER_SECRETS:-false}
       RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-true}
-      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-aax/ee-base:latest}
+      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-aax/ee-base:1.0.0}
     ports:
-      - "${AWX_WEB_PORT:-8080}:8052"
+      - "${HOST_BIND:-127.0.0.1}:${AWX_WEB_PORT:-8080}:8052"
     volumes:
       - awx_projects:/var/lib/awx/projects
       - awx_rsyslog:/var/log/tower
-      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - awx-network
       - hub-network
@@ -183,10 +197,10 @@ services:
     build:
       context: ./images/awx
       args:
-        VERSION: ${VERSION:-dev}
+        VERSION: ${VERSION:-1.0.0}
         BUILD_DATE: ${BUILD_DATE:-}
         VCS_REF: ${VCS_REF:-}
-    image: ${AWX_IMAGE:-aax/awx:latest}
+    image: ${AWX_IMAGE:-aax/awx:1.0.0}
     pull_policy: build
     container_name: awx-task
     hostname: awx
@@ -195,27 +209,28 @@ services:
       [
         "/bin/bash",
         "-c",
-        "mkdir -p /etc/tower && cat > /etc/tower/settings.py << 'PYEOF'\nimport os\nDATABASES = {'default': {'ENGINE': 'django.db.backends.postgresql', 'NAME': os.getenv('DATABASE_NAME', 'awx'), 'USER': os.getenv('DATABASE_USER', 'awx'), 'PASSWORD': os.getenv('DATABASE_PASSWORD', 'awxpass'), 'HOST': os.getenv('DATABASE_HOST', 'awx-postgres'), 'PORT': int(os.getenv('DATABASE_PORT', 5432))}}\nSECRET_KEY = os.getenv('SECRET_KEY', 'awxsecret')\nDEBUG = False\nALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]\nBROADCAST_WEBSOCKET_SECRET = os.getenv('SECRET_KEY', 'awxsecret')\nPYEOF\nexec /usr/local/bin/dumb-init -- /usr/bin/launch_awx_task.sh",
+        "mkdir -p /etc/tower && cat > /etc/tower/settings.py << 'PYEOF'\nimport os\nALLOW_PLACEHOLDER_SECRETS = os.getenv('AAX_ALLOW_PLACEHOLDER_SECRETS', 'false').lower() == 'true'\nif not ALLOW_PLACEHOLDER_SECRETS:\n    for _name in ('DATABASE_PASSWORD', 'SECRET_KEY'):\n        _value = os.getenv(_name, '')\n        if _value.startswith('REPLACE_WITH_') or _value.startswith('CHANGE_ME_'):\n            raise RuntimeError(f'{_name} contains placeholder value; set AAX_ALLOW_PLACEHOLDER_SECRETS=true only for local dev')\nDATABASES = {'default': {'ENGINE': 'django.db.backends.postgresql', 'NAME': os.getenv('DATABASE_NAME', 'awx'), 'USER': os.getenv('DATABASE_USER', 'awx'), 'PASSWORD': os.environ['DATABASE_PASSWORD'], 'HOST': os.getenv('DATABASE_HOST', 'awx-postgres'), 'PORT': int(os.getenv('DATABASE_PORT', 5432))}}\nSECRET_KEY = os.environ['SECRET_KEY']\nDEBUG = False\nALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]\nBROADCAST_WEBSOCKET_SECRET = os.environ['SECRET_KEY']\nPYEOF\nexec /usr/local/bin/dumb-init -- /usr/bin/launch_awx_task.sh",
       ]
+    # yamllint enable rule:line-length
     environment:
       DATABASE_USER: ${DATABASE_USER:-awx}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-awxpass}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD must be set (non-empty) in .env or environment}
       DATABASE_NAME: ${DATABASE_NAME:-awx}
       DATABASE_PORT: ${DATABASE_PORT:-5432}
       DATABASE_HOST: ${DATABASE_HOST:-awx-postgres}
       REDIS_HOST: ${REDIS_HOST:-awx-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
-      SECRET_KEY: ${SECRET_KEY:-awxsecret}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set (non-empty) in .env or environment}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
       AWX_SKIP_MIGRATIONS: ${AWX_SKIP_MIGRATIONS:-false}
       DJANGO_SETTINGS_MODULE: awx.settings.production
       AWX_SETTINGS_FILE: /dev/null
+      AAX_ALLOW_PLACEHOLDER_SECRETS: ${AAX_ALLOW_PLACEHOLDER_SECRETS:-false}
       RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-true}
-      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-aax/ee-base:latest}
+      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-aax/ee-base:1.0.0}
     volumes:
       - awx_projects:/var/lib/awx/projects
       - awx_rsyslog:/var/log/tower
-      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - awx-network
       - hub-network
@@ -232,7 +247,7 @@ services:
       start_period: 120s
 
   awx-receptor:
-    image: ${RECEPTOR_IMAGE:-quay.io/ansible/receptor:latest}
+    image: ${RECEPTOR_IMAGE:-quay.io/ansible/receptor:1.5.7}
     container_name: awx-receptor
     profiles:
       - controller
@@ -241,31 +256,17 @@ services:
     environment:
       RECEPTOR_CONFIG: |
         ---
-        # Receptor node configuration for AWX execution
-
-        # Node configuration
         - node:
-            id: receptor-node
-
-        # Control socket for receptorctl
+            id: receptor-controller
         - control-service:
             service: control
             filename: /var/lib/receptor/receptor.sock
             permissions: "0660"
-
-        # TCP listener for mesh communication
         - tcp-listener:
             port: 8888
             bindaddr: 0.0.0.0
-
-        # Work command configuration for Ansible execution
-        - work-command:
-            worktype: ansible-runner
-            command: ansible-runner
-            params: worker
-            allowruntimeparams: true
-
-        # Logging configuration
+        - tcp-peer:
+            address: receptor-hop:8888
         - log-level:
             level: info
     command:
@@ -281,7 +282,7 @@ services:
     networks:
       - awx-network
     ports:
-      - "${AWX_RECEPTOR_PORT:-8888}:8888"
+      - "${HOST_BIND:-127.0.0.1}:${AWX_RECEPTOR_PORT:-8888}:8888"
     healthcheck:
       test:
         [
@@ -295,6 +296,144 @@ services:
       timeout: 10s
       retries: 3
 
+  receptor-hop:
+    image: ${RECEPTOR_IMAGE:-quay.io/ansible/receptor:1.5.7}
+    container_name: receptor-hop
+    profiles:
+      - controller
+    hostname: receptor-hop
+    user: "0"
+    environment:
+      RECEPTOR_CONFIG: |
+        ---
+        - node:
+            id: receptor-hop
+        - control-service:
+            service: control
+            filename: /var/lib/receptor/receptor.sock
+            permissions: "0660"
+        - tcp-listener:
+            port: 8888
+            bindaddr: 0.0.0.0
+        - tcp-peer:
+            address: awx-receptor:8888
+        - tcp-peer:
+            address: receptor-execution:8888
+        - log-level:
+            level: info
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        mkdir -p /etc/receptor
+        printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
+        receptor --config /etc/receptor/receptor.conf
+    volumes:
+      - receptor_hop_data:/var/lib/receptor
+    networks:
+      - awx-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "receptorctl",
+          "--socket",
+          "/var/lib/receptor/receptor.sock",
+          "status",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  receptor-execution:
+    image: ${RECEPTOR_IMAGE:-quay.io/ansible/receptor:1.5.7}
+    container_name: receptor-execution
+    profiles:
+      - controller
+    hostname: receptor-execution
+    user: "0"
+    environment:
+      RECEPTOR_CONFIG: |
+        ---
+        - node:
+            id: receptor-execution
+        - control-service:
+            service: control
+            filename: /var/lib/receptor/receptor.sock
+            permissions: "0660"
+        - tcp-listener:
+            port: 8888
+            bindaddr: 0.0.0.0
+        - tcp-peer:
+            address: receptor-hop:8888
+        - work-command:
+            worktype: ansible-runner
+            command: ansible-runner
+            params: worker
+            allowruntimeparams: true
+        - log-level:
+            level: info
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        mkdir -p /etc/receptor
+        printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
+        receptor --config /etc/receptor/receptor.conf
+    volumes:
+      - receptor_execution_data:/var/lib/receptor
+    networks:
+      - awx-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "receptorctl",
+          "--socket",
+          "/var/lib/receptor/receptor.sock",
+          "status",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  gateway:
+    build:
+      context: ./images/gateway
+      args:
+        BUILD_DATE: ${BUILD_DATE:-}
+        VCS_REF: ${VCS_REF:-}
+        VERSION: ${VERSION:-1.0.0}
+    image: aax/gateway:${VERSION:-1.0.0}
+    pull_policy: build
+    container_name: aax-gateway
+    profiles:
+      - controller
+      - hub
+      - eda
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:${GATEWAY_PORT:-8088}:8080"
+    networks:
+      - awx-network
+      - hub-network
+      - eda-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8080/healthz >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
   hub-postgres:
     image: postgres:16-alpine
     container_name: aax-hub-postgres
@@ -302,7 +441,7 @@ services:
       - hub
     environment:
       POSTGRES_USER: galaxy
-      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:-hubpassword}
+      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:?HUB_DB_PASSWORD must be set (non-empty) in .env or environment}
       POSTGRES_DB: hub
       POSTGRES_INITDB_ARGS: "-E UTF8"
     volumes:
@@ -342,16 +481,20 @@ services:
       args:
         BUILD_DATE: ${BUILD_DATE:-}
         VCS_REF: ${VCS_REF:-}
-        VERSION: ${VERSION:-dev}
-    image: aax/pulp:${VERSION:-dev}
+        VERSION: ${VERSION:-1.0.0}
+    image: aax/pulp:${VERSION:-1.0.0}
     pull_policy: build
     container_name: aax-pulp-api
     command: ["pulpcore-api"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       POSTGRES_HOST: hub-postgres
       POSTGRES_PORT: 5432
       POSTGRES_USER: galaxy
-      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:-hubpassword}
+      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:?HUB_DB_PASSWORD must be set (non-empty) in .env or environment}
       POSTGRES_DB: hub
       REDIS_HOST: hub-redis
       REDIS_PORT: 6379
@@ -377,20 +520,22 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
-    ports:
-      - "${PULP_API_PORT:-24817}:24817"
 
   pulp-content:
     profiles:
       - hub
-    image: aax/pulp:${VERSION:-dev}
+    image: aax/pulp:${VERSION:-1.0.0}
     container_name: aax-pulp-content
     command: ["pulpcore-content"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       POSTGRES_HOST: hub-postgres
       POSTGRES_PORT: 5432
       POSTGRES_USER: galaxy
-      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:-hubpassword}
+      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:?HUB_DB_PASSWORD must be set (non-empty) in .env or environment}
       POSTGRES_DB: hub
       REDIS_HOST: hub-redis
       REDIS_PORT: 6379
@@ -413,20 +558,22 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    ports:
-      - "${PULP_CONTENT_PORT:-24816}:24816"
 
   pulp-worker:
     profiles:
       - hub
-    image: aax/pulp:${VERSION:-dev}
+    image: aax/pulp:${VERSION:-1.0.0}
     container_name: aax-pulp-worker
     command: ["pulpcore-worker"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       POSTGRES_HOST: hub-postgres
       POSTGRES_PORT: 5432
       POSTGRES_USER: galaxy
-      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:-hubpassword}
+      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:?HUB_DB_PASSWORD must be set (non-empty) in .env or environment}
       POSTGRES_DB: hub
       REDIS_HOST: hub-redis
       REDIS_PORT: 6379
@@ -458,26 +605,30 @@ services:
       args:
         BUILD_DATE: ${BUILD_DATE:-}
         VCS_REF: ${VCS_REF:-}
-        VERSION: ${VERSION:-dev}
-    image: aax/galaxy-ng:${VERSION:-dev}
+        VERSION: ${VERSION:-1.0.0}
+    image: aax/galaxy-ng:${VERSION:-1.0.0}
     pull_policy: build
     container_name: aax-galaxy-ng
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       POSTGRES_HOST: hub-postgres
       POSTGRES_PORT: 5432
       POSTGRES_USER: galaxy
-      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:-hubpassword}
+      POSTGRES_PASSWORD: ${HUB_DB_PASSWORD:?HUB_DB_PASSWORD must be set (non-empty) in .env or environment}
       POSTGRES_DB: hub
       REDIS_HOST: hub-redis
       REDIS_PORT: 6379
       PULP_API_ROOT: http://pulp-api:24817
-      PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://localhost:24816}
-      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:5001}
+      PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://pulp-content:24816}
+      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://galaxy-ng:8000}
       GALAXY_ADMIN_USERNAME: ${GALAXY_ADMIN_USERNAME:-admin}
-      GALAXY_ADMIN_PASSWORD: ${HUB_ADMIN_PASSWORD:-changeme}
+      GALAXY_ADMIN_PASSWORD: ${HUB_ADMIN_PASSWORD:?HUB_ADMIN_PASSWORD must be set (non-empty) in .env or environment}
       GALAXY_ADMIN_EMAIL: ${GALAXY_ADMIN_EMAIL:-admin@example.com}
-      GALAXY_SECRET_KEY: ${GALAXY_SECRET_KEY:-change-me-to-a-long-random-string}
-      GALAXY_ALLOWED_HOSTS: ${GALAXY_ALLOWED_HOSTS:-*}
+      GALAXY_SECRET_KEY: ${GALAXY_SECRET_KEY:?GALAXY_SECRET_KEY must be set (non-empty) in .env or environment}
+      GALAXY_ALLOWED_HOSTS: ${GALAXY_ALLOWED_HOSTS:-localhost,127.0.0.1,galaxy-ng,gateway}
       GALAXY_SIGNATURE_UPLOAD_ENABLED: ${GALAXY_SIGNATURE_UPLOAD_ENABLED:-false}
       GALAXY_REQUIRE_CONTENT_APPROVAL: ${GALAXY_REQUIRE_CONTENT_APPROVAL:-true}
       GALAXY_AUTO_SIGN_COLLECTIONS: ${GALAXY_AUTO_SIGN_COLLECTIONS:-false}
@@ -503,7 +654,7 @@ services:
       retries: 5
       start_period: 90s
     ports:
-      - "${GALAXY_PORT:-5001}:8000"
+      - "${HOST_BIND:-127.0.0.1}:${GALAXY_PORT:-5001}:8000"
 
   eda-postgres:
     image: postgres:15
@@ -513,7 +664,7 @@ services:
     environment:
       POSTGRES_DB: ${EDA_DB_NAME:-eda}
       POSTGRES_USER: ${EDA_DB_USER:-eda}
-      POSTGRES_PASSWORD: ${EDA_DB_PASSWORD:-edapass}
+      POSTGRES_PASSWORD: ${EDA_DB_PASSWORD:?EDA_DB_PASSWORD must be set (non-empty) in .env or environment}
       POSTGRES_HOST_AUTH_METHOD: scram-sha-256
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
     volumes:
@@ -548,20 +699,25 @@ services:
       context: images/eda-controller
       dockerfile: Dockerfile
       args:
-        VERSION: ${VERSION:-dev}
+        VERSION: ${VERSION:-1.0.0}
         BUILD_DATE: ${BUILD_DATE:-unknown}
         VCS_REF: ${VCS_REF:-unknown}
         EDA_VERSION: 1.1.3
+    image: aax/eda-controller:${VERSION:-1.0.0}
     pull_policy: build
     container_name: eda-controller
     profiles:
       - eda
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       EDA_DB_HOST: eda-postgres
       EDA_DB_PORT: 5432
       EDA_DB_NAME: ${EDA_DB_NAME:-eda}
       EDA_DB_USER: ${EDA_DB_USER:-eda}
-      EDA_DB_PASSWORD: ${EDA_DB_PASSWORD:-edapass}
+      EDA_DB_PASSWORD: ${EDA_DB_PASSWORD:?EDA_DB_PASSWORD must be set (non-empty) in .env or environment}
       EDA_REDIS_HOST: eda-redis
       EDA_REDIS_PORT: 6379
       EDA_PORT: 5000
@@ -577,11 +733,39 @@ services:
       - eda_projects:/home/eda/projects
       - eda_logs:/var/log/eda
     ports:
-      - "${EDA_PORT:-5000}:5000"
+      - "${HOST_BIND:-127.0.0.1}:${EDA_PORT:-5000}:5000"
     networks:
+      - awx-network
       - eda-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test:
+        - CMD-SHELL
+        - |-
+          python - <<'PY'
+          import os
+          import socket
+          import sys
+          import urllib.request
+
+          checks = [
+              (os.getenv('EDA_DB_HOST', 'eda-postgres'), int(os.getenv('EDA_DB_PORT', '5432'))),
+              (os.getenv('EDA_REDIS_HOST', 'eda-redis'), int(os.getenv('EDA_REDIS_PORT', '6379'))),
+          ]
+          for host, port in checks:
+              sock = socket.socket()
+              sock.settimeout(2)
+              try:
+                  sock.connect((host, port))
+              except Exception:
+                  sys.exit(1)
+              finally:
+                  sock.close()
+
+          urllib.request.urlopen(
+              f"http://127.0.0.1:{os.getenv('EDA_PORT', '5000')}/health",
+              timeout=2,
+          )
+          PY
       interval: 30s
       timeout: 10s
       retries: 3
@@ -625,6 +809,10 @@ volumes:
     name: awx_rsyslog
   receptor_data:
     name: receptor_data
+  receptor_hop_data:
+    name: receptor_hop_data
+  receptor_execution_data:
+    name: receptor_execution_data
   hub_postgres_data:
     labels:
       com.aax.description: "PostgreSQL database for Private Automation Hub"

@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../
+  - external-secret.example.yaml
+
+patches:
+  - path: delete-dev-secret.yaml
+    target:
+      kind: Secret
+      name: aax-secrets
+      namespace: aax

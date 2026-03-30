@@ -7,15 +7,32 @@ namespace: aax
 resources:
   - namespace.yaml
   - configmap.yaml
+  - secret.yaml
+  - awx-settings-configmap.yaml
+  - receptor-configs.yaml
   - persistent-volumes.yaml
   - ee-base-deployment.yaml
   - ee-builder-deployment.yaml
   - dev-tools-deployment.yaml
+  - controller-stack.yaml
+  - hub-stack.yaml
+  - eda-stack.yaml
+  - gateway-deployment.yaml
 
 images:
   - name: aax/ee-base
-    newTag: latest
+    newTag: 1.0.0
   - name: aax/ee-builder
-    newTag: latest
+    newTag: 1.0.0
   - name: aax/dev-tools
-    newTag: latest
+    newTag: 1.0.0
+  - name: aax/awx
+    newTag: 1.0.0
+  - name: aax/pulp
+    newTag: 1.0.0
+  - name: aax/galaxy-ng
+    newTag: 1.0.0
+  - name: aax/eda-controller
+    newTag: 1.0.0
+  - name: aax/gateway
+    newTag: 1.0.0

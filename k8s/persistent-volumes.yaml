@@ -62,3 +62,147 @@ spec:
     requests:
       storage: 10Gi
   storageClassName: hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: awx-postgres-data
+  namespace: aax
+  labels:
+    app.kubernetes.io/name: awx-postgres-data
+    app.kubernetes.io/part-of: aax
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: awx-projects
+  namespace: aax
+  labels:
+    app.kubernetes.io/name: awx-projects
+    app.kubernetes.io/part-of: aax
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: awx-rsyslog
+  namespace: aax
+  labels:
+    app.kubernetes.io/name: awx-rsyslog
+    app.kubernetes.io/part-of: aax
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hub-postgres-data
+  namespace: aax
+  labels:
+    app.kubernetes.io/name: hub-postgres-data
+    app.kubernetes.io/part-of: aax
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hub-pulp-storage
+  namespace: aax
+  labels:
+    app.kubernetes.io/name: hub-pulp-storage
+    app.kubernetes.io/part-of: aax
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hub-assets
+  namespace: aax
+  labels:
+    app.kubernetes.io/name: hub-assets
+    app.kubernetes.io/part-of: aax
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: eda-postgres-data
+  namespace: aax
+  labels:
+    app.kubernetes.io/name: eda-postgres-data
+    app.kubernetes.io/part-of: aax
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: eda-projects
+  namespace: aax
+  labels:
+    app.kubernetes.io/name: eda-projects
+    app.kubernetes.io/part-of: aax
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: eda-logs
+  namespace: aax
+  labels:
+    app.kubernetes.io/name: eda-logs
+    app.kubernetes.io/part-of: aax
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: hostpath

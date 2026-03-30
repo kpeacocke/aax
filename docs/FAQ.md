@@ -78,7 +78,7 @@ cat > execution-environment.yml <<EOF
 version: 3
 images:
   base_image:
-    name: aax/ee-base:latest
+    name: aax/ee-base:1.0.0
 
 dependencies:
   python: requirements.txt
@@ -95,7 +95,7 @@ EOF
 # Build
 docker compose exec ee-builder ansible-builder build \
   -f execution-environment.yml \
-  -t my-custom-ee:latest
+  -t my-custom-ee:1.0.0
 ```
 
 ---
@@ -171,6 +171,23 @@ docker compose exec ee-builder id
 # If not in docker group, restart
 docker compose restart ee-builder
 ```
+
+---
+
+### Q: SSH host key checking breaks local lab runs
+
+**A:** AAX now defaults to secure SSH trust (`host_key_checking=True`). For throwaway local labs only, use a scoped override rather than changing the global default:
+
+```bash
+# One-off command override
+docker compose exec ee-base env ANSIBLE_HOST_KEY_CHECKING=False ansible all -i inventory.ini -m ping
+
+# Or project-local ansible.cfg override in your repo (do not bake into shared images)
+[defaults]
+host_key_checking = False
+```
+
+Keep secure defaults in shared and production-like environments.
 
 ---
 

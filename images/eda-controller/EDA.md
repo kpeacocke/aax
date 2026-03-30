@@ -126,7 +126,7 @@ Default profile configuration in `docker-compose.yml`:
 
 ```yaml
 eda-controller:
-  image: aax/eda-controller:latest
+  image: aax/eda-controller:1.0.0
   ports:
     - "5000:5000"
   environment:
