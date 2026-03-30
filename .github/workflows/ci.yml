@@ -153,13 +153,23 @@ jobs:
         run: pip install pytest pytest-cov
 
       - name: Build base image
-        run: docker build -f ./images/ee-base/Dockerfile -t aax/ee-base:1.0.0 ./images/ee-base
+        run: |
+          docker build \
+            --build-arg VERSION=1.0.0 \
+            --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            --build-arg VCS_REF=${GITHUB_SHA} \
+            -f ./images/ee-base/Dockerfile \
+            -t aax/ee-base:1.0.0 \
+            ./images/ee-base
 
       - name: Build ${{ matrix.image }} image
         if: matrix.image != 'ee-base'
         run: |
           docker build \
             --build-arg BASE_IMAGE=aax/ee-base:1.0.0 \
+            --build-arg VERSION=1.0.0 \
+            --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            --build-arg VCS_REF=${GITHUB_SHA} \
             -f ./images/${{ matrix.image }}/Dockerfile \
             -t aax/${{ matrix.image }}:1.0.0 \
             ./images/${{ matrix.image }}
@@ -194,13 +204,23 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - name: Build base image
-        run: docker build -f ./images/ee-base/Dockerfile -t aax/ee-base:1.0.0 ./images/ee-base
+        run: |
+          docker build \
+            --build-arg VERSION=1.0.0 \
+            --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            --build-arg VCS_REF=${GITHUB_SHA} \
+            -f ./images/ee-base/Dockerfile \
+            -t aax/ee-base:1.0.0 \
+            ./images/ee-base
 
       - name: Build ${{ matrix.image }} image
         if: matrix.image != 'ee-base'
         run: |
           docker build \
             --build-arg BASE_IMAGE=aax/ee-base:1.0.0 \
+            --build-arg VERSION=1.0.0 \
+            --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            --build-arg VCS_REF=${GITHUB_SHA} \
             -f ./images/${{ matrix.image }}/Dockerfile \
             -t aax/${{ matrix.image }}:1.0.0 \
             ./images/${{ matrix.image }}

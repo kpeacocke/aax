@@ -186,17 +186,17 @@ class TestYourNewImage:
     def test_image_builds(self):
         """Test that the image builds successfully."""
         result = subprocess.run(
-          [
-            "docker",
-            "build",
-            "-f",
-            "images/your-new-image/Dockerfile",
-            "-t",
-            "aax/your-new-image:1.0.0",
-            "images/your-new-image",
-          ],
-          capture_output=True,
-          text=True
+            [
+                "docker",
+                "build",
+                "-f",
+                "images/your-new-image/Dockerfile",
+                "-t",
+                "aax/your-new-image:1.0.0",
+                "images/your-new-image",
+            ],
+            capture_output=True,
+            text=True
         )
         assert result.returncode == 0
 
