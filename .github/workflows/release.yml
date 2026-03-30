@@ -22,16 +22,33 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  secrets-scan:
+    name: Scan for Secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@2d792d19f0f05c45aecbf0c58d148842768c598e # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   test:
     name: Pre-Release Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: [secrets-scan]
     strategy:
       matrix:
         image:
           - ee-base
           - ee-builder
           - dev-tools
+          - gateway
       fail-fast: true
     steps:
       - name: Checkout code
@@ -52,7 +69,7 @@ jobs:
       - name: Run hadolint
         uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
         with:
-          dockerfile: images/${{ matrix.image }}/Dockerfile
+          dockerfile: ${{ matrix.image == 'pulp' && 'images/pulp/Dockerfile.pulp' || format('images/{0}/Dockerfile', matrix.image) }}
           failure-threshold: warning
 
       - name: Build base image
@@ -60,7 +77,7 @@ jobs:
         with:
           context: ./images/ee-base
           file: ./images/ee-base/Dockerfile
-          tags: aax/ee-base:latest
+          tags: aax/ee-base:1.0.0
           cache-from: type=gha,scope=ee-base
           cache-to: type=gha,mode=max,scope=ee-base
           load: true
@@ -70,9 +87,9 @@ jobs:
         uses: docker/build-push-action@5cd11c3a4ced054e52742c5fd54dca954e0edd85 # v6.7.0
         with:
           context: ./images/${{ matrix.image == 'ee-base' && 'ee-base' || matrix.image }}
-          file: ./images/${{ matrix.image }}/Dockerfile
-          tags: aax/${{ matrix.image }}:latest
-          build-args: ${{ matrix.image != 'ee-base' && 'BASE_IMAGE=aax/ee-base:latest' || '' }}
+          file: ${{ matrix.image == 'pulp' && './images/pulp/Dockerfile.pulp' || format('./images/{0}/Dockerfile', matrix.image) }}
+          tags: aax/${{ matrix.image }}:1.0.0
+          build-args: ${{ matrix.image != 'ee-base' && 'BASE_IMAGE=aax/ee-base:1.0.0' || '' }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           load: true
@@ -91,6 +108,7 @@ jobs:
           - ee-base
           - dev-tools
           - ee-builder
+          - gateway
       fail-fast: true
     steps:
       - name: Checkout code
@@ -104,7 +122,7 @@ jobs:
         with:
           context: ./images/ee-base
           file: ./images/ee-base/Dockerfile
-          tags: aax/ee-base:latest
+          tags: aax/ee-base:1.0.0
           cache-from: type=gha,scope=ee-base
           load: true
         if: matrix.image != 'ee-base'
@@ -114,15 +132,15 @@ jobs:
         with:
           context: ./images/${{ matrix.image == 'ee-base' && 'ee-base' || matrix.image }}
           file: ./images/${{ matrix.image }}/Dockerfile
-          tags: aax/${{ matrix.image }}:latest
-          build-args: ${{ matrix.image != 'ee-base' && 'BASE_IMAGE=aax/ee-base:latest' || '' }}
+          tags: aax/${{ matrix.image }}:1.0.0
+          build-args: ${{ matrix.image != 'ee-base' && 'BASE_IMAGE=aax/ee-base:1.0.0' || '' }}
           cache-from: type=gha,scope=${{ matrix.image }}
           load: true
 
       - name: Run Trivy vulnerability scanner (blocking)
         uses: aquasecurity/trivy-action@6e7b7d1fd3e4fef0c5fa8cce1229c54b2c9bd0d8 # 0.24.0
         with:
-          image-ref: aax/${{ matrix.image }}:latest
+          image-ref: aax/${{ matrix.image }}:1.0.0
           format: sarif
           output: trivy-${{ matrix.image }}.sarif
           severity: HIGH,CRITICAL
@@ -135,11 +153,32 @@ jobs:
           sarif_file: trivy-${{ matrix.image }}.sarif
           category: trivy-${{ matrix.image }}
 
+  policy-checks:
+    name: Policy and Docs Contract Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [test, security-scan, secrets-scan]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install policy test dependencies
+        run: pip install pytest pytest-cov
+
+      - name: Run repository policy and docs contract tests
+        run: pytest -q tests/test_repo_policy.py tests/test_docs_contract.py
+
   release-please:
     name: Create Release
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [test, security-scan]
+    needs: [test, security-scan, policy-checks]
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -162,6 +201,7 @@ jobs:
           - ee-base
           - ee-builder
           - dev-tools
+          - gateway
     steps:
       - name: Checkout code
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
@@ -191,7 +231,6 @@ jobs:
             type=semver,pattern={{version}},value=${{ needs.release-please.outputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=${{ needs.release-please.outputs.version }}
             type=semver,pattern={{major}},value=${{ needs.release-please.outputs.version }}
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build base image for multi-arch
         uses: docker/build-push-action@5cd11c3a4ced054e52742c5fd54dca954e0edd85 # v6.7.0
@@ -199,7 +238,7 @@ jobs:
           context: ./images/ee-base
           file: ./images/ee-base/Dockerfile
           platforms: linux/amd64,linux/arm64
-          tags: aax/ee-base:latest
+          tags: aax/ee-base:${{ needs.release-please.outputs.version }}
           cache-from: type=gha,scope=ee-base
           cache-to: type=gha,mode=max,scope=ee-base
           outputs: type=docker
@@ -216,7 +255,7 @@ jobs:
             VERSION=${{ needs.release-please.outputs.version }}
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
             VCS_REF=${{ github.sha }}
-            ${{ matrix.image != 'ee-base' && 'BASE_IMAGE=aax/ee-base:latest' || '' }}
+            ${{ matrix.image != 'ee-base' && format('BASE_IMAGE=aax/ee-base:{0}', needs.release-please.outputs.version) || '' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           push: true

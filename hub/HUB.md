@@ -52,10 +52,10 @@ Key environment variables for the hub:
 
 ```bash
 # Hub admin credentials
-export HUB_ADMIN_PASSWORD=changeme
+export HUB_ADMIN_PASSWORD=<set-a-strong-password>
 
 # Database configuration
-export HUB_DB_PASSWORD=hubpassword
+export HUB_DB_PASSWORD=<set-a-strong-password>
 
 # Galaxy NG configuration
 export GALAXY_SIGNATURE_UPLOAD_ENABLED=false
@@ -78,13 +78,13 @@ docker compose --profile hub up -d
 
 - **Galaxy NG UI**: <http://localhost:5001>
 - **API Root**: <http://localhost:5001/api/galaxy/>
-- **Pulp API**: <http://localhost:24817/pulp/api/v3/>
-- **Content Delivery**: <http://localhost:24816>
+- **Pulp API via gateway**: <http://localhost:8088/pulp/api/v3/>
+- **Content Delivery via gateway**: <http://localhost:8088/pulp/content/>
 
 Default credentials:
 
 - Username: `admin`
-- Password: (set via `HUB_ADMIN_PASSWORD` or default: `changeme`)
+- Password: value set in `HUB_ADMIN_PASSWORD`
 
 ### 4. Verify Installation
 
@@ -97,6 +97,9 @@ docker compose --profile hub logs -f
 
 # Test API access
 curl http://localhost:5001/api/galaxy/
+
+# Test Pulp access through the unified gateway
+curl http://localhost:8088/pulp/api/v3/status/
 ```
 
 ## Configuration
@@ -153,7 +156,7 @@ Galaxy NG can also serve as a container registry for execution environments.
 
 ```bash
 # Tag your EE image
-docker tag aax/ee-base:latest localhost:5001/ee-base:latest
+docker tag aax/ee-base:1.0.0 localhost:5001/ee-base:1.0.0
 
 # Log in to the registry
 docker login localhost:5001
@@ -161,13 +164,13 @@ docker login localhost:5001
 # Password: <HUB_ADMIN_PASSWORD>
 
 # Push the image
-docker push localhost:5001/ee-base:latest
+docker push localhost:5001/ee-base:1.0.0
 ```
 
 #### Pull from the Hub
 
 ```bash
-docker pull localhost:5001/ee-base:latest
+docker pull localhost:5001/ee-base:1.0.0
 ```
 
 ## Integration with AWX
@@ -240,7 +243,7 @@ curl http://localhost:5001/api/galaxy/v3/collections/namespace/collection/
 # Get auth token first
 TOKEN=$(curl -X POST http://localhost:5001/api/galaxy/v3/auth/token/ \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"changeme"}' | jq -r .token) # pragma: allowlist secret
+  -d '{"username":"admin","password":"<your-hub-admin-password>"}' | jq -r .token)
 
 # Upload collection
 curl -X POST http://localhost:5001/api/galaxy/v3/artifacts/collections/ \
@@ -252,10 +255,10 @@ curl -X POST http://localhost:5001/api/galaxy/v3/artifacts/collections/ \
 
 ```bash
 # List repositories
-curl http://localhost:24817/pulp/api/v3/repositories/ansible/ansible/
+curl http://localhost:8088/pulp/api/v3/repositories/ansible/ansible/
 
 # List content
-curl http://localhost:24817/pulp/api/v3/content/ansible/collection_versions/
+curl http://localhost:8088/pulp/api/v3/content/ansible/collection_versions/
 ```
 
 ## Management Commands

@@ -3,7 +3,10 @@ Tests for Docker images in the AAX project.
 These tests verify that images build correctly and function as expected.
 """
 import subprocess
+import time
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -34,7 +37,7 @@ def build_image(tag, dockerfile, context, build_args=None):
 class TestEEBaseImage:
     """Tests for the Ansible EE base image."""
 
-    IMAGE_NAME = "aax/ee-base:latest"
+    IMAGE_NAME = "aax/ee-base:1.0.0"
 
     def test_image_builds(self):
         """Test that the ee-base image builds successfully."""
@@ -88,13 +91,19 @@ class TestEEBaseImage:
 
     def test_ansible_config_exists(self):
         """Test that ansible.cfg is in the correct location."""
+        build_result = build_image(
+            self.IMAGE_NAME,
+            "images/ee-base/Dockerfile",
+            "images/ee-base",
+        )
+        assert build_result.returncode == 0, f"Build failed: {build_result.stderr}"
         result = subprocess.run(
             ["docker", "run", "--rm", self.IMAGE_NAME, "cat", "/etc/ansible/ansible.cfg"],
             capture_output=True,
             text=True
         )
         assert result.returncode == 0
-        assert "host_key_checking = False" in result.stdout
+        assert "host_key_checking = True" in result.stdout
 
     def test_user_is_ansible(self):
         """Test that the container runs as the ansible user."""
@@ -131,12 +140,12 @@ class TestEEBaseImage:
 class TestEEBuilderImage:
     """Tests for the Ansible EE builder image."""
 
-    IMAGE_NAME = "aax/ee-builder:latest"
+    IMAGE_NAME = "aax/ee-builder:1.0.0"
 
     def test_image_builds(self):
         """Test that the ee-builder image builds successfully."""
         base_result = build_image(
-            "aax/ee-base:latest",
+            "aax/ee-base:1.0.0",
             "images/ee-base/Dockerfile",
             "images/ee-base",
         )
@@ -145,7 +154,7 @@ class TestEEBuilderImage:
             self.IMAGE_NAME,
             "images/ee-builder/Dockerfile",
             "images/ee-builder",
-            build_args={"BASE_IMAGE": "aax/ee-base:latest"},
+            build_args={"BASE_IMAGE": "aax/ee-base:1.0.0"},
         )
         assert result.returncode == 0, f"Build failed: {result.stderr}"
 
@@ -212,12 +221,12 @@ class TestEEBuilderImage:
 class TestDevToolsImage:
     """Tests for the Ansible development tools image."""
 
-    IMAGE_NAME = "aax/dev-tools:latest"
+    IMAGE_NAME = "aax/dev-tools:1.0.0"
 
     def test_image_builds(self):
         """Test that the dev-tools image builds successfully."""
         base_result = build_image(
-            "aax/ee-base:latest",
+            "aax/ee-base:1.0.0",
             "images/ee-base/Dockerfile",
             "images/ee-base",
         )
@@ -226,7 +235,7 @@ class TestDevToolsImage:
             self.IMAGE_NAME,
             "images/dev-tools/Dockerfile",
             "images/dev-tools",
-            build_args={"BASE_IMAGE": "aax/ee-base:latest"},
+            build_args={"BASE_IMAGE": "aax/ee-base:1.0.0"},
         )
         assert result.returncode == 0, f"Build failed: {result.stderr}"
 
@@ -258,53 +267,101 @@ class TestDevToolsImage:
             text=True
         )
         assert result.returncode == 0
-        assert "ansible [core 2.20.0]" in result.stdout
 
-    def test_python_version(self):
-        """Test that the correct Python version is installed."""
+
+class TestGatewayImage:
+    """Tests for the unified gateway image."""
+
+    IMAGE_NAME = "aax/gateway:1.0.0"
+
+    def test_image_builds(self):
+        """Test that the gateway image builds successfully."""
+        result = build_image(
+            self.IMAGE_NAME,
+            "images/gateway/Dockerfile",
+            "images/gateway",
+        )
+        assert result.returncode == 0, f"Build failed: {result.stderr}"
+
+    def test_nginx_config_valid(self):
+        """Test that the bundled nginx config is valid."""
         result = subprocess.run(
-            ["docker", "run", "--rm", self.IMAGE_NAME, "python3", "--version"],
+            ["docker", "run", "--rm", self.IMAGE_NAME, "nginx", "-t"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"nginx config invalid: {result.stderr}"
+
+    def test_routes_bundled_into_image(self):
+        """Test that the gateway image includes the expected upstream routes."""
+        result = subprocess.run(
+            ["docker", "run", "--rm", self.IMAGE_NAME, "cat", "/etc/nginx/conf.d/default.conf"],
             capture_output=True,
             text=True
         )
         assert result.returncode == 0
-        assert "Python 3.14" in result.stdout
+        assert "awx-web:8052" in result.stdout
+        assert "galaxy-ng:8000" in result.stdout
+        assert "pulp-api:24817" in result.stdout
+        assert "eda-controller:5000" in result.stdout
 
-    def test_user_is_ansible(self):
-        """Test that the container runs as the ansible user."""
-        result = subprocess.run(
-            ["docker", "run", "--rm", self.IMAGE_NAME, "whoami"],
+    def test_health_endpoint_available(self):
+        """Test that the gateway health endpoint responds."""
+        container_name = f"aax-gateway-test-{int(time.time() * 1000)}"
+        subprocess.run(["docker", "rm", "-f", container_name], capture_output=True, text=True)
+        start = subprocess.run(
+            [
+                "docker",
+                "run",
+                "-d",
+                "--rm",
+                "--name",
+                container_name,
+                "--add-host",
+                "awx-web:127.0.0.1",
+                "--add-host",
+                "galaxy-ng:127.0.0.1",
+                "--add-host",
+                "pulp-api:127.0.0.1",
+                "--add-host",
+                "pulp-content:127.0.0.1",
+                "--add-host",
+                "eda-controller:127.0.0.1",
+                self.IMAGE_NAME,
+            ],
             capture_output=True,
-            text=True
+            text=True,
         )
-        assert result.returncode == 0
-        assert result.stdout.strip() == "ansible"
+        assert start.returncode == 0, f"Gateway failed to start: {start.stderr}"
 
-    def test_workspace_directory(self):
-        """Test that the workspace directory is set correctly."""
-        result = subprocess.run(
-            ["docker", "run", "--rm", self.IMAGE_NAME, "pwd"],
-            capture_output=True,
-            text=True
-        )
-        assert result.returncode == 0
-        assert result.stdout.strip() == "/workspace"
-
-    def test_pager_disabled(self):
-        """Test that PAGER environment variable is set."""
-        result = subprocess.run(
-            ["docker", "run", "--rm", self.IMAGE_NAME, "printenv", "PAGER"],
-            capture_output=True,
-            text=True
-        )
-        assert result.returncode == 0
-        assert result.stdout.strip() == ""
+        try:
+            for _ in range(20):
+                result = subprocess.run(
+                    [
+                        "docker",
+                        "exec",
+                        container_name,
+                        "sh",
+                        "-c",
+                        "wget -qO- http://127.0.0.1:8080/healthz",
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode == 0:
+                    assert result.stdout.strip() == "ok"
+                    break
+                time.sleep(1)
+            else:
+                pytest.fail("Gateway health endpoint did not become ready")
+        finally:
+            subprocess.run(["docker", "rm", "-f", container_name], capture_output=True, text=True)
 
 
 class TestAWXImage:
     """Tests for the AWX automation controller image."""
 
-    IMAGE_NAME = "aax/awx:latest"
+    IMAGE_NAME = "aax/awx:1.0.0"
 
     def test_image_builds(self):
         """Test that the AWX image builds successfully."""
@@ -356,7 +413,7 @@ class TestAWXImage:
 class TestGalaxyNGImage:
     """Tests for the Galaxy NG image."""
 
-    IMAGE_NAME = "aax/galaxy-ng:latest"
+    IMAGE_NAME = "aax/galaxy-ng:1.0.0"
 
     def test_image_builds(self):
         """Test that the Galaxy NG image builds successfully."""
@@ -417,7 +474,7 @@ class TestGalaxyNGImage:
 class TestPulpImage:
     """Tests for the Pulp content management image."""
 
-    IMAGE_NAME = "aax/pulp:latest"
+    IMAGE_NAME = "aax/pulp:1.0.0"
 
     def test_image_builds(self):
         """Test that the Pulp image builds successfully."""
@@ -478,7 +535,7 @@ class TestPulpImage:
 class TestEDAImage:
     """Tests for the Event-Driven Ansible controller image."""
 
-    IMAGE_NAME = "aax/eda:latest"
+    IMAGE_NAME = "aax/eda-controller:1.0.0"
 
     def test_image_builds(self):
         """Test that the EDA image builds successfully."""

@@ -55,7 +55,6 @@ This document describes the CI/CD pipeline for the AAX project.
 │   4. Build and Push (if release created)                         │
 │      ├─ Build images with version tags                          │
 │      ├─ Push to ghcr.io/kpeacocke/aax-*:VERSION                │
-│      ├─ Push to ghcr.io/kpeacocke/aax-*:latest                 │
 │      └─ Upload release artifacts                                │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -122,7 +121,6 @@ This document describes the CI/CD pipeline for the AAX project.
 - Builds images with version metadata
 - Pushes to GitHub Container Registry:
   - `ghcr.io/kpeacocke/aax-IMAGE:VERSION`
-  - `ghcr.io/kpeacocke/aax-IMAGE:latest`
 - Generates release artifact manifest
 - Uploads to release assets
 
@@ -132,10 +130,10 @@ This document describes the CI/CD pipeline for the AAX project.
 
 The workflows are designed with clear separation:
 
-| Workflow        | When                       | Tests  | Security       | Pushes Images              |
-| --------------- | -------------------------- | ------ | -------------- | -------------------------- |
-| **ci.yml**      | Development branches & PRs | ✅ Full | ℹ️ Develop only | ❌ No                       |
-| **release.yml** | Main branch (release)      | ✅ Full | ✅ Blocking     | ✅ Yes (if release created) |
+| Workflow    | When                       | Tests | Security     | Pushes Images            |
+| ----------- | -------------------------- | ----- | ------------ | ------------------------ |
+| ci.yml      | Development branches & PRs | Full  | Develop-only | No                       |
+| release.yml | Main branch (release)      | Full  | Blocking     | Yes (if release created) |
 
 - **ci.yml** runs on feature branches and PRs for fast feedback
 - **release.yml** runs only on main for production releases
@@ -183,7 +181,7 @@ In [tests/test_images.py](../tests/test_images.py):
 ```python
 class TestYourNewImage:
     """Tests for your-new-image."""
-    IMAGE_NAME = "aax/your-new-image:latest"
+  IMAGE_NAME = "aax/your-new-image:1.0.0"
 
     def test_image_builds(self):
         """Test that the image builds successfully."""
@@ -194,7 +192,7 @@ class TestYourNewImage:
             "-f",
             "images/your-new-image/Dockerfile",
             "-t",
-            "aax/your-new-image:latest",
+            "aax/your-new-image:1.0.0",
             "images/your-new-image",
           ],
           capture_output=True,

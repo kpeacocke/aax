@@ -10,7 +10,11 @@ on:
       - "release/**"
     paths:
       - "images/**"
+      - "k8s/**"
+      - "docker-compose.yml"
+      - ".env.example"
       - "tests/**"
+      - "docs/**"
       - "pyproject.toml"
       - ".github/workflows/ci.yml"
   pull_request:
@@ -19,7 +23,11 @@ on:
       - develop
     paths:
       - "images/**"
+      - "k8s/**"
+      - "docker-compose.yml"
+      - ".env.example"
       - "tests/**"
+      - "docs/**"
       - "pyproject.toml"
       - ".github/workflows/ci.yml"
 
@@ -99,11 +107,31 @@ jobs:
           recursive: true
           failure-threshold: warning
 
+  policy-checks:
+    name: Policy Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install test dependencies
+        run: pip install pytest pytest-cov
+
+      - name: Run repository policy tests
+        run: pytest -q tests/test_repo_policy.py tests/test_docs_contract.py
+
   test-images:
     name: Test Docker Images
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [lint-dockerfiles, secrets-scan]
+    needs: [lint-dockerfiles, secrets-scan, policy-checks]
     strategy:
       matrix:
         image:
@@ -125,15 +153,15 @@ jobs:
         run: pip install pytest pytest-cov
 
       - name: Build base image
-        run: docker build -f ./images/ee-base/Dockerfile -t aax/ee-base:latest ./images/ee-base
+        run: docker build -f ./images/ee-base/Dockerfile -t aax/ee-base:1.0.0 ./images/ee-base
 
       - name: Build ${{ matrix.image }} image
         if: matrix.image != 'ee-base'
         run: |
           docker build \
-            --build-arg BASE_IMAGE=aax/ee-base:latest \
+            --build-arg BASE_IMAGE=aax/ee-base:1.0.0 \
             -f ./images/${{ matrix.image }}/Dockerfile \
-            -t aax/${{ matrix.image }}:latest \
+            -t aax/${{ matrix.image }}:1.0.0 \
             ./images/${{ matrix.image }}
 
       - name: Run tests for ${{ matrix.image }}
@@ -166,21 +194,21 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - name: Build base image
-        run: docker build -f ./images/ee-base/Dockerfile -t aax/ee-base:latest ./images/ee-base
+        run: docker build -f ./images/ee-base/Dockerfile -t aax/ee-base:1.0.0 ./images/ee-base
 
       - name: Build ${{ matrix.image }} image
         if: matrix.image != 'ee-base'
         run: |
           docker build \
-            --build-arg BASE_IMAGE=aax/ee-base:latest \
+            --build-arg BASE_IMAGE=aax/ee-base:1.0.0 \
             -f ./images/${{ matrix.image }}/Dockerfile \
-            -t aax/${{ matrix.image }}:latest \
+            -t aax/${{ matrix.image }}:1.0.0 \
             ./images/${{ matrix.image }}
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@6e7b7d1fd3e4fef0c5fa8cce1229c54b2c9bd0d8 # 0.24.0
         with:
-          image-ref: aax/${{ matrix.image }}:latest
+          image-ref: aax/${{ matrix.image }}:1.0.0
           format: sarif
           output: trivy-${{ matrix.image }}.sarif
           severity: LOW,MEDIUM,HIGH,CRITICAL
@@ -189,7 +217,7 @@ jobs:
       - name: Generate SBOM with Syft
         uses: anchore/sbom-action@d94f46e13c6c62f59525ac9a1e147a99dc0b9bf5 # v0.17.0
         with:
-          image: aax/${{ matrix.image }}:latest
+          image: aax/${{ matrix.image }}:1.0.0
           format: spdx-json
           output-file: sbom-${{ matrix.image }}.spdx.json
 

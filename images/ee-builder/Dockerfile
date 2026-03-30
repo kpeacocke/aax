@@ -1,5 +1,5 @@
 # images/ee-builder/Dockerfile
-ARG BASE_IMAGE=aax/ee-base:latest
+ARG BASE_IMAGE=aax/ee-base:1.0.0
 # hadolint ignore=DL3006,DL3007
 FROM ${BASE_IMAGE}
 

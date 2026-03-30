@@ -11,6 +11,7 @@ Quick navigation to the main documentation.
 
 - Component mapping and status: [../COMPONENTS.md](../COMPONENTS.md)
 - High availability guidance: [HA-DEPLOYMENT.md](HA-DEPLOYMENT.md)
+- HA milestone plan: [HA_MILESTONE_PLAN.md](HA_MILESTONE_PLAN.md)
 
 ## Stacks and Services
 

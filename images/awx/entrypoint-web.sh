@@ -23,7 +23,7 @@ awx-manage shell <<EOF
 from django.contrib.auth import get_user_model
 User = get_user_model()
 if not User.objects.filter(username='${AWX_ADMIN_USER:-admin}').exists():
-    User.objects.create_superuser('${AWX_ADMIN_USER:-admin}', '', '${AWX_ADMIN_PASSWORD:-password}')
+  User.objects.create_superuser('${AWX_ADMIN_USER:-admin}', '', '${AWX_ADMIN_PASSWORD}')
     print("Admin user created")
 else:
     print("Admin user already exists")

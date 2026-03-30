@@ -1,0 +1,43 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: awx-web-pdb
+  namespace: aax
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: awx-web
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: galaxy-ng-pdb
+  namespace: aax
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: galaxy-ng
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gateway-pdb
+  namespace: aax
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: gateway
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: eda-controller-pdb
+  namespace: aax
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: eda-controller

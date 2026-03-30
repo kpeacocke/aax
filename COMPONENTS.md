@@ -174,17 +174,17 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
 
 ## Gap Analysis Summary
 
-| Aspect                      | Status           | Details                                                           |
-| --------------------------- | ---------------- | ----------------------------------------------------------------- |
-| **Core Automation**         | ✅ Complete       | AWX + execution environments cover full automation stack          |
-| **Content Management**      | ✅ Complete       | Private Automation Hub covers custom and community content        |
-| **Distributed Execution**   | ✅ Complete       | Receptor mesh for distributed job execution                       |
-| **Content Development**     | ✅ Complete       | ansible-builder and ansible-navigator included                    |
-| **Event-Driven Automation** | ✅ Complete       | ansible-rulebook EDA controller now fully integrated              |
-| **High Availability**       | ⚠️ Partial        | Single-node Docker Compose; HA requires external LB or Kubernetes |
-| **Certified Content**       | ❌ Not Applicable | Would require Red Hat subscription; use Private Hub instead       |
-| **Enterprise RBAC**         | ✅ Supported      | AWX RBAC; can extend with LDAP/SAML via AWX plugins               |
-| **Audit & Compliance**      | ✅ Supported      | Execution history and logging in PostgreSQL                       |
+| Aspect                      | Status         | Details                                                           |
+| --------------------------- | -------------- | ----------------------------------------------------------------- |
+| **Core Automation**         | Complete       | AWX + execution environments cover full automation stack          |
+| **Content Management**      | Complete       | Private Automation Hub covers custom and community content        |
+| **Distributed Execution**   | Complete       | Receptor mesh for distributed job execution                       |
+| **Content Development**     | Complete       | ansible-builder and ansible-navigator included                    |
+| **Event-Driven Automation** | Complete       | ansible-rulebook EDA controller now fully integrated              |
+| **High Availability**       | Partial        | Single-node Docker Compose; HA requires external LB or Kubernetes |
+| **Certified Content**       | Not Applicable | Would require Red Hat subscription; use Private Hub instead       |
+| **Enterprise RBAC**         | Supported      | AWX RBAC; can extend with LDAP/SAML via AWX plugins               |
+| **Audit & Compliance**      | Supported      | Execution history and logging in PostgreSQL                       |
 
 ## Design Decisions
 
@@ -231,7 +231,7 @@ docker compose --profile controller up -d
 
 ```bash
 docker compose --profile hub up -d
-# Access at http://localhost:8081
+# Access at http://localhost:5001
 ```
 
 ### Execution Environments
@@ -241,11 +241,11 @@ docker compose up -d dev-tools
 docker compose exec dev-tools ansible-navigator
 ```
 
-### Event-Driven Automation (Coming Soon)
+### Event-Driven Automation
 
 ```bash
-# Not yet available
-# Track progress: https://github.com/kpeacocke/AAX/issues
+docker compose --profile eda up -d
+# Access at http://localhost:5000
 ```
 
 ---

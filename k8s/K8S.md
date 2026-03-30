@@ -17,9 +17,9 @@ The deployment consists of:
 - Kubernetes cluster (v1.24+)
 - kubectl CLI tool configured
 - Container images built and available:
-  - `aax/ee-base:latest`
-  - `aax/ee-builder:latest`
-  - `aax/dev-tools:latest`
+  - `aax/ee-base:1.0.0`
+  - `aax/ee-builder:1.0.0`
+  - `aax/dev-tools:1.0.0`
 - Storage class `standard` available (or modify in `persistent-volumes.yaml`)
 
 ## Quick Start
@@ -83,7 +83,7 @@ Data:
 
 #### ee-base
 
-- **Image**: `aax/ee-base:latest`
+- **Image**: `aax/ee-base:1.0.0`
 - **Replicas**: 1
 - **Resources**: 1-2 CPU, 1-2Gi memory
 - **Health Checks**: Python import tests
@@ -91,7 +91,7 @@ Data:
 
 #### ee-builder
 
-- **Image**: `aax/ee-builder:latest`
+- **Image**: `aax/ee-builder:1.0.0`
 - **Replicas**: 1
 - **Resources**: 1-2 CPU, 1-2Gi memory
 - **Dependencies**: Waits for ee-base
@@ -100,7 +100,7 @@ Data:
 
 #### dev-tools
 
-- **Image**: `aax/dev-tools:latest`
+- **Image**: `aax/dev-tools:1.0.0`
 - **Replicas**: 1
 - **Resources**: 1-2 CPU, 1-2Gi memory
 - **Dependencies**: Waits for ee-base
