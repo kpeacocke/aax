@@ -307,7 +307,7 @@ class TestGatewayImage:
 
     def test_health_endpoint_available(self):
         """Test that the gateway health endpoint responds."""
-        container_name = "aax-gateway-test"
+        container_name = f"aax-gateway-test-{int(time.time() * 1000)}"
         subprocess.run(["docker", "rm", "-f", container_name], capture_output=True, text=True)
         start = subprocess.run(
             [
@@ -317,8 +317,16 @@ class TestGatewayImage:
                 "--rm",
                 "--name",
                 container_name,
-                "-p",
-                "18080:8080",
+                "--add-host",
+                "awx-web:127.0.0.1",
+                "--add-host",
+                "galaxy-ng:127.0.0.1",
+                "--add-host",
+                "pulp-api:127.0.0.1",
+                "--add-host",
+                "pulp-content:127.0.0.1",
+                "--add-host",
+                "eda-controller:127.0.0.1",
                 self.IMAGE_NAME,
             ],
             capture_output=True,
@@ -327,9 +335,16 @@ class TestGatewayImage:
         assert start.returncode == 0, f"Gateway failed to start: {start.stderr}"
 
         try:
-            for _ in range(10):
+            for _ in range(20):
                 result = subprocess.run(
-                    ["curl", "-fsS", "http://127.0.0.1:18080/healthz"],
+                    [
+                        "docker",
+                        "exec",
+                        container_name,
+                        "sh",
+                        "-c",
+                        "wget -qO- http://127.0.0.1:8080/healthz",
+                    ],
                     capture_output=True,
                     text=True,
                 )

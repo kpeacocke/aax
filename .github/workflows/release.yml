@@ -33,7 +33,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@2d792d19f0f05c45aecbf0c58d148842768c598e # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -169,7 +169,7 @@ jobs:
           cache: "pip"
 
       - name: Install policy test dependencies
-        run: pip install pytest
+        run: pip install pytest pytest-cov
 
       - name: Run repository policy and docs contract tests
         run: pytest -q tests/test_repo_policy.py tests/test_docs_contract.py

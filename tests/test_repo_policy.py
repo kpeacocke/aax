@@ -23,7 +23,8 @@ def _env_example_var_names(env_example_text: str) -> set[str]:
 
 def test_kubernetes_manifests_do_not_use_latest_tags() -> None:
     """Deployment manifests should be pinned to tested image tags."""
-    k8s_files = list((REPO_ROOT / "k8s").glob("*.yaml"))
+    k8s_dir = REPO_ROOT / "k8s"
+    k8s_files = list(k8s_dir.rglob("*.yaml")) + list(k8s_dir.rglob("*.yml"))
     offenders = []
     for file_path in k8s_files:
         content = file_path.read_text(encoding="utf-8")
@@ -44,7 +45,7 @@ def test_release_workflow_has_secret_scan_gate() -> None:
     required_tokens = [
         "secrets-scan:",
         "name: Scan for Secrets",
-        "gitleaks/gitleaks-action@v2",
+        "gitleaks/gitleaks-action@",
         "needs: [secrets-scan]",
         "needs: [test, security-scan, secrets-scan]",
     ]
@@ -116,6 +117,8 @@ def test_kubernetes_hub_allowed_hosts_are_not_wildcard() -> None:
 def test_awx_task_has_no_docker_socket_mount_in_k8s() -> None:
     """Kubernetes AWX task deployment should not mount the host Docker socket."""
     content = _read("k8s/controller-stack.yaml")
+    assert "name: awx-task" in content
+    assert "name: awx-receptor" in content
     awx_task_section = content.split("name: awx-task", 1)[1].split("name: awx-receptor", 1)[0]
     assert "/var/run/docker.sock" not in awx_task_section
 

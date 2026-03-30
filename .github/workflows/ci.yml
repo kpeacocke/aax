@@ -122,7 +122,7 @@ jobs:
           cache: "pip"
 
       - name: Install test dependencies
-        run: pip install pytest
+        run: pip install pytest pytest-cov
 
       - name: Run repository policy tests
         run: pytest -q tests/test_repo_policy.py tests/test_docs_contract.py

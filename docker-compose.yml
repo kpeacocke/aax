@@ -622,8 +622,8 @@ services:
       REDIS_HOST: hub-redis
       REDIS_PORT: 6379
       PULP_API_ROOT: http://pulp-api:24817
-      PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://localhost:24816}
-      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:5001}
+      PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://pulp-content:24816}
+      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://galaxy-ng:8000}
       GALAXY_ADMIN_USERNAME: ${GALAXY_ADMIN_USERNAME:-admin}
       GALAXY_ADMIN_PASSWORD: ${HUB_ADMIN_PASSWORD:?HUB_ADMIN_PASSWORD must be set (non-empty) in .env or environment}
       GALAXY_ADMIN_EMAIL: ${GALAXY_ADMIN_EMAIL:-admin@example.com}

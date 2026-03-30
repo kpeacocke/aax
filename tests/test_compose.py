@@ -15,6 +15,25 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
+def _required_compose_env() -> dict[str, str]:
+    """Return required compose secrets with deterministic test values."""
+    env = os.environ.copy()
+    env.update(
+        {
+            "POSTGRES_PASSWORD": "test-postgres-password",  # pragma: allowlist secret
+            "DATABASE_PASSWORD": "test-database-password",  # pragma: allowlist secret
+            "AWX_ADMIN_PASSWORD": "test-awx-admin-password",  # pragma: allowlist secret
+            "SECRET_KEY": "test-secret-key",  # pragma: allowlist secret
+            "HUB_DB_PASSWORD": "test-hub-db-password",  # pragma: allowlist secret
+            "HUB_ADMIN_PASSWORD": "test-hub-admin-password",  # pragma: allowlist secret
+            "GALAXY_SECRET_KEY": "test-galaxy-secret-key",  # pragma: allowlist secret
+            "PULP_SECRET_KEY": "test-pulp-secret-key",  # pragma: allowlist secret
+            "EDA_DB_PASSWORD": "test-eda-db-password",  # pragma: allowlist secret
+        }
+    )
+    return env
+
+
 @pytest.fixture(scope="module")
 def compose_up():
     """Start docker-compose services before tests and tear down after."""
@@ -23,7 +42,8 @@ def compose_up():
         ["docker", "compose", "up", "-d", "ee-base", "ee-builder", "dev-tools"],
         capture_output=True,
         text=True,
-        cwd=str(REPO_ROOT)
+        cwd=str(REPO_ROOT),
+        env=_required_compose_env(),
     )
     assert result.returncode == 0, f"Failed to start services: {result.stderr}"
 
@@ -36,7 +56,8 @@ def compose_up():
     subprocess.run(
         ["docker", "compose", "down"],
         capture_output=True,
-        cwd=str(REPO_ROOT)
+        cwd=str(REPO_ROOT),
+        env=_required_compose_env(),
     )
 
 
@@ -49,7 +70,8 @@ class TestDockerCompose:
             ["docker", "compose", "config"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0, f"Invalid compose config: {result.stderr}"
 
@@ -59,7 +81,8 @@ class TestDockerCompose:
             ["docker", "compose", "build"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0, f"Build failed: {result.stderr}"
 
@@ -80,7 +103,8 @@ class TestDockerCompose:
             ],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         services = result.stdout.strip().split("\n")
@@ -109,7 +133,8 @@ class TestDockerCompose:
             ["docker", "compose", "--profile", "controller", "config"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         assert "image: aax/awx:" in result.stdout
@@ -120,7 +145,8 @@ class TestDockerCompose:
             ["docker", "compose", "--profile", "controller", "config"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         assert "DEFAULT_EXECUTION_ENVIRONMENT: aax/ee-base:" in result.stdout
@@ -154,7 +180,8 @@ class TestDockerCompose:
             ],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         config = result.stdout
@@ -180,7 +207,8 @@ class TestDockerCompose:
             ],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         config = result.stdout
@@ -199,7 +227,8 @@ class TestDockerCompose:
             ["docker", "compose", "--profile", "controller", "config", "--format", "json"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         config = json.loads(result.stdout)
@@ -212,7 +241,8 @@ class TestDockerCompose:
             ["docker", "compose", "--profile", "controller", "config", "--format", "json"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         config = json.loads(result.stdout)
@@ -225,7 +255,8 @@ class TestDockerCompose:
             ["docker", "compose", "--profile", "hub", "config", "--format", "json"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         config = json.loads(result.stdout)
@@ -240,7 +271,8 @@ class TestDockerCompose:
             ["docker", "compose", "--profile", "controller", "--profile", "hub", "--profile", "eda", "config", "--format", "json"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         config = json.loads(result.stdout)
@@ -256,7 +288,8 @@ class TestDockerCompose:
             ["docker", "compose", "--profile", "controller", "config"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         config = result.stdout
@@ -420,7 +453,8 @@ class TestComposeCompatibility:
             ["docker", "compose", "config"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         config = result.stdout
@@ -432,7 +466,8 @@ class TestComposeCompatibility:
             ["docker", "compose", "config"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         config = result.stdout

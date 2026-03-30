@@ -588,7 +588,7 @@ services:
       - awx-network
 
   pulp-worker:
-    image: aax/galaxy-ng:1.0.0
+    image: aax/pulp:1.0.0
     environment:
       POSTGRES_HOST: rds-endpoint.amazonaws.com
       POSTGRES_PORT: 5432
@@ -601,7 +601,7 @@ services:
       - /mnt/aax-content:/var/lib/pulp
     networks:
       - awx-network
-    command: pulp-worker
+    command: pulpcore-worker
     deploy:
       replicas: 3  # Scale to multiple workers
 
