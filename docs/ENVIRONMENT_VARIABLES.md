@@ -210,8 +210,8 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 | `HUB_DB_PASSWORD`           | `REPLACE_WITH_STRONG_HUB_DB_PASSWORD`     | **Required.** Shared Hub/Pulp PostgreSQL password |
 | `PULP_SECRET_KEY`           | `CHANGE_ME_PULP_SECRET_KEY`               | **Required.** Pulp secret key                 |
 | `PULP_ALLOWED_HOSTS`        | `localhost,127.0.0.1,[::1]`               | Allowed hosts for Pulp endpoints              |
-| `PULP_CONTENT_ORIGIN`       | `http://localhost:24816`                  | Public content origin URL                     |
-| `PULP_ANSIBLE_API_HOSTNAME` | `http://localhost:5001`                   | Public API hostname for Pulp/Galaxy links     |
+| `PULP_CONTENT_ORIGIN`       | `http://pulp-content:24816`               | Internal content origin URL used by Hub/Pulp  |
+| `PULP_ANSIBLE_API_HOSTNAME` | `http://galaxy-ng:8000`                   | Internal API hostname used by Hub/Galaxy links |
 | `PULP_WORKERS`              | `2`                                       | Number of Pulp worker processes               |
 | `PULP_LOGGING_LEVEL`        | `INFO`                                    | Pulp log level                                |
 

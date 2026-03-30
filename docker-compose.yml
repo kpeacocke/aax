@@ -257,7 +257,7 @@ services:
       RECEPTOR_CONFIG: |
         ---
         - node:
-          id: receptor-controller
+            id: receptor-controller
         - control-service:
             service: control
             filename: /var/lib/receptor/receptor.sock
@@ -266,7 +266,7 @@ services:
             port: 8888
             bindaddr: 0.0.0.0
         - tcp-peer:
-          address: receptor-hop:8888
+            address: receptor-hop:8888
         - log-level:
             level: info
     command:
