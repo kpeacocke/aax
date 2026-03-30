@@ -219,17 +219,18 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 
 ## EDA Controller
 
-| Variable                     | Default                    | Description                     |
-| ---------------------------- | -------------------------- | ------------------------------- |
-| `EDA_DOCKER_IMAGE`           | `aax/eda-controller:1.0.0` | EDA Controller image            |
-| `EDA_POSTGRES_HOST`          | `postgres`                 | EDA database host               |
-| `EDA_POSTGRES_NAME`          | `eda`                      | EDA database name               |
-| `EDA_POSTGRES_USER`          | `eda`                      | EDA database user               |
-| `EDA_POSTGRES_PASSWORD`      | `edadb`                    | EDA database password           |
-| `EDA_ADMIN_USER`             | `admin`                    | EDA admin username              |
-| `EDA_ADMIN_PASSWORD`         | `edaadmin`                 | EDA admin password              |
-| `EDA_CONTROLLER_LISTEN_PORT` | `8000`                     | Controller port                 |
-| `EDA_ANSIBLE_RUNNER_IMAGE`   | `aax/ee-base:1.0.0`        | EDA execution environment image |
+| Variable           | Default                               | Description                                                         |
+| ------------------ | ------------------------------------- | ------------------------------------------------------------------- |
+| `EDA_DB_NAME`      | `eda`                                 | EDA PostgreSQL database name                                        |
+| `EDA_DB_USER`      | `eda`                                 | EDA PostgreSQL database user                                        |
+| `EDA_DB_PASSWORD`  | `REPLACE_WITH_STRONG_EDA_DB_PASSWORD` | **Required.** EDA database password (must not be empty)             |
+| `EDA_PORT`         | `5000`                                | Host port exposed for EDA controller API/UI                         |
+| `EDA_LOG_LEVEL`    | `INFO`                                | EDA controller logging level                                        |
+| `EDA_SKIP_DB_WAIT` | `false`                               | Skip startup wait for database readiness (dev troubleshooting only) |
+| `EDA_DB_HOST`      | `eda-postgres`                        | Container-level DB host used by compose runtime                     |
+| `EDA_DB_PORT`      | `5432`                                | Container-level DB port used by compose runtime                     |
+| `EDA_REDIS_HOST`   | `eda-redis`                           | Container-level Redis host used by compose runtime                  |
+| `EDA_REDIS_PORT`   | `6379`                                | Container-level Redis port used by compose runtime                  |
 
 ---
 

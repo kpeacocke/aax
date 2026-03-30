@@ -34,19 +34,32 @@ def build_image(tag, dockerfile, context, build_args=None):
     return result
 
 
+@pytest.fixture(scope="module")
+def ee_base_image_built():
+    """Build ee-base once for the module to avoid redundant rebuilds."""
+    result = build_image(
+        "aax/ee-base:1.0.0",
+        "images/ee-base/Dockerfile",
+        "images/ee-base",
+    )
+    assert result.returncode == 0, f"Build failed: {result.stderr}"
+
+
+@pytest.mark.usefixtures("ee_base_image_built")
 class TestEEBaseImage:
     """Tests for the Ansible EE base image."""
 
     IMAGE_NAME = "aax/ee-base:1.0.0"
 
     def test_image_builds(self):
-        """Test that the ee-base image builds successfully."""
-        result = build_image(
-            self.IMAGE_NAME,
-            "images/ee-base/Dockerfile",
-            "images/ee-base",
+        """Test that the ee-base image is available after build fixture runs."""
+        result = subprocess.run(
+            ["docker", "image", "inspect", self.IMAGE_NAME],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
         )
-        assert result.returncode == 0, f"Build failed: {result.stderr}"
+        assert result.returncode == 0, f"Image not found: {result.stderr}"
 
     def test_ansible_installed(self):
         """Test that Ansible is installed and accessible."""
@@ -91,12 +104,6 @@ class TestEEBaseImage:
 
     def test_ansible_config_exists(self):
         """Test that ansible.cfg is in the correct location."""
-        build_result = build_image(
-            self.IMAGE_NAME,
-            "images/ee-base/Dockerfile",
-            "images/ee-base",
-        )
-        assert build_result.returncode == 0, f"Build failed: {build_result.stderr}"
         result = subprocess.run(
             ["docker", "run", "--rm", self.IMAGE_NAME, "cat", "/etc/ansible/ansible.cfg"],
             capture_output=True,

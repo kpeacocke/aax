@@ -314,7 +314,8 @@ class TestServiceOrchestration:
             ["docker", "compose", "ps", "--format", "json"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         # Check that services are running
@@ -330,7 +331,8 @@ class TestServiceOrchestration:
                 ["docker", "compose", "ps", "ee-base", "--format", "{{.Health}}"],
                 capture_output=True,
                 text=True,
-                cwd=str(REPO_ROOT)
+                cwd=str(REPO_ROOT),
+                env=_required_compose_env(),
             )
             if "healthy" in result.stdout.lower():
                 break
@@ -344,7 +346,8 @@ class TestServiceOrchestration:
             ["docker", "compose", "ps", "ee-builder", "--format", "{{.State}}"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         assert "running" in result.stdout.lower() or "exited" in result.stdout.lower()
@@ -355,7 +358,8 @@ class TestServiceOrchestration:
             ["docker", "compose", "ps", "dev-tools", "--format", "{{.State}}"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         assert "running" in result.stdout.lower() or "exited" in result.stdout.lower()
@@ -393,7 +397,8 @@ class TestServiceFunctionality:
             ["docker", "compose", "exec", "-T", "ee-base", "ansible", "--version"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         assert "ansible [core 2.20.0]" in result.stdout
@@ -404,7 +409,8 @@ class TestServiceFunctionality:
             ["docker", "compose", "exec", "-T", "ee-builder", "ansible-builder", "--version"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         assert "3.1" in result.stdout
@@ -415,7 +421,8 @@ class TestServiceFunctionality:
             ["docker", "compose", "exec", "-T", "dev-tools", "ansible-navigator", "--version"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         assert "24.2.0" in result.stdout
@@ -426,7 +433,8 @@ class TestServiceFunctionality:
             ["docker", "compose", "exec", "-T", "dev-tools", "ansible-lint", "--version"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         assert "25.12.1" in result.stdout
@@ -439,7 +447,8 @@ class TestServiceFunctionality:
              "import socket; socket.gethostbyname('ee-base')"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0, "Services cannot communicate on shared network"
 
@@ -485,7 +494,8 @@ class TestEnvironmentVariables:
                 ["docker", "compose", "exec", "-T", service, "printenv", "ANSIBLE_NOCOWS"],
                 capture_output=True,
                 text=True,
-                cwd=str(REPO_ROOT)
+                cwd=str(REPO_ROOT),
+                env=_required_compose_env(),
             )
             assert result.returncode == 0
             assert result.stdout.strip() == "1"
@@ -496,7 +506,8 @@ class TestEnvironmentVariables:
             ["docker", "compose", "exec", "-T", "dev-tools", "printenv", "PAGER"],
             capture_output=True,
             text=True,
-            cwd=str(REPO_ROOT)
+            cwd=str(REPO_ROOT),
+            env=_required_compose_env(),
         )
         assert result.returncode == 0
         assert result.stdout.strip() == ""
