@@ -134,11 +134,11 @@ def test_compose_published_ports_use_localhost_host_bind_default() -> None:
     """Compose published ports should use HOST_BIND with localhost default."""
     content = _read("docker-compose.yml")
     required_bindings = [
-        '${HOST_BIND:-127.0.0.1}:${AWX_WEB_PORT:-8080}:8052',
-        '${HOST_BIND:-127.0.0.1}:${AWX_RECEPTOR_PORT:-8888}:8888',
-        '${HOST_BIND:-127.0.0.1}:${GATEWAY_PORT:-8088}:8080',
-        '${HOST_BIND:-127.0.0.1}:${GALAXY_PORT:-5001}:8000',
-        '${HOST_BIND:-127.0.0.1}:${EDA_PORT:-5000}:5000',
+        '"${HOST_BIND:-127.0.0.1}:${AWX_WEB_PORT:-8080}:8052"',
+        '"${HOST_BIND:-127.0.0.1}:${AWX_RECEPTOR_PORT:-8888}:8888"',
+        '"${HOST_BIND:-127.0.0.1}:${GATEWAY_PORT:-8088}:8080"',
+        '"${HOST_BIND:-127.0.0.1}:${GALAXY_PORT:-5001}:8000"',
+        '"${HOST_BIND:-127.0.0.1}:${EDA_PORT:-5000}:5000"',
     ]
     for binding in required_bindings:
         assert binding in content

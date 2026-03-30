@@ -26,7 +26,12 @@ DATABASES = {
 # AWX specific settings
 SECRET_KEY = os.environ['SECRET_KEY']
 DEBUG = False
-ALLOWED_HOSTS = ['*']
+_allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '')
+if _allowed_hosts_env:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
+else:
+    # Restrictive defaults for local/controller service names.
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]', 'awx', 'awx-web']
 
 # Broadcast websocket setting
 BROADCAST_WEBSOCKET_SECRET = os.environ['SECRET_KEY']
