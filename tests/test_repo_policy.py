@@ -271,6 +271,7 @@ def test_placeholder_secret_tokens_are_confined_to_templates() -> None:
     """Placeholder secret marker values should stay in template files only."""
     allowed_files = {
         ".env.example",
+        "docker-compose.yml",
         "k8s/secret.yaml",
         "k8s/awx-settings-configmap.yaml",
         "k8s/overlays/production/external-secret.example.yaml",
@@ -278,7 +279,9 @@ def test_placeholder_secret_tokens_are_confined_to_templates() -> None:
     marker_tokens = ["REPLACE_WITH_", "CHANGE_ME_"]
 
     offenders: list[str] = []
-    for file_path in REPO_ROOT.rglob("*.yaml"):
+    yaml_files = set(REPO_ROOT.rglob("*.yaml"))
+    yaml_files.update(REPO_ROOT.rglob("*.yml"))
+    for file_path in sorted(yaml_files):
         rel = file_path.relative_to(REPO_ROOT).as_posix()
         content = file_path.read_text(encoding="utf-8")
         if any(token in content for token in marker_tokens) and rel not in allowed_files:
