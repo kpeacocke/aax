@@ -26,7 +26,7 @@ AAX delivers the core AAP building blocks using upstream projects:
 - **Event-driven automation:** ansible-rulebook
 - **Automation mesh:** Receptor
 
-For the full component mapping and status, see [COMPONENTS.md](COMPONENTS.md).
+For a strict AAP-to-AAX component mapping, implementation status, and gap analysis, see [COMPONENTS.md](COMPONENTS.md).
 
 ## Quick Start
 
