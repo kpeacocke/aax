@@ -141,13 +141,13 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 
 ## Database (PostgreSQL)
 
-| Variable               | Default                    | Description                                   |
-| ---------------------- | -------------------------- | --------------------------------------------- |
-| `POSTGRES_DB`          | `awx`                      | Database name                                 |
-| `POSTGRES_USER`        | `awx`                      | Database user                                 |
-| `POSTGRES_PASSWORD`    | `awxdb`                    | Database password                             |
-| `POSTGRES_INITDB_ARGS` | ``                         | PostgreSQL init args, e.g., `--encoding=UTF8` |
-| `PGDATA`               | `/var/lib/postgresql/data` | Data directory                                |
+| Variable               | Default                    | Description                                                                      |
+| ---------------------- | -------------------------- | -------------------------------------------------------------------------------- |
+| `POSTGRES_DB`          | `awx`                      | Internal Postgres database name for the AWX DB container                         |
+| `POSTGRES_USER`        | `awx`                      | Internal Postgres database user for the AWX DB container                         |
+| `DATABASE_PASSWORD`    | `set-in-env`               | Shared AWX DB password used by both the `awx-postgres` container and AWX runtime |
+| `POSTGRES_INITDB_ARGS` | ``                         | PostgreSQL init args, e.g., `--encoding=UTF8`                                    |
+| `PGDATA`               | `/var/lib/postgresql/data` | Data directory                                                                   |
 
 ---
 

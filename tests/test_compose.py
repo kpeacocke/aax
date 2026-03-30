@@ -20,7 +20,6 @@ def _required_compose_env() -> dict[str, str]:
     env = os.environ.copy()
     env.update(
         {
-            "POSTGRES_PASSWORD": "test-postgres-password",  # pragma: allowlist secret
             "DATABASE_PASSWORD": "test-database-password",  # pragma: allowlist secret
             "AWX_ADMIN_PASSWORD": "test-awx-admin-password",  # pragma: allowlist secret
             "SECRET_KEY": "test-secret-key",  # pragma: allowlist secret
