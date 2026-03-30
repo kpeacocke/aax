@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: ee-builder
-          image: aax/ee-builder:latest
+          image: aax/ee-builder:1.0.0
           imagePullPolicy: IfNotPresent
           command: ["sleep", "infinity"]
           workingDir: /workspace

@@ -1,0 +1,7 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulp-api
+  namespace: aax
+spec:
+  replicas: 2

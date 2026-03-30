@@ -50,6 +50,17 @@ RUN curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | gpg --d
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
+# Install GitHub CLI
+# hadolint ignore=DL3008
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/etc/apt/keyrings/githubcli-archive-keyring.gpg \
+  && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+  | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends gh \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
+
 # Install development tools (separate layer - changes occasionally)
 # hadolint ignore=DL3008
 RUN apt-get update \
@@ -103,7 +114,7 @@ ENV PATH="/home/vscode/.local/bin:${PATH}"
 
 # Create verification script for runtime health checks instead of build-time failures
 RUN printf '#!/bin/bash\nset -e\necho "Verifying tool installations..."\n' > /home/vscode/.local/bin/verify-tools \
-  && printf 'docker --version\ndocker compose version\nkubectl version --client\nhadolint --version\nshellcheck --version\n' >> /home/vscode/.local/bin/verify-tools \
+  && printf 'docker --version\ndocker compose version\nkubectl version --client\ngh --version\nhadolint --version\nshellcheck --version\n' >> /home/vscode/.local/bin/verify-tools \
   && printf 'yamllint --version\nmarkdownlint --version\npre-commit --version\ncz version\npytest --version\n' >> /home/vscode/.local/bin/verify-tools \
   && printf 'echo "All tools verified successfully!"\n' >> /home/vscode/.local/bin/verify-tools \
   && chmod +x /home/vscode/.local/bin/verify-tools

@@ -233,13 +233,13 @@ docker compose exec postgres pg_dump -U awx awx | \
 
 ```bash
 # Using Trivy
-trivy image aax/awx:latest
+trivy image aax/awx:1.0.0
 
 # Using Snyk
-snyk container test aax/awx:latest
+snyk container test aax/awx:1.0.0
 
 # Using Clair
-clairctl analyze aax/awx:latest
+clairctl analyze aax/awx:1.0.0
 ```
 
 #### Run as Non-Root User

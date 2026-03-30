@@ -6,12 +6,14 @@ Complete guide to configurable environment variables for AAX deployment.
 
 ### Authentication & Security
 
-| Variable             | Default                    | Description                          |
-| -------------------- | -------------------------- | ------------------------------------ |
-| `AWX_ADMIN_USER`     | `admin`                    | AWX admin username                   |
-| `AWX_ADMIN_PASSWORD` | `awxadmin`                 | **Change in production**             |
-| `AWX_SECRET_KEY`     | `awxsecret`                | Django secret key for session/crypto |
-| `INSIGHTS_URL_BASE`  | `https://cloud.redhat.com` | Red Hat Insights integration URL     |
+| Variable                        | Default                    | Description                              |
+| ------------------------------- | -------------------------- | ---------------------------------------- |
+| `AWX_ADMIN_USER`                | `admin`                    | AWX admin username                       |
+| `AWX_ADMIN_PASSWORD`            | `REPLACE_WITH_STRONG...`   | **Required. Set a strong value.**        |
+| `SECRET_KEY`                    | `REPLACE_WITH_64_CHAR...`  | Django secret key for session/crypto     |
+| `AWX_ALLOW_INSECURE_COOKIES`    | `false`                    | **Dev-only** cookie security override    |
+| `AAX_ALLOW_PLACEHOLDER_SECRETS` | `false`                    | **Dev-only** placeholder secret override |
+| `INSIGHTS_URL_BASE`             | `https://cloud.redhat.com` | Red Hat Insights integration URL         |
 
 **⚠️ Security Best Practices:**
 
@@ -21,20 +23,21 @@ openssl rand -hex 32
 
 # Set secure passwords
 AWX_ADMIN_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(64))")
 ```
 
 ---
 
 ### Database Configuration
 
-| Variable            | Default    | Description                                                                   |
-| ------------------- | ---------- | ----------------------------------------------------------------------------- |
-| `DATABASE_HOST`     | `postgres` | PostgreSQL hostname                                                           |
-| `DATABASE_NAME`     | `awx`      | Database name                                                                 |
-| `DATABASE_USER`     | `awx`      | Database user                                                                 |
-| `DATABASE_PASSWORD` | `awxdb`    | Database password                                                             |
-| `DATABASE_PORT`     | `5432`     | PostgreSQL port                                                               |
-| `DATABASE_SSLMODE`  | `prefer`   | SSL mode: `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full` |
+| Variable            | Default        | Description                                                                   |
+| ------------------- | -------------- | ----------------------------------------------------------------------------- |
+| `DATABASE_HOST`     | `awx-postgres` | PostgreSQL hostname                                                           |
+| `DATABASE_NAME`     | `awx`          | Database name                                                                 |
+| `DATABASE_USER`     | `awx`          | Database user                                                                 |
+| `DATABASE_PASSWORD` | `set-in-env`   | Database password                                                             |
+| `DATABASE_PORT`     | `5432`         | PostgreSQL port                                                               |
+| `DATABASE_SSLMODE`  | `prefer`       | SSL mode: `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full` |
 
 ---
 
@@ -138,13 +141,13 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 
 ## Database (PostgreSQL)
 
-| Variable               | Default                    | Description                                   |
-| ---------------------- | -------------------------- | --------------------------------------------- |
-| `POSTGRES_DB`          | `awx`                      | Database name                                 |
-| `POSTGRES_USER`        | `awx`                      | Database user                                 |
-| `POSTGRES_PASSWORD`    | `awxdb`                    | Database password                             |
-| `POSTGRES_INITDB_ARGS` | ``                         | PostgreSQL init args, e.g., `--encoding=UTF8` |
-| `PGDATA`               | `/var/lib/postgresql/data` | Data directory                                |
+| Variable               | Default                    | Description                                                                      |
+| ---------------------- | -------------------------- | -------------------------------------------------------------------------------- |
+| `POSTGRES_DB`          | `awx`                      | Internal Postgres database name for the AWX DB container                         |
+| `POSTGRES_USER`        | `awx`                      | Internal Postgres database user for the AWX DB container                         |
+| `DATABASE_PASSWORD`    | `set-in-env`               | Shared AWX DB password used by both the `awx-postgres` container and AWX runtime |
+| `POSTGRES_INITDB_ARGS` | ``                         | PostgreSQL init args, e.g., `--encoding=UTF8`                                    |
+| `PGDATA`               | `/var/lib/postgresql/data` | Data directory                                                                   |
 
 ---
 
@@ -161,11 +164,11 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 
 ### Runtime
 
-| Variable           | Default              | Description                         |
-| ------------------ | -------------------- | ----------------------------------- |
-| `EE_DOCKER_IMAGE`  | `aax/ee-base:latest` | Default execution environment image |
-| `DEFAULT_EE_IMAGE` | `aax/ee-base:latest` | System default EE image             |
-| `EE_PULL_POLICY`   | `if-not-present`     | Image pull policy for EEs           |
+| Variable           | Default             | Description                         |
+| ------------------ | ------------------- | ----------------------------------- |
+| `EE_DOCKER_IMAGE`  | `aax/ee-base:1.0.0` | Default execution environment image |
+| `DEFAULT_EE_IMAGE` | `aax/ee-base:1.0.0` | System default EE image             |
+| `EE_PULL_POLICY`   | `if-not-present`    | Image pull policy for EEs           |
 
 ---
 
@@ -182,59 +185,64 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 
 ## Galaxy NG
 
-| Variable                   | Default                | Description              |
-| -------------------------- | ---------------------- | ------------------------ |
-| `GALAXY_DOCKER_IMAGE`      | `aax/galaxy-ng:latest` | Galaxy NG image          |
-| `GALAXY_POSTGRES_HOST`     | `postgres`             | Galaxy database host     |
-| `GALAXY_POSTGRES_NAME`     | `galaxy`               | Galaxy database name     |
-| `GALAXY_POSTGRES_USER`     | `galaxy`               | Galaxy database user     |
-| `GALAXY_POSTGRES_PASSWORD` | `galaxydb`             | Galaxy database password |
-| `GALAXY_ADMIN_USER`        | `admin`                | Galaxy admin username    |
-| `GALAXY_ADMIN_PASSWORD`    | `galaxyadmin`          | Galaxy admin password    |
-| `PULP_BASEPATH`            | `/api/galaxy`          | Base API path for Galaxy |
+| Variable                            | Default                                         | Description                                  |
+| ----------------------------------- | ----------------------------------------------- | -------------------------------------------- |
+| `GALAXY_DOCKER_IMAGE`               | `aax/galaxy-ng:1.0.0`                           | Galaxy NG image                              |
+| `GALAXY_ADMIN_USERNAME`             | `admin`                                         | Galaxy admin username                        |
+| `HUB_ADMIN_PASSWORD`                | `REPLACE_WITH_STRONG_HUB_ADMIN_PASSWORD`        | **Required.** Galaxy admin password          |
+| `GALAXY_ADMIN_EMAIL`                | `admin@example.com`                             | Galaxy admin email                           |
+| `GALAXY_SECRET_KEY`                 | `REPLACE_WITH_64_CHAR_RANDOM_GALAXY_SECRET_KEY` | **Required.** Galaxy/Django secret key       |
+| `GALAXY_ALLOWED_HOSTS`              | `localhost,127.0.0.1,galaxy-ng,gateway`         | Allowed hosts for Galaxy                     |
+| `GALAXY_REQUIRE_CONTENT_APPROVAL`   | `true`                                          | Require approval before content is published |
+| `GALAXY_AUTO_SIGN_COLLECTIONS`      | `false`                                         | Automatically sign uploaded collections      |
+| `GALAXY_SIGNATURE_UPLOAD_ENABLED`   | `false`                                         | Enable signature upload support              |
+| `GALAXY_COLLECTION_SIGNING_SERVICE` | ``                                              | Collection signing service label             |
+| `GALAXY_CONTAINER_SIGNING_SERVICE`  | ``                                              | Container signing service label              |
+| `PULP_BASEPATH`                     | `/api/galaxy`                                   | Base API path exposed by Galaxy              |
 
 ---
 
 ## Pulp
 
-| Variable                 | Default            | Description            |
-| ------------------------ | ------------------ | ---------------------- |
-| `PULP_DOCKER_IMAGE`      | `aax/pulp:latest`  | Pulp image             |
-| `PULP_POSTGRES_HOST`     | `postgres`         | Pulp database host     |
-| `PULP_POSTGRES_NAME`     | `pulp`             | Pulp database name     |
-| `PULP_POSTGRES_USER`     | `pulp`             | Pulp database user     |
-| `PULP_POSTGRES_PASSWORD` | `pulpdb`           | Pulp database password |
-| `PULP_ADMIN_USERNAME`    | `admin`            | Pulp admin username    |
-| `PULP_ADMIN_PASSWORD`    | `pulpadmin`        | Pulp admin password    |
-| `PULP_CONTENT_ORIGIN`    | `http://localhost` | Content origin URL     |
+| Variable                    | Default                               | Description                                       |
+| --------------------------- | ------------------------------------- | ------------------------------------------------- |
+| `PULP_DOCKER_IMAGE`         | `aax/pulp:1.0.0`                      | Pulp image                                        |
+| `HUB_DB_PASSWORD`           | `REPLACE_WITH_STRONG_HUB_DB_PASSWORD` | **Required.** Shared Hub/Pulp PostgreSQL password |
+| `PULP_SECRET_KEY`           | `CHANGE_ME_PULP_SECRET_KEY`           | **Required.** Pulp secret key                     |
+| `PULP_ALLOWED_HOSTS`        | `localhost,127.0.0.1,[::1]`           | Allowed hosts for Pulp endpoints                  |
+| `PULP_CONTENT_ORIGIN`       | `http://pulp-content:24816`           | Internal content origin URL used by Hub/Pulp      |
+| `PULP_ANSIBLE_API_HOSTNAME` | `http://galaxy-ng:8000`               | Internal API hostname used by Hub/Galaxy links    |
+| `PULP_WORKERS`              | `2`                                   | Number of Pulp worker processes                   |
+| `PULP_LOGGING_LEVEL`        | `INFO`                                | Pulp log level                                    |
 
 ---
 
 ## EDA Controller
 
-| Variable                     | Default                     | Description                     |
-| ---------------------------- | --------------------------- | ------------------------------- |
-| `EDA_DOCKER_IMAGE`           | `aax/eda-controller:latest` | EDA Controller image            |
-| `EDA_POSTGRES_HOST`          | `postgres`                  | EDA database host               |
-| `EDA_POSTGRES_NAME`          | `eda`                       | EDA database name               |
-| `EDA_POSTGRES_USER`          | `eda`                       | EDA database user               |
-| `EDA_POSTGRES_PASSWORD`      | `edadb`                     | EDA database password           |
-| `EDA_ADMIN_USER`             | `admin`                     | EDA admin username              |
-| `EDA_ADMIN_PASSWORD`         | `edaadmin`                  | EDA admin password              |
-| `EDA_CONTROLLER_LISTEN_PORT` | `8000`                      | Controller port                 |
-| `EDA_ANSIBLE_RUNNER_IMAGE`   | `aax/ee-base:latest`        | EDA execution environment image |
+| Variable           | Default                               | Description                                                         |
+| ------------------ | ------------------------------------- | ------------------------------------------------------------------- |
+| `EDA_DB_NAME`      | `eda`                                 | EDA PostgreSQL database name                                        |
+| `EDA_DB_USER`      | `eda`                                 | EDA PostgreSQL database user                                        |
+| `EDA_DB_PASSWORD`  | `REPLACE_WITH_STRONG_EDA_DB_PASSWORD` | **Required.** EDA database password (must not be empty)             |
+| `EDA_PORT`         | `5000`                                | Host port exposed for EDA controller API/UI                         |
+| `EDA_LOG_LEVEL`    | `INFO`                                | EDA controller logging level                                        |
+| `EDA_SKIP_DB_WAIT` | `false`                               | Skip startup wait for database readiness (dev troubleshooting only) |
+| `EDA_DB_HOST`      | `eda-postgres`                        | Container-level DB host used by compose runtime                     |
+| `EDA_DB_PORT`      | `5432`                                | Container-level DB port used by compose runtime                     |
+| `EDA_REDIS_HOST`   | `eda-redis`                           | Container-level Redis host used by compose runtime                  |
+| `EDA_REDIS_PORT`   | `6379`                                | Container-level Redis port used by compose runtime                  |
 
 ---
 
 ## Docker Image Tags & Versions
 
-| Variable               | Default  | Description                 |
-| ---------------------- | -------- | --------------------------- |
-| `AWX_IMAGE_TAG`        | `latest` | AWX Docker image tag        |
-| `EE_BASE_IMAGE_TAG`    | `latest` | EE Base Docker image tag    |
-| `EE_BUILDER_IMAGE_TAG` | `latest` | EE Builder Docker image tag |
-| `POSTGRES_VERSION`     | `13`     | PostgreSQL version          |
-| `REDIS_VERSION`        | `7`      | Redis version               |
+| Variable               | Default                       | Description                  |
+| ---------------------- | ----------------------------- | ---------------------------- |
+| `AWX_IMAGE_TAG`        | `1.0.0`                       | AWX Docker image tag         |
+| `EE_BASE_IMAGE_TAG`    | `1.0.0`                       | EE Base Docker image tag     |
+| `EE_BUILDER_IMAGE_TAG` | `1.0.0`                       | EE Builder Docker image tag  |
+| `POSTGRES_VERSION`     | 15 (AWX/EDA), 16-alpine (Hub) | PostgreSQL versions by stack |
+| `REDIS_VERSION`        | `7`                           | Redis version                |
 
 ---
 
@@ -252,6 +260,18 @@ export ALLOWED_HOSTS=awx.example.com,localhost
 export AWX_CSRF_TRUSTED_ORIGINS=https://awx.example.com
 export AWX_HTTPS_BIND_PORT=443
 ```
+
+---
+
+## Deprecated Variables
+
+Use these mappings when upgrading old configs:
+
+| Deprecated Variable         | Replacement                  | Migration Note                                                         |
+| --------------------------- | ---------------------------- | ---------------------------------------------------------------------- |
+| `AWX_SECRET_KEY`            | `SECRET_KEY`                 | Standardized variable name in runtime and docs.                        |
+| `AWX_SESSION_COOKIE_SECURE` | `AWX_ALLOW_INSECURE_COOKIES` | Keep `AWX_ALLOW_INSECURE_COOKIES=false` for secure default.            |
+| `AWX_CSRF_COOKIE_SECURE`    | `AWX_ALLOW_INSECURE_COOKIES` | Secure cookie behavior is now derived from explicit dev override flag. |
 
 ---
 
@@ -320,7 +340,7 @@ volumes:
 
 ```bash
 # Security
-AWX_SECRET_KEY=$(openssl rand -hex 32)
+SECRET_KEY=$(openssl rand -hex 32)
 AWX_ADMIN_USER=admin
 AWX_ADMIN_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
 
@@ -350,8 +370,8 @@ DEBUG=False
 ### .env.development
 
 ```bash
-AWX_ADMIN_PASSWORD=awxadmin
-DATABASE_PASSWORD=awxdb
+AWX_ADMIN_PASSWORD=dev-password
+DATABASE_PASSWORD=dev-db-password
 DEBUG=True
 LOG_LEVEL=DEBUG
 INSIGHTS_TRACKING_STATE=False
@@ -368,8 +388,8 @@ services:
   awx-web:
     environment:
       AWX_ADMIN_USER: ${AWX_ADMIN_USER:-admin}
-      AWX_ADMIN_PASSWORD: ${AWX_ADMIN_PASSWORD:-awxadmin}
-      SECRET_KEY: ${AWX_SECRET_KEY:-awxsecret}
+      AWX_ADMIN_PASSWORD: ${AWX_ADMIN_PASSWORD:?AWX_ADMIN_PASSWORD must be set}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
 ```
 
 ### Loading from file
@@ -431,7 +451,7 @@ docker compose up -d
 # Generate a .env file with random secrets
 
 cat > .env << EOF
-AWX_SECRET_KEY=$(openssl rand -hex 32)
+SECRET_KEY=$(openssl rand -hex 32)
 AWX_ADMIN_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
 DATABASE_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(16))")
 GALAXY_ADMIN_PASSWORD=$(python3 -c "import secrets; print(secrets.token_urlsafe(16))")

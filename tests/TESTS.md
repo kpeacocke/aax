@@ -47,23 +47,23 @@ When adding new images, create new test classes following this pattern:
 class TestNewImage:
     """Tests for the new image."""
 
-    IMAGE_NAME = "aax/new-image:latest"
+    IMAGE_NAME = "aax/new-image:1.0.0"
 
     def test_image_builds(self):
         """Test that the image builds successfully."""
         result = subprocess.run(
-          [
-            "docker",
-            "build",
-            "-f",
-            "images/new-image/Dockerfile",
-            "-t",
-            "aax/new-image:latest",
-            "images/new-image",
-          ],
-          capture_output=True,
-          text=True,
-          cwd="/workspaces/aax"
+            [
+                "docker",
+                "build",
+                "-f",
+                "images/new-image/Dockerfile",
+                "-t",
+                "aax/new-image:1.0.0",
+                "images/new-image",
+            ],
+            capture_output=True,
+            text=True,
+            cwd="/workspaces/aax"
         )
         assert result.returncode == 0, f"Build failed: {result.stderr}"
 

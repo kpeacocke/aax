@@ -19,12 +19,17 @@ awx-manage migrate --noinput
 
 # Create admin user if it doesn't exist
 echo "Checking for admin user..."
-awx-manage shell <<EOF
+awx-manage shell <<'EOF'
+import os
 from django.contrib.auth import get_user_model
+
 User = get_user_model()
-if not User.objects.filter(username='${AWX_ADMIN_USER:-admin}').exists():
-    User.objects.create_superuser('${AWX_ADMIN_USER:-admin}', '', '${AWX_ADMIN_PASSWORD:-password}')
-    print("Admin user created")
+username = os.environ.get("AWX_ADMIN_USER", "admin")
+password = os.environ["AWX_ADMIN_PASSWORD"]
+
+if not User.objects.filter(username=username).exists():
+  User.objects.create_superuser(username, '', password)
+  print("Admin user created")
 else:
     print("Admin user already exists")
 EOF

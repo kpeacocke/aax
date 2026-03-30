@@ -1,0 +1,73 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../namespace.yaml
+  - ../../configmap.yaml
+  - ../../secret.yaml
+  - ../../awx-settings-configmap.yaml
+  - ../../receptor-configs.yaml
+  - ../../persistent-volumes.yaml
+  - ../../ee-base-deployment.yaml
+  - ../../ee-builder-deployment.yaml
+  - ../../dev-tools-deployment.yaml
+  - ../../controller-stack.yaml
+  - ../../hub-stack.yaml
+  - ../../eda-stack.yaml
+  - ../../gateway-deployment.yaml
+  - poddisruptionbudgets.yaml
+
+images:
+  - name: aax/ee-base
+    newTag: 1.0.0
+  - name: aax/ee-builder
+    newTag: 1.0.0
+  - name: aax/dev-tools
+    newTag: 1.0.0
+  - name: aax/awx
+    newTag: 1.0.0
+  - name: aax/pulp
+    newTag: 1.0.0
+  - name: aax/galaxy-ng
+    newTag: 1.0.0
+  - name: aax/eda-controller
+    newTag: 1.0.0
+  - name: aax/gateway
+    newTag: 1.0.0
+
+patches:
+  - path: replicas-awx-web.yaml
+    target:
+      kind: Deployment
+      name: awx-web
+      namespace: aax
+  - path: replicas-awx-task.yaml
+    target:
+      kind: Deployment
+      name: awx-task
+      namespace: aax
+  - path: replicas-galaxy-ng.yaml
+    target:
+      kind: Deployment
+      name: galaxy-ng
+      namespace: aax
+  - path: replicas-pulp-api.yaml
+    target:
+      kind: Deployment
+      name: pulp-api
+      namespace: aax
+  - path: replicas-pulp-content.yaml
+    target:
+      kind: Deployment
+      name: pulp-content
+      namespace: aax
+  - path: replicas-eda-controller.yaml
+    target:
+      kind: Deployment
+      name: eda-controller
+      namespace: aax
+  - path: replicas-gateway.yaml
+    target:
+      kind: Deployment
+      name: gateway
+      namespace: aax

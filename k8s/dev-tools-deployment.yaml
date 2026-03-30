@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: dev-tools
-          image: aax/dev-tools:latest
+          image: aax/dev-tools:1.0.0
           imagePullPolicy: IfNotPresent
           command: ["sleep", "infinity"]
           workingDir: /workspace

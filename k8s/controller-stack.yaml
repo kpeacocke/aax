@@ -1,0 +1,583 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: awx-postgres
+  namespace: aax
+  labels:
+    app: awx-postgres
+    app.kubernetes.io/name: awx-postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: awx-postgres
+  template:
+    metadata:
+      labels:
+        app: awx-postgres
+        app.kubernetes.io/name: awx-postgres
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: awx-postgres
+          image: postgres:15
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_DB
+              value: awx
+            - name: POSTGRES_USER
+              value: awx
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: DATABASE_PASSWORD
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: scram-sha-256
+            - name: POSTGRES_INITDB_ARGS
+              value: --auth-host=scram-sha-256
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - name: awx-postgres-data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U awx"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U awx"]
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - name: awx-postgres-data
+          persistentVolumeClaim:
+            claimName: awx-postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: awx-postgres
+  namespace: aax
+spec:
+  selector:
+    app: awx-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: awx-redis
+  namespace: aax
+  labels:
+    app: awx-redis
+    app.kubernetes.io/name: awx-redis
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: awx-redis
+  template:
+    metadata:
+      labels:
+        app: awx-redis
+        app.kubernetes.io/name: awx-redis
+        app.kubernetes.io/component: cache
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: awx-redis
+          image: redis:7
+          imagePullPolicy: IfNotPresent
+          command: ["redis-server", "--appendonly", "yes"]
+          ports:
+            - containerPort: 6379
+              name: redis
+          volumeMounts:
+            - name: awx-redis-data
+              mountPath: /data
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 20
+      volumes:
+        - name: awx-redis-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: awx-redis
+  namespace: aax
+spec:
+  selector:
+    app: awx-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: awx-web
+  namespace: aax
+  labels:
+    app: awx-web
+    app.kubernetes.io/name: awx-web
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: awx-web
+  template:
+    metadata:
+      labels:
+        app: awx-web
+        app.kubernetes.io/name: awx-web
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: awx-web
+          image: aax/awx:1.0.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: aax-config
+          env:
+            - name: DATABASE_HOST
+              value: awx-postgres
+            - name: DATABASE_PORT
+              value: "5432"
+            - name: DATABASE_NAME
+              value: awx
+            - name: DATABASE_USER
+              value: awx
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: DATABASE_PASSWORD
+            - name: REDIS_HOST
+              value: awx-redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: AWX_ADMIN_USER
+              value: admin
+            - name: AWX_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: AWX_ADMIN_PASSWORD
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: SECRET_KEY
+            - name: ALLOWED_HOSTS
+              value: localhost,127.0.0.1,awx-web,gateway
+            - name: AWX_CSRF_TRUSTED_ORIGINS
+              value: http://localhost:8080,http://localhost:8088,http://gateway:8080
+            - name: AWX_ALLOW_INSECURE_COOKIES
+              value: "false"
+            - name: AAX_ALLOW_PLACEHOLDER_SECRETS
+              value: "false"
+            - name: DEFAULT_EXECUTION_ENVIRONMENT
+              value: aax/ee-base:1.0.0
+            - name: RECEPTOR_RELEASE_WORK
+              value: "true"
+          ports:
+            - containerPort: 8052
+              name: http
+          volumeMounts:
+            - name: awx-projects
+              mountPath: /var/lib/awx/projects
+            - name: awx-rsyslog
+              mountPath: /var/log/tower
+            - name: awx-settings
+              mountPath: /etc/tower/settings.py
+              subPath: settings.py
+          readinessProbe:
+            httpGet:
+              path: /api/v2/ping/
+              port: 8052
+            initialDelaySeconds: 45
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /api/v2/ping/
+              port: 8052
+            initialDelaySeconds: 90
+            periodSeconds: 30
+      volumes:
+        - name: awx-projects
+          persistentVolumeClaim:
+            claimName: awx-projects
+        - name: awx-rsyslog
+          persistentVolumeClaim:
+            claimName: awx-rsyslog
+        - name: awx-settings
+          configMap:
+            name: awx-settings
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: awx-web
+  namespace: aax
+spec:
+  selector:
+    app: awx-web
+  ports:
+    - name: http
+      port: 8052
+      targetPort: 8052
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: awx-task
+  namespace: aax
+  labels:
+    app: awx-task
+    app.kubernetes.io/name: awx-task
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: awx-task
+  template:
+    metadata:
+      labels:
+        app: awx-task
+        app.kubernetes.io/name: awx-task
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: awx-task
+          image: aax/awx:1.0.0
+          imagePullPolicy: IfNotPresent
+          command: ["/usr/local/bin/entrypoint-task.sh"]
+          envFrom:
+            - configMapRef:
+                name: aax-config
+          env:
+            - name: DATABASE_HOST
+              value: awx-postgres
+            - name: DATABASE_PORT
+              value: "5432"
+            - name: DATABASE_NAME
+              value: awx
+            - name: DATABASE_USER
+              value: awx
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: DATABASE_PASSWORD
+            - name: REDIS_HOST
+              value: awx-redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: SECRET_KEY
+            - name: AAX_ALLOW_PLACEHOLDER_SECRETS
+              value: "false"
+            - name: ALLOWED_HOSTS
+              value: localhost,127.0.0.1,awx-task
+            - name: DEFAULT_EXECUTION_ENVIRONMENT
+              value: aax/ee-base:1.0.0
+            - name: RECEPTOR_RELEASE_WORK
+              value: "true"
+          volumeMounts:
+            - name: awx-projects
+              mountPath: /var/lib/awx/projects
+            - name: awx-rsyslog
+              mountPath: /var/log/tower
+            - name: awx-settings
+              mountPath: /etc/tower/settings.py
+              subPath: settings.py
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "awx-manage check || exit 1"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "awx-manage check || exit 1"]
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: awx-projects
+          persistentVolumeClaim:
+            claimName: awx-projects
+        - name: awx-rsyslog
+          persistentVolumeClaim:
+            claimName: awx-rsyslog
+        - name: awx-settings
+          configMap:
+            name: awx-settings
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: awx-receptor
+  namespace: aax
+  labels:
+    app: awx-receptor
+    app.kubernetes.io/name: awx-receptor
+    app.kubernetes.io/component: mesh
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: awx-receptor
+  template:
+    metadata:
+      labels:
+        app: awx-receptor
+        app.kubernetes.io/name: awx-receptor
+        app.kubernetes.io/component: mesh
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: awx-receptor
+          image: quay.io/ansible/receptor:1.5.7
+          imagePullPolicy: IfNotPresent
+          command: ["receptor", "--config", "/etc/receptor/receptor.conf"]
+          ports:
+            - containerPort: 8888
+              name: mesh
+          volumeMounts:
+            - name: receptor-config
+              mountPath: /etc/receptor/receptor.conf
+              subPath: receptor.conf
+            - name: receptor-data
+              mountPath: /var/lib/receptor
+          readinessProbe:
+            exec:
+              command:
+                [
+                  "receptorctl",
+                  "--socket",
+                  "/var/lib/receptor/receptor.sock",
+                  "status",
+                ]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            exec:
+              command:
+                [
+                  "receptorctl",
+                  "--socket",
+                  "/var/lib/receptor/receptor.sock",
+                  "status",
+                ]
+            initialDelaySeconds: 20
+            periodSeconds: 30
+      volumes:
+        - name: receptor-config
+          configMap:
+            name: awx-receptor-config
+        - name: receptor-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: awx-receptor
+  namespace: aax
+spec:
+  selector:
+    app: awx-receptor
+  ports:
+    - name: mesh
+      port: 8888
+      targetPort: 8888
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: receptor-hop
+  namespace: aax
+  labels:
+    app: receptor-hop
+    app.kubernetes.io/name: receptor-hop
+    app.kubernetes.io/component: mesh
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: receptor-hop
+  template:
+    metadata:
+      labels:
+        app: receptor-hop
+        app.kubernetes.io/name: receptor-hop
+        app.kubernetes.io/component: mesh
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: receptor-hop
+          image: quay.io/ansible/receptor:1.5.7
+          imagePullPolicy: IfNotPresent
+          command: ["receptor", "--config", "/etc/receptor/receptor.conf"]
+          ports:
+            - containerPort: 8888
+              name: mesh
+          volumeMounts:
+            - name: receptor-config
+              mountPath: /etc/receptor/receptor.conf
+              subPath: receptor.conf
+            - name: receptor-data
+              mountPath: /var/lib/receptor
+          readinessProbe:
+            exec:
+              command:
+                [
+                  "receptorctl",
+                  "--socket",
+                  "/var/lib/receptor/receptor.sock",
+                  "status",
+                ]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            exec:
+              command:
+                [
+                  "receptorctl",
+                  "--socket",
+                  "/var/lib/receptor/receptor.sock",
+                  "status",
+                ]
+            initialDelaySeconds: 20
+            periodSeconds: 30
+      volumes:
+        - name: receptor-config
+          configMap:
+            name: receptor-hop-config
+        - name: receptor-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: receptor-hop
+  namespace: aax
+spec:
+  selector:
+    app: receptor-hop
+  ports:
+    - name: mesh
+      port: 8888
+      targetPort: 8888
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: receptor-execution
+  namespace: aax
+  labels:
+    app: receptor-execution
+    app.kubernetes.io/name: receptor-execution
+    app.kubernetes.io/component: mesh
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: receptor-execution
+  template:
+    metadata:
+      labels:
+        app: receptor-execution
+        app.kubernetes.io/name: receptor-execution
+        app.kubernetes.io/component: mesh
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: receptor-execution
+          image: quay.io/ansible/receptor:1.5.7
+          imagePullPolicy: IfNotPresent
+          command: ["receptor", "--config", "/etc/receptor/receptor.conf"]
+          ports:
+            - containerPort: 8888
+              name: mesh
+          volumeMounts:
+            - name: receptor-config
+              mountPath: /etc/receptor/receptor.conf
+              subPath: receptor.conf
+            - name: receptor-data
+              mountPath: /var/lib/receptor
+          readinessProbe:
+            exec:
+              command:
+                [
+                  "receptorctl",
+                  "--socket",
+                  "/var/lib/receptor/receptor.sock",
+                  "status",
+                ]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            exec:
+              command:
+                [
+                  "receptorctl",
+                  "--socket",
+                  "/var/lib/receptor/receptor.sock",
+                  "status",
+                ]
+            initialDelaySeconds: 20
+            periodSeconds: 30
+      volumes:
+        - name: receptor-config
+          configMap:
+            name: receptor-execution-config
+        - name: receptor-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: receptor-execution
+  namespace: aax
+spec:
+  selector:
+    app: receptor-execution
+  ports:
+    - name: mesh
+      port: 8888
+      targetPort: 8888
