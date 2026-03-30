@@ -95,7 +95,18 @@ jobs:
           load: true
 
       - name: Run pytest tests
-        run: pytest tests/test_images.py::Test$(echo ${{ matrix.image }} | sed -r 's/(^|-)([a-z])/\U\2/g' | sed 's/-//g')Image -v
+        run: |
+          case "${{ matrix.image }}" in
+            ee-base) test_class="TestEEBaseImage" ;;
+            ee-builder) test_class="TestEEBuilderImage" ;;
+            dev-tools) test_class="TestDevToolsImage" ;;
+            gateway) test_class="TestGatewayImage" ;;
+            *)
+              echo "Unsupported image for test class mapping: ${{ matrix.image }}"
+              exit 1
+              ;;
+          esac
+          pytest "tests/test_images.py::${test_class}" -v
 
   security-scan:
     name: Security Scan
@@ -238,10 +249,10 @@ jobs:
           context: ./images/ee-base
           file: ./images/ee-base/Dockerfile
           platforms: linux/amd64,linux/arm64
-          tags: aax/ee-base:${{ needs.release-please.outputs.version }}
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-ee-base:${{ needs.release-please.outputs.version }}
           cache-from: type=gha,scope=ee-base
           cache-to: type=gha,mode=max,scope=ee-base
-          outputs: type=docker
+          push: true
         if: matrix.image != 'ee-base'
 
       - name: Build and push ${{ matrix.image }} multi-arch
@@ -255,7 +266,7 @@ jobs:
             VERSION=${{ needs.release-please.outputs.version }}
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
             VCS_REF=${{ github.sha }}
-            ${{ matrix.image != 'ee-base' && format('BASE_IMAGE=aax/ee-base:{0}', needs.release-please.outputs.version) || '' }}
+            ${{ matrix.image != 'ee-base' && format('BASE_IMAGE={0}/{1}/aax-ee-base:{2}', env.REGISTRY, github.repository_owner, needs.release-please.outputs.version) || '' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           push: true
