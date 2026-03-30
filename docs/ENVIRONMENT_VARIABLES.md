@@ -185,31 +185,35 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 
 ## Galaxy NG
 
-| Variable                   | Default               | Description              |
-| -------------------------- | --------------------- | ------------------------ |
-| `GALAXY_DOCKER_IMAGE`      | `aax/galaxy-ng:1.0.0` | Galaxy NG image          |
-| `GALAXY_POSTGRES_HOST`     | `postgres`            | Galaxy database host     |
-| `GALAXY_POSTGRES_NAME`     | `galaxy`              | Galaxy database name     |
-| `GALAXY_POSTGRES_USER`     | `galaxy`              | Galaxy database user     |
-| `GALAXY_POSTGRES_PASSWORD` | `galaxydb`            | Galaxy database password |
-| `GALAXY_ADMIN_USER`        | `admin`               | Galaxy admin username    |
-| `GALAXY_ADMIN_PASSWORD`    | `galaxyadmin`         | Galaxy admin password    |
-| `PULP_BASEPATH`            | `/api/galaxy`         | Base API path for Galaxy |
+| Variable                        | Default                                           | Description                                     |
+| ------------------------------- | ------------------------------------------------- | ----------------------------------------------- |
+| `GALAXY_DOCKER_IMAGE`           | `aax/galaxy-ng:1.0.0`                             | Galaxy NG image                                 |
+| `GALAXY_ADMIN_USERNAME`         | `admin`                                           | Galaxy admin username                           |
+| `HUB_ADMIN_PASSWORD`            | `REPLACE_WITH_STRONG_HUB_ADMIN_PASSWORD`          | **Required.** Galaxy admin password             |
+| `GALAXY_ADMIN_EMAIL`            | `admin@example.com`                               | Galaxy admin email                              |
+| `GALAXY_SECRET_KEY`             | `REPLACE_WITH_64_CHAR_RANDOM_GALAXY_SECRET_KEY`   | **Required.** Galaxy/Django secret key          |
+| `GALAXY_ALLOWED_HOSTS`          | `localhost,127.0.0.1,galaxy-ng,gateway`           | Allowed hosts for Galaxy                        |
+| `GALAXY_REQUIRE_CONTENT_APPROVAL` | `true`                                          | Require approval before content is published    |
+| `GALAXY_AUTO_SIGN_COLLECTIONS`  | `false`                                           | Automatically sign uploaded collections         |
+| `GALAXY_SIGNATURE_UPLOAD_ENABLED` | `false`                                         | Enable signature upload support                 |
+| `GALAXY_COLLECTION_SIGNING_SERVICE` | ``                                            | Collection signing service label                |
+| `GALAXY_CONTAINER_SIGNING_SERVICE` | ``                                             | Container signing service label                 |
+| `PULP_BASEPATH`                 | `/api/galaxy`                                     | Base API path exposed by Galaxy                 |
 
 ---
 
 ## Pulp
 
-| Variable                 | Default            | Description            |
-| ------------------------ | ------------------ | ---------------------- |
-| `PULP_DOCKER_IMAGE`      | `aax/pulp:1.0.0`   | Pulp image             |
-| `PULP_POSTGRES_HOST`     | `postgres`         | Pulp database host     |
-| `PULP_POSTGRES_NAME`     | `pulp`             | Pulp database name     |
-| `PULP_POSTGRES_USER`     | `pulp`             | Pulp database user     |
-| `PULP_POSTGRES_PASSWORD` | `pulpdb`           | Pulp database password |
-| `PULP_ADMIN_USERNAME`    | `admin`            | Pulp admin username    |
-| `PULP_ADMIN_PASSWORD`    | `pulpadmin`        | Pulp admin password    |
-| `PULP_CONTENT_ORIGIN`    | `http://localhost` | Content origin URL     |
+| Variable                    | Default                                   | Description                                   |
+| --------------------------- | ----------------------------------------- | --------------------------------------------- |
+| `PULP_DOCKER_IMAGE`         | `aax/pulp:1.0.0`                          | Pulp image                                    |
+| `HUB_DB_PASSWORD`           | `REPLACE_WITH_STRONG_HUB_DB_PASSWORD`     | **Required.** Shared Hub/Pulp PostgreSQL password |
+| `PULP_SECRET_KEY`           | `CHANGE_ME_PULP_SECRET_KEY`               | **Required.** Pulp secret key                 |
+| `PULP_ALLOWED_HOSTS`        | `localhost,127.0.0.1,[::1]`               | Allowed hosts for Pulp endpoints              |
+| `PULP_CONTENT_ORIGIN`       | `http://localhost:24816`                  | Public content origin URL                     |
+| `PULP_ANSIBLE_API_HOSTNAME` | `http://localhost:5001`                   | Public API hostname for Pulp/Galaxy links     |
+| `PULP_WORKERS`              | `2`                                       | Number of Pulp worker processes               |
+| `PULP_LOGGING_LEVEL`        | `INFO`                                    | Pulp log level                                |
 
 ---
 
@@ -236,7 +240,7 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 | `AWX_IMAGE_TAG`        | `1.0.0` | AWX Docker image tag        |
 | `EE_BASE_IMAGE_TAG`    | `1.0.0` | EE Base Docker image tag    |
 | `EE_BUILDER_IMAGE_TAG` | `1.0.0` | EE Builder Docker image tag |
-| `POSTGRES_VERSION`     | `13`    | PostgreSQL version          |
+| `POSTGRES_VERSION`     | 15 (AWX/EDA), 16-alpine (Hub) | PostgreSQL versions by stack |
 | `REDIS_VERSION`        | `7`     | Redis version               |
 
 ---

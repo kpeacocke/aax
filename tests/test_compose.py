@@ -153,7 +153,7 @@ class TestDockerCompose:
 
     def test_missing_required_secret_fails_compose_render(self):
         """Test that required secret variables fail fast when empty."""
-        env = os.environ.copy()
+        env = _required_compose_env()
         env["DATABASE_PASSWORD"] = ""
         result = subprocess.run(
             ["docker", "compose", "--profile", "controller", "config"],
