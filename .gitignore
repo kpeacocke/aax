@@ -301,6 +301,7 @@ gcp-key.json
 *password*
 *secret*
 !.secrets.baseline
+!docs/SECRETS_PRODUCTION.md
 *token*
 *.pwd
 
