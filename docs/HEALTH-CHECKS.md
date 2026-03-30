@@ -215,7 +215,7 @@ GET /pulp/api/v3/status/
 **Test:**
 
 ```bash
-curl http://localhost:24816/pulp/api/v3/status/
+curl http://localhost:8088/pulp/api/v3/status/
 ```
 
 ---
@@ -288,13 +288,13 @@ docker compose ps
 
 ```text
 NAME                  IMAGE                           STATUS
-awx-web               aax/awx:latest                  Up (healthy)
-ee-base               aax/ee-base:latest              Up (healthy)
-ee-builder            aax/ee-builder:latest           Up (healthy)
-dev-tools             aax/dev-tools:latest            Up (healthy)
-galaxy-ng             aax/galaxy-ng:latest            Up (healthy)
-pulp                  aax/pulp:latest                 Up (healthy)
-eda                   aax/eda:latest                  Up (healthy)
+awx-web               aax/awx:1.0.0                   Up (healthy)
+ee-base               aax/ee-base:1.0.0               Up (healthy)
+ee-builder            aax/ee-builder:1.0.0            Up (healthy)
+dev-tools             aax/dev-tools:1.0.0             Up (healthy)
+galaxy-ng             aax/galaxy-ng:1.0.0             Up (healthy)
+pulp                  aax/pulp:1.0.0                  Up (healthy)
+eda-controller        aax/eda-controller:1.0.0        Up (healthy)
 ```
 
 **Check logs for health check failures:**

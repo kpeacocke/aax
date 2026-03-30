@@ -2,6 +2,8 @@
 Tests for Docker Compose configuration and service orchestration.
 These tests verify that services start correctly, dependencies work, and health checks pass.
 """
+import os
+import json
 import subprocess
 import time
 from pathlib import Path
@@ -89,6 +91,9 @@ class TestDockerCompose:
             "awx-web",
             "awx-task",
             "awx-receptor",
+            "receptor-hop",
+            "receptor-execution",
+            "gateway",
             "galaxy-ng",
             "pulp-api",
             "pulp-content",
@@ -107,7 +112,7 @@ class TestDockerCompose:
             cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
-        assert "image: aax/awx:latest" in result.stdout
+        assert "image: aax/awx:" in result.stdout
 
     def test_default_execution_environment_uses_local_image(self):
         """Test that the controller default EE points at the local ee-base image."""
@@ -118,7 +123,22 @@ class TestDockerCompose:
             cwd=str(REPO_ROOT)
         )
         assert result.returncode == 0
-        assert "DEFAULT_EXECUTION_ENVIRONMENT: aax/ee-base:latest" in result.stdout
+        assert "DEFAULT_EXECUTION_ENVIRONMENT: aax/ee-base:" in result.stdout
+
+    def test_missing_required_secret_fails_compose_render(self):
+        """Test that required secret variables fail fast when empty."""
+        env = os.environ.copy()
+        env["DATABASE_PASSWORD"] = ""
+        result = subprocess.run(
+            ["docker", "compose", "--profile", "controller", "config"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT),
+            env=env,
+        )
+        assert result.returncode != 0
+        combined_output = f"{result.stdout}\n{result.stderr}"
+        assert "DATABASE_PASSWORD must be set" in combined_output
 
     def test_eda_controller_shares_awx_network(self):
         """Test that EDA can reach AWX over a shared compose network."""
@@ -143,6 +163,113 @@ class TestDockerCompose:
         assert "eda-network:" in config
         assert "awx-network: null" in eda_section
         assert "eda-network: null" in eda_section
+
+    def test_gateway_exposes_unified_entrypoint(self):
+        """Test that the gateway provides a single entrypoint across stack networks."""
+        result = subprocess.run(
+            [
+                "docker",
+                "compose",
+                "--profile",
+                "controller",
+                "--profile",
+                "hub",
+                "--profile",
+                "eda",
+                "config",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT)
+        )
+        assert result.returncode == 0
+        config = result.stdout
+        gateway_section = config.split("gateway:", 1)[1]
+        assert "image: aax/gateway:" in gateway_section
+        assert "mode: ingress" in gateway_section
+        assert 'published: "8088"' in gateway_section
+        assert "target: 8080" in gateway_section
+        assert "awx-network: null" in gateway_section
+        assert "hub-network: null" in gateway_section
+        assert "eda-network: null" in gateway_section
+
+    def test_awx_web_does_not_mount_docker_socket(self):
+        """Test that awx-web does not get direct Docker host control."""
+        result = subprocess.run(
+            ["docker", "compose", "--profile", "controller", "config", "--format", "json"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT)
+        )
+        assert result.returncode == 0
+        config = json.loads(result.stdout)
+        volumes = config["services"]["awx-web"].get("volumes", [])
+        assert all(volume.get("target") != "/var/run/docker.sock" for volume in volumes)
+
+    def test_awx_task_does_not_mount_docker_socket(self):
+        """Test that awx-task does not get direct Docker host control."""
+        result = subprocess.run(
+            ["docker", "compose", "--profile", "controller", "config", "--format", "json"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT)
+        )
+        assert result.returncode == 0
+        config = json.loads(result.stdout)
+        volumes = config["services"]["awx-task"].get("volumes", [])
+        assert all(volume.get("target") != "/var/run/docker.sock" for volume in volumes)
+
+    def test_pulp_services_are_not_published_on_host_ports(self):
+        """Test that raw Pulp services stay internal by default."""
+        result = subprocess.run(
+            ["docker", "compose", "--profile", "hub", "config", "--format", "json"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT)
+        )
+        assert result.returncode == 0
+        config = json.loads(result.stdout)
+        pulp_api_ports = config["services"]["pulp-api"].get("ports", [])
+        pulp_content_ports = config["services"]["pulp-content"].get("ports", [])
+        assert pulp_api_ports == []
+        assert pulp_content_ports == []
+
+    def test_published_ports_bind_to_localhost_by_default(self):
+        """Test that externally published ports are localhost-bound by default."""
+        result = subprocess.run(
+            ["docker", "compose", "--profile", "controller", "--profile", "hub", "--profile", "eda", "config", "--format", "json"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT)
+        )
+        assert result.returncode == 0
+        config = json.loads(result.stdout)
+
+        for service_name in ["awx-web", "awx-receptor", "gateway", "galaxy-ng", "eda-controller"]:
+            ports = config["services"][service_name].get("ports", [])
+            assert ports, f"Expected published ports for {service_name}"
+            assert all(port.get("host_ip") == "127.0.0.1" for port in ports)
+
+    def test_receptor_mesh_is_multi_node(self):
+        """Test that the controller profile renders a controller-hop-execution receptor mesh."""
+        result = subprocess.run(
+            ["docker", "compose", "--profile", "controller", "config"],
+            capture_output=True,
+            text=True,
+            cwd=str(REPO_ROOT)
+        )
+        assert result.returncode == 0
+        config = result.stdout
+        assert "awx-receptor:" in config
+        assert "receptor-hop:" in config
+        assert "receptor-execution:" in config
+        assert "id: receptor-controller" in config
+        assert "id: receptor-hop" in config
+        assert "id: receptor-execution" in config
+        assert "address: receptor-hop:8888" in config
+        assert "address: awx-receptor:8888" in config
+        assert "address: receptor-execution:8888" in config
+        assert "worktype: ansible-runner" in config
 
 
 class TestServiceOrchestration:

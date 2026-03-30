@@ -2,6 +2,23 @@
 
 This guide provides comprehensive instructions for deploying AAX components in a high-availability configuration using load balancers, database replication, and distributed services.
 
+## Current Implementation Status
+
+Implemented now in-repo:
+
+- Optional Kubernetes HA overlay at `k8s/overlays/ha`.
+- Multi-replica control-plane Deployments for key services.
+- PodDisruptionBudgets for key externally consumed services.
+- Static HA rendering checks in `tests/test_kubernetes.py`.
+
+Not yet implemented in-repo:
+
+- PostgreSQL replication/failover topology.
+- Redis Sentinel or equivalent Redis HA orchestration.
+- Shared-storage failover automation.
+
+For a concrete and test-aligned plan, see `docs/HA_MILESTONE_PLAN.md`.
+
 ## Overview
 
 AAX can be deployed in HA mode to eliminate single points of failure and improve reliability and scalability. HA deployments use:
@@ -522,7 +539,7 @@ services:
   # External Load Balancer (nginx, HAProxy)
 
   awx-web:
-    image: aax/awx:latest
+    image: aax/awx:1.0.0
     environment:
       POSTGRES_HOST: rds-endpoint.amazonaws.com
       POSTGRES_PORT: 5432
@@ -540,7 +557,7 @@ services:
       - awx-network
 
   awx-task:
-    image: aax/awx:latest
+    image: aax/awx:1.0.0
     environment:
       POSTGRES_HOST: rds-endpoint.amazonaws.com
       POSTGRES_PORT: 5432
@@ -554,7 +571,7 @@ services:
     command: awx-task
 
   galaxy-ng:
-    image: aax/galaxy-ng:latest
+    image: aax/galaxy-ng:1.0.0
     environment:
       POSTGRES_HOST: rds-endpoint.amazonaws.com
       POSTGRES_PORT: 5432
@@ -571,7 +588,7 @@ services:
       - awx-network
 
   pulp-worker:
-    image: aax/galaxy-ng:latest
+    image: aax/galaxy-ng:1.0.0
     environment:
       POSTGRES_HOST: rds-endpoint.amazonaws.com
       POSTGRES_PORT: 5432

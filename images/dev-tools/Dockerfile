@@ -4,7 +4,7 @@
 # Includes ansible-navigator, ansible-lint, and development utilities
 # Multi-stage build: separates build dependencies from runtime
 
-ARG BASE_IMAGE=aax/ee-base:latest
+ARG BASE_IMAGE=aax/ee-base:1.0.0
 
 # Stage 1: Builder
 # hadolint ignore=DL3006,DL3007

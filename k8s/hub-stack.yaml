@@ -1,0 +1,532 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hub-postgres
+  namespace: aax
+  labels:
+    app: hub-postgres
+    app.kubernetes.io/name: hub-postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hub-postgres
+  template:
+    metadata:
+      labels:
+        app: hub-postgres
+        app.kubernetes.io/name: hub-postgres
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: hub-postgres
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_DB
+              value: hub
+            - name: POSTGRES_USER
+              value: galaxy
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: HUB_DB_PASSWORD
+            - name: POSTGRES_INITDB_ARGS
+              value: -E UTF8
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - name: hub-postgres-data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U galaxy -d hub"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U galaxy -d hub"]
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - name: hub-postgres-data
+          persistentVolumeClaim:
+            claimName: hub-postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hub-postgres
+  namespace: aax
+spec:
+  selector:
+    app: hub-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hub-redis
+  namespace: aax
+  labels:
+    app: hub-redis
+    app.kubernetes.io/name: hub-redis
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hub-redis
+  template:
+    metadata:
+      labels:
+        app: hub-redis
+        app.kubernetes.io/name: hub-redis
+        app.kubernetes.io/component: cache
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: hub-redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          command: ["redis-server", "--appendonly", "yes"]
+          ports:
+            - containerPort: 6379
+              name: redis
+          volumeMounts:
+            - name: hub-redis-data
+              mountPath: /data
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 20
+      volumes:
+        - name: hub-redis-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hub-redis
+  namespace: aax
+spec:
+  selector:
+    app: hub-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulp-api
+  namespace: aax
+  labels:
+    app: pulp-api
+    app.kubernetes.io/name: pulp-api
+    app.kubernetes.io/component: content
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulp-api
+  template:
+    metadata:
+      labels:
+        app: pulp-api
+        app.kubernetes.io/name: pulp-api
+        app.kubernetes.io/component: content
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: pulp-api
+          image: aax/pulp:1.0.0
+          imagePullPolicy: IfNotPresent
+          args: ["pulpcore-api"]
+          env:
+            - name: POSTGRES_HOST
+              value: hub-postgres
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: hub
+            - name: POSTGRES_USER
+              value: galaxy
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: HUB_DB_PASSWORD
+            - name: REDIS_HOST
+              value: hub-redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: PULP_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: PULP_SECRET_KEY
+            - name: PULP_ALLOWED_HOSTS
+              value: localhost,127.0.0.1,pulp-api,pulp-content,galaxy-ng,gateway
+            - name: PULP_CONTENT_ORIGIN
+              value: http://pulp-content:24816
+            - name: PULP_ANSIBLE_API_HOSTNAME
+              value: http://galaxy-ng:8000
+            - name: PULP_SETTINGS
+              value: /etc/pulp/settings.py
+            - name: DJANGO_SETTINGS_MODULE
+              value: pulpcore.app.settings
+          ports:
+            - containerPort: 24817
+              name: http
+          volumeMounts:
+            - name: hub-pulp-storage
+              mountPath: /var/lib/pulp
+          readinessProbe:
+            httpGet:
+              path: /pulp/api/v3/status/
+              port: 24817
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /pulp/api/v3/status/
+              port: 24817
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: hub-pulp-storage
+          persistentVolumeClaim:
+            claimName: hub-pulp-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulp-api
+  namespace: aax
+spec:
+  selector:
+    app: pulp-api
+  ports:
+    - name: http
+      port: 24817
+      targetPort: 24817
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulp-content
+  namespace: aax
+  labels:
+    app: pulp-content
+    app.kubernetes.io/name: pulp-content
+    app.kubernetes.io/component: content
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulp-content
+  template:
+    metadata:
+      labels:
+        app: pulp-content
+        app.kubernetes.io/name: pulp-content
+        app.kubernetes.io/component: content
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: pulp-content
+          image: aax/pulp:1.0.0
+          imagePullPolicy: IfNotPresent
+          args: ["pulpcore-content"]
+          env:
+            - name: POSTGRES_HOST
+              value: hub-postgres
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: hub
+            - name: POSTGRES_USER
+              value: galaxy
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: HUB_DB_PASSWORD
+            - name: REDIS_HOST
+              value: hub-redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: PULP_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: PULP_SECRET_KEY
+            - name: PULP_ALLOWED_HOSTS
+              value: localhost,127.0.0.1,pulp-api,pulp-content,galaxy-ng,gateway
+            - name: PULP_CONTENT_ORIGIN
+              value: http://pulp-content:24816
+            - name: PULP_ANSIBLE_API_HOSTNAME
+              value: http://galaxy-ng:8000
+            - name: PULP_SETTINGS
+              value: /etc/pulp/settings.py
+            - name: DJANGO_SETTINGS_MODULE
+              value: pulpcore.app.settings
+          ports:
+            - containerPort: 24816
+              name: http
+          volumeMounts:
+            - name: hub-pulp-storage
+              mountPath: /var/lib/pulp
+          readinessProbe:
+            httpGet:
+              path: /pulp/content/
+              port: 24816
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /pulp/content/
+              port: 24816
+            initialDelaySeconds: 40
+            periodSeconds: 30
+      volumes:
+        - name: hub-pulp-storage
+          persistentVolumeClaim:
+            claimName: hub-pulp-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulp-content
+  namespace: aax
+spec:
+  selector:
+    app: pulp-content
+  ports:
+    - name: http
+      port: 24816
+      targetPort: 24816
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulp-worker
+  namespace: aax
+  labels:
+    app: pulp-worker
+    app.kubernetes.io/name: pulp-worker
+    app.kubernetes.io/component: content
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulp-worker
+  template:
+    metadata:
+      labels:
+        app: pulp-worker
+        app.kubernetes.io/name: pulp-worker
+        app.kubernetes.io/component: content
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: pulp-worker
+          image: aax/pulp:1.0.0
+          imagePullPolicy: IfNotPresent
+          args: ["pulpcore-worker"]
+          env:
+            - name: POSTGRES_HOST
+              value: hub-postgres
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: hub
+            - name: POSTGRES_USER
+              value: galaxy
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: HUB_DB_PASSWORD
+            - name: REDIS_HOST
+              value: hub-redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: PULP_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: PULP_SECRET_KEY
+            - name: PULP_ALLOWED_HOSTS
+              value: localhost,127.0.0.1,pulp-api,pulp-content,galaxy-ng,gateway
+            - name: PULP_CONTENT_ORIGIN
+              value: http://pulp-content:24816
+            - name: PULP_ANSIBLE_API_HOSTNAME
+              value: http://galaxy-ng:8000
+            - name: PULP_SETTINGS
+              value: /etc/pulp/settings.py
+            - name: DJANGO_SETTINGS_MODULE
+              value: pulpcore.app.settings
+          volumeMounts:
+            - name: hub-pulp-storage
+              mountPath: /var/lib/pulp
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pgrep -f pulpcore-worker"]
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pgrep -f pulpcore-worker"]
+            initialDelaySeconds: 40
+            periodSeconds: 30
+      volumes:
+        - name: hub-pulp-storage
+          persistentVolumeClaim:
+            claimName: hub-pulp-storage
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: galaxy-ng
+  namespace: aax
+  labels:
+    app: galaxy-ng
+    app.kubernetes.io/name: galaxy-ng
+    app.kubernetes.io/component: hub
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: galaxy-ng
+  template:
+    metadata:
+      labels:
+        app: galaxy-ng
+        app.kubernetes.io/name: galaxy-ng
+        app.kubernetes.io/component: hub
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: galaxy-ng
+          image: aax/galaxy-ng:1.0.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_HOST
+              value: hub-postgres
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: hub
+            - name: POSTGRES_USER
+              value: galaxy
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: HUB_DB_PASSWORD
+            - name: REDIS_HOST
+              value: hub-redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: PULP_API_ROOT
+              value: http://pulp-api:24817
+            - name: PULP_CONTENT_ORIGIN
+              value: http://pulp-content:24816
+            - name: PULP_ANSIBLE_API_HOSTNAME
+              value: http://galaxy-ng:8000
+            - name: GALAXY_ADMIN_USERNAME
+              value: admin
+            - name: GALAXY_ADMIN_EMAIL
+              value: admin@example.com
+            - name: GALAXY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: HUB_ADMIN_PASSWORD
+            - name: HUB_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: HUB_ADMIN_PASSWORD
+            - name: GALAXY_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: GALAXY_SECRET_KEY
+            - name: GALAXY_ALLOWED_HOSTS
+              value: localhost,127.0.0.1,galaxy-ng,gateway
+            - name: GALAXY_SIGNATURE_UPLOAD_ENABLED
+              value: "false"
+            - name: GALAXY_REQUIRE_CONTENT_APPROVAL
+              value: "true"
+            - name: GALAXY_AUTO_SIGN_COLLECTIONS
+              value: "false"
+            - name: DJANGO_SETTINGS_MODULE
+              value: galaxy_ng.app.settings
+            - name: DJANGO_DEBUG
+              value: "false"
+            - name: PULP_LOGGING_LEVEL
+              value: INFO
+          ports:
+            - containerPort: 8000
+              name: http
+          volumeMounts:
+            - name: hub-pulp-storage
+              mountPath: /var/lib/pulp
+            - name: hub-assets
+              mountPath: /app/static
+          readinessProbe:
+            httpGet:
+              path: /api/galaxy/
+              port: 8000
+            initialDelaySeconds: 45
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /api/galaxy/
+              port: 8000
+            initialDelaySeconds: 90
+            periodSeconds: 30
+      volumes:
+        - name: hub-pulp-storage
+          persistentVolumeClaim:
+            claimName: hub-pulp-storage
+        - name: hub-assets
+          persistentVolumeClaim:
+            claimName: hub-assets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: galaxy-ng
+  namespace: aax
+spec:
+  selector:
+    app: galaxy-ng
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

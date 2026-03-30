@@ -231,7 +231,7 @@ docker compose --profile controller up -d
 
 ```bash
 docker compose --profile hub up -d
-# Access at http://localhost:8081
+# Access at http://localhost:5001
 ```
 
 ### Execution Environments
@@ -241,11 +241,11 @@ docker compose up -d dev-tools
 docker compose exec dev-tools ansible-navigator
 ```
 
-### Event-Driven Automation (Coming Soon)
+### Event-Driven Automation
 
 ```bash
-# Not yet available
-# Track progress: https://github.com/kpeacocke/AAX/issues
+docker compose --profile eda up -d
+# Access at http://localhost:5000
 ```
 
 ---

@@ -29,7 +29,7 @@ This controller stack builds AWX from the official Ansible AWX source repository
 - **Maintenance** - Updates require rebuilding the image with a new AWX version tag
 - **Complexity** - More moving parts than using pre-built images
 
-The root compose file builds `awx-web` and `awx-task` from `images/awx/Dockerfile` (tagged as `${AWX_IMAGE:-aax/awx:latest}`), installing all Python dependencies and using custom entrypoint scripts for the web and task services.
+The root compose file builds `awx-web` and `awx-task` from `images/awx/Dockerfile` (tagged as `${AWX_IMAGE:-aax/awx:1.0.0}`), installing all Python dependencies and using custom entrypoint scripts for the web and task services.
 
 ## Prerequisites
 
@@ -63,7 +63,7 @@ Key variables you may want to customise:
 - `AWX_WEB_PORT` - Host port for AWX web interface (default: 8080)
 - `AWX_RECEPTOR_PORT` - Host port for Receptor (default: 8888)
 
-If you don't create a `.env` file, the stack will use default values.
+You should create a `.env` file before startup. The controller stack now requires explicit secret values instead of weak built-in defaults.
 
 ### 2. Start the Controller Stack
 
@@ -88,9 +88,9 @@ docker compose --profile controller logs -f awx-task
 
 - **URL**: <http://localhost:8080>
 - **Username**: `admin`
-- **Password**: `password`
+- **Password**: value from `AWX_ADMIN_PASSWORD` in your `.env`
 
-> ⚠️ **Security Note**: Change the default password immediately in production!
+> ⚠️ **Security Note**: Use a strong password and secret key before the first startup.
 
 ## Running Your First Job
 
@@ -98,13 +98,7 @@ docker compose --profile controller logs -f awx-task
 
 1. Navigate to <http://localhost:8080> and log in
 2. Go to **Resources** → **Templates**
-3. Create a new **Job Template**:
-   - **Name**: Hello World
-   - **Job Type**: Run
-   - **Inventory**: Demo Inventory (create if needed)
-   - **Project**: Demo Project (create if needed)
-   - **Execution Environment**: `aax/ee-base:latest`
-   - **Playbook**: Select a playbook from your project
+3. Create a new **Job Template** with **Name** `Hello World`, **Job Type** `Run`, **Inventory** `Demo Inventory`, **Project** `Demo Project`, **Execution Environment** `aax/ee-base:1.0.0`, and a playbook from your project.
 4. Click **Launch** to run the job
 
 ### Option 2: Via AWX CLI
@@ -121,7 +115,7 @@ Run a simple command:
 # Configure AWX CLI
 export TOWER_HOST=http://localhost:8080
 export TOWER_USERNAME=admin
-export TOWER_PASSWORD=password
+export TOWER_PASSWORD=<your-awx-admin-password>
 export TOWER_VERIFY_SSL=false
 
 # List available execution environments
@@ -153,7 +147,7 @@ cat > hello-world.yml <<EOF
   tasks:
     - name: Print hello message
       debug:
-        msg: "Hello from AWX using aax/ee-base:latest!"
+        msg: "Hello from AWX using aax/ee-base:1.0.0!"
 
     - name: Show Ansible version
       command: ansible --version
@@ -180,11 +174,11 @@ docker cp . awx-task:/var/lib/awx/projects/demo/
 
 ### Default Execution Environment
 
-The controller is pre-configured to use `aax/ee-base:latest` as the default execution environment. This is set via:
+The controller is pre-configured to use `aax/ee-base:1.0.0` as the default execution environment. This is set via:
 
 ```yaml
 environment:
-  DEFAULT_EXECUTION_ENVIRONMENT: aax/ee-base:latest
+  DEFAULT_EXECUTION_ENVIRONMENT: aax/ee-base:1.0.0
 ```
 
 ### Changing Admin Credentials
@@ -201,8 +195,8 @@ SECRET_KEY=your-secret-key
 ```yaml
 environment:
   AWX_ADMIN_USER: ${AWX_ADMIN_USER:-admin}
-  AWX_ADMIN_PASSWORD: ${AWX_ADMIN_PASSWORD:-your-secure-password}
-  SECRET_KEY: ${SECRET_KEY:-your-secret-key}
+  AWX_ADMIN_PASSWORD: ${AWX_ADMIN_PASSWORD:?AWX_ADMIN_PASSWORD must be set}
+  SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
 ```
 
 ### Database Credentials
@@ -405,14 +399,14 @@ docker compose --profile controller exec -T awx-postgres \
 
 This controller stack uses the execution environments built in the main AAX project:
 
-- **Base EE**: `aax/ee-base:latest` - Default execution environment
-- **Builder**: `aax/ee-builder:latest` - For building custom EEs
-- **Dev Tools**: `aax/dev-tools:latest` - For development and testing
+- **Base EE**: `aax/ee-base:1.0.0` - Default execution environment
+- **Builder**: `aax/ee-builder:1.0.0` - For building custom EEs
+- **Dev Tools**: `aax/dev-tools:1.0.0` - For development and testing
 
 To build custom execution environments within AWX:
 
 1. Create an execution environment definition
-2. Use the AWX API or UI to register `aax/ee-builder:latest`
+2. Use the AWX API or UI to register `aax/ee-builder:1.0.0`
 3. Build and register custom EEs through AWX
 
 ## Next Steps

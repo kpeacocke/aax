@@ -15,7 +15,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('DATABASE_NAME', 'awx'),
         'USER': os.getenv('DATABASE_USER', 'awx'),
-        'PASSWORD': os.getenv('DATABASE_PASSWORD', 'awxpass'),
+        'PASSWORD': os.environ['DATABASE_PASSWORD'],
         'HOST': os.getenv('DATABASE_HOST', 'awx-postgres'),
         'PORT': os.getenv('DATABASE_PORT', '5432'),
         'ATOMIC_REQUESTS': True,
@@ -24,12 +24,12 @@ DATABASES = {
 }
 
 # AWX specific settings
-SECRET_KEY = os.getenv('SECRET_KEY', 'awxsecret')
+SECRET_KEY = os.environ['SECRET_KEY']
 DEBUG = False
 ALLOWED_HOSTS = ['*']
 
 # Broadcast websocket setting
-BROADCAST_WEBSOCKET_SECRET = os.getenv('SECRET_KEY', 'awxsecret')
+BROADCAST_WEBSOCKET_SECRET = os.environ['SECRET_KEY']
 SETTINGS_EOF
 
 # Execute the launcher
