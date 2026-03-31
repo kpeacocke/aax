@@ -214,7 +214,7 @@ class TestDockerCompose:
         gateway_section = config.split("gateway:", 1)[1]
         assert "image: aax/gateway:" in gateway_section
         assert "mode: ingress" in gateway_section
-        assert "published:" in gateway_section
+        assert 'published: "18088"' in gateway_section
         assert "target: 8080" in gateway_section
         assert "awx-network: null" in gateway_section
         assert "hub-network: null" in gateway_section

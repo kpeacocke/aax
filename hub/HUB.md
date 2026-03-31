@@ -74,7 +74,7 @@ export GALAXY_AUTO_SIGN_COLLECTIONS=false
 
 # Pulp configuration
 export PULP_CONTENT_ORIGIN=http://localhost:24816
-export PULP_ANSIBLE_API_HOSTNAME=http://localhost:15002
+export PULP_ANSIBLE_API_HOSTNAME=http://localhost:15001
 ```
 
 ### 2. Start the Hub Stack
@@ -90,15 +90,15 @@ updates the admin user from `GALAXY_ADMIN_USERNAME`, `GALAXY_ADMIN_EMAIL`, and
 
 ### 3. Access the Hub Interface
 
-- **Galaxy NG endpoint**: <http://localhost:15002>
-- **API Root**: <http://localhost:15002/api/galaxy/>
-- **Login form**: <http://localhost:15002/auth/login/?next=/api/galaxy/>
+- **Galaxy NG endpoint**: <http://localhost:15001>
+- **API Root**: <http://localhost:15001/api/galaxy/>
+- **Login form**: <http://localhost:15001/auth/login/?next=/api/galaxy/>
 - **Pulp API via gateway**: <http://localhost:18088/pulp/api/v3/>
 - **Content Delivery via gateway**: <http://localhost:18088/pulp/content/>
 
 Notes:
 
-- In this AAX image, `http://localhost:15002/ui/` is a compatibility path and redirects to `/api/galaxy/`.
+- In this AAX image, `http://localhost:15001/ui/` is a compatibility path and redirects to `/api/galaxy/`.
 - The supported browser flow is login at `/auth/login/` and then session-authenticated access to `/api/galaxy/`.
 - A full interactive Automation Hub web console is not exposed at `/ui/` in this packaging.
 
@@ -117,10 +117,10 @@ docker compose --profile hub ps
 docker compose --profile hub logs -f
 
 # Test API access
-curl http://localhost:15002/api/galaxy/
+curl http://localhost:15001/api/galaxy/
 
 # Test browser login entrypoint
-curl -I 'http://localhost:15002/auth/login/?next=/api/galaxy/'
+curl -I 'http://localhost:15001/auth/login/?next=/api/galaxy/'
 
 # Test Pulp access through the unified gateway
 curl http://localhost:18088/pulp/api/v3/status/
@@ -139,7 +139,7 @@ cat > ~/.ansible.cfg << EOF
 server_list = private_hub
 
 [galaxy_server.private_hub]
-url=http://localhost:15002/api/galaxy/
+url=http://localhost:15001/api/galaxy/
 token=<your-api-token>
 EOF
 
@@ -150,7 +150,7 @@ ansible-galaxy collection publish namespace-collection-1.0.0.tar.gz
 
 #### Via UI
 
-Use the login form at `http://localhost:15002/auth/login/?next=/api/galaxy/` and then
+Use the login form at `http://localhost:15001/auth/login/?next=/api/galaxy/` and then
 operate through the authenticated API browser or CLI workflows. The `/ui/` route is
 compatibility-only and redirects to `/api/galaxy/`.
 
@@ -167,7 +167,7 @@ To approve a collection:
 
 ```bash
 # Via API
-curl -X POST http://localhost:15002/api/galaxy/v3/collections/namespace/name/versions/1.0.0/move/published/ \
+curl -X POST http://localhost:15001/api/galaxy/v3/collections/namespace/name/versions/1.0.0/move/published/ \
   -H "Authorization: Token <your-api-token>"
 ```
 
@@ -179,21 +179,21 @@ Galaxy NG can also serve as a container registry for execution environments.
 
 ```bash
 # Tag your EE image
-docker tag aax/ee-base:1.0.0 localhost:15002/ee-base:1.0.0
+docker tag aax/ee-base:1.0.0 localhost:15001/ee-base:1.0.0
 
 # Log in to the registry
-docker login localhost:15002
+docker login localhost:15001
 # Username: admin
 # Password: <HUB_ADMIN_PASSWORD>
 
 # Push the image
-docker push localhost:15002/ee-base:1.0.0
+docker push localhost:15001/ee-base:1.0.0
 ```
 
 #### Pull from the Hub
 
 ```bash
-docker pull localhost:15002/ee-base:1.0.0
+docker pull localhost:15001/ee-base:1.0.0
 ```
 
 ## Integration with AWX
@@ -252,25 +252,25 @@ networks:
 ### List Collections
 
 ```bash
-curl http://localhost:15002/api/galaxy/v3/collections/
+curl http://localhost:15001/api/galaxy/v3/collections/
 ```
 
 ### Get Collection Details
 
 ```bash
-curl http://localhost:15002/api/galaxy/v3/collections/namespace/collection/
+curl http://localhost:15001/api/galaxy/v3/collections/namespace/collection/
 ```
 
 ### Upload Collection
 
 ```bash
 # Get auth token first
-TOKEN=$(curl -X POST http://localhost:15002/api/galaxy/v3/auth/token/ \
+TOKEN=$(curl -X POST http://localhost:15001/api/galaxy/v3/auth/token/ \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"<your-hub-admin-password>"}' | jq -r .token)
 
 # Upload collection
-curl -X POST http://localhost:15002/api/galaxy/v3/artifacts/collections/ \
+curl -X POST http://localhost:15001/api/galaxy/v3/artifacts/collections/ \
   -H "Authorization: Token $TOKEN" \
   -F "file=@namespace-collection-1.0.0.tar.gz"
 ```
@@ -400,7 +400,7 @@ docker run --rm -v aax_hub_pulp_storage:/data -v $(pwd):/backup \
 
 ## Login Notes
 
-- Session login is available at `http://localhost:15002/auth/login/?next=/api/galaxy/`.
+- Session login is available at `http://localhost:15001/auth/login/?next=/api/galaxy/`.
 - The default admin username is controlled by `GALAXY_ADMIN_USERNAME` and defaults to `admin`.
 - The default admin password is taken from `HUB_ADMIN_PASSWORD`.
 - On a fresh Hub initialization, the admin account is created by `pulp-api` during startup.

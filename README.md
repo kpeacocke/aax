@@ -38,7 +38,7 @@ cp .env.example .env
 docker compose --profile controller up -d
 ```
 
-- **AWX UI:** <http://localhost:18088>
+- **AWX UI:** <http://localhost:18080>
 - **Admin password:**
 
   ```bash
