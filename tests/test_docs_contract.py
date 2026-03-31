@@ -26,8 +26,8 @@ def test_workflow_docs_do_not_claim_latest_pushes() -> None:
 def test_hub_docs_use_gateway_for_pulp_endpoints() -> None:
     """Hub docs should reference gateway endpoints for Pulp access."""
     content = _read("hub/HUB.md")
-    assert "http://localhost:8088/pulp/api/v3/" in content
-    assert "http://localhost:8088/pulp/content/" in content
+    assert "http://localhost:18088/pulp/api/v3/" in content
+    assert "http://localhost:18088/pulp/content/" in content
 
 
 def test_env_example_documents_cookie_override_flag() -> None:
@@ -53,7 +53,7 @@ def test_canonical_endpoints_doc_exists_and_covers_defaults() -> None:
         "GATEWAY_PORT",
         "GALAXY_PORT",
         "EDA_PORT",
-        "http://localhost:8088/pulp/api/v3/",
+        "http://localhost:18088/pulp/api/v3/",
     ]
     for token in required_tokens:
         assert token in content
@@ -128,9 +128,9 @@ def test_network_boundaries_doc_and_debug_exposure_override_exist() -> None:
         assert token in boundaries
 
     for token in [
-        "0.0.0.0:${AWX_WEB_PORT:-8080}:8052",
-        "0.0.0.0:${GATEWAY_PORT:-8088}:8080",
-        "0.0.0.0:${EDA_PORT:-5000}:5000",
+        "0.0.0.0:${AWX_WEB_PORT:-18080}:8052",
+        "0.0.0.0:${GATEWAY_PORT:-18088}:8080",
+        "0.0.0.0:${EDA_PORT:-15000}:5000",
     ]:
         assert token in override
 

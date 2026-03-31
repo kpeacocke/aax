@@ -49,6 +49,7 @@ ARG VCS_REF
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
   curl \
+  git \
   gnupg \
   postgresql-client \
   redis-tools \
@@ -62,7 +63,7 @@ RUN groupadd -g 1000 galaxy && \
   mkdir -p /app/static && \
   mkdir -p /var/lib/pulp/media /var/lib/pulp/assets /var/lib/pulp/tmp && \
   mkdir -p /etc/pulp/certs && \
-  chown -R galaxy:galaxy /app /var/lib/pulp
+  chown -R galaxy:galaxy /app /var/lib/pulp /etc/pulp
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
@@ -70,14 +71,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Patch Galaxy NG settings to fix LOGGING version issue
 # hadolint ignore=DL3059
-RUN python -c "import re; \
-  f = open('/opt/venv/lib/python3.11/site-packages/galaxy_ng/app/settings.py', 'r'); \
-  content = f.read(); f.close(); \
-  content = content.replace('LOGGING = {', 'LOGGING = {\\n    \"version\": 1,\\n    \"disable_existing_loggers\": False,\\n    \"formatters\": {\\n        \"simple\": {\\n            \"format\": \"%(asctime)s %(name)-12s %(levelname)-8s %(message)s\",\\n        },\\n    },'); \
-  content = content.replace(\"    'dynaconf_merge',\\n\", ''); \
-  content = content.replace('    \\\"dynaconf_merge\\\": True,', ''); \
-  f = open('/opt/venv/lib/python3.11/site-packages/galaxy_ng/app/settings.py', 'w'); \
-  f.write(content); f.close()"
+RUN echo "Skipping in-place rewrite of galaxy_ng settings to avoid corruption of INSTALLED_APPS."
 
 # Patch ruamel.yaml metadata to remove clib dependency (same as in Pulp)
 # hadolint ignore=DL3059
@@ -86,6 +80,8 @@ RUN find /opt/venv/lib/python3.11/site-packages/ruamel.yaml-*.dist-info -name ME
 
 # Copy entrypoint script
 COPY --chown=galaxy:galaxy entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY --chown=galaxy:galaxy settings.py /etc/pulp/settings.py
+COPY --chown=galaxy:galaxy aax_wsgi.py /app/aax_wsgi.py
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # OCI metadata labels

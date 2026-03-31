@@ -134,11 +134,11 @@ def test_compose_published_ports_use_localhost_host_bind_default() -> None:
     """Compose published ports should use HOST_BIND with localhost default."""
     content = _read("docker-compose.yml")
     required_bindings = [
-        '"${HOST_BIND:-127.0.0.1}:${AWX_WEB_PORT:-8080}:8052"',
-        '"${HOST_BIND:-127.0.0.1}:${AWX_RECEPTOR_PORT:-8888}:8888"',
-        '"${HOST_BIND:-127.0.0.1}:${GATEWAY_PORT:-8088}:8080"',
-        '"${HOST_BIND:-127.0.0.1}:${GALAXY_PORT:-5001}:8000"',
-        '"${HOST_BIND:-127.0.0.1}:${EDA_PORT:-5000}:5000"',
+        '"${HOST_BIND:-127.0.0.1}:${AWX_WEB_PORT:-18080}:8052"',
+        '"${HOST_BIND:-127.0.0.1}:${AWX_RECEPTOR_PORT:-18888}:8888"',
+        '"${HOST_BIND:-127.0.0.1}:${GATEWAY_PORT:-18088}:8080"',
+        '"${HOST_BIND:-127.0.0.1}:${GALAXY_PORT:-15001}:8000"',
+        '"${HOST_BIND:-127.0.0.1}:${EDA_PORT:-15000}:5000"',
     ]
     for binding in required_bindings:
         assert binding in content
@@ -364,9 +364,10 @@ def test_env_example_matches_compose_variable_surface() -> None:
     """Env template and compose interpolation surface should stay synchronized."""
     compose_vars = _compose_env_var_names(_read("docker-compose.yml"))
     env_example_vars = _env_example_var_names(_read(".env.example"))
+    compose_cli_only_vars = {"COMPOSE_PROFILES", "COMPOSE_PROJECT_NAME"}
 
     missing_in_env_example = sorted(compose_vars - env_example_vars)
-    unused_in_env_example = sorted(env_example_vars - compose_vars)
+    unused_in_env_example = sorted((env_example_vars - compose_vars) - compose_cli_only_vars)
 
     assert missing_in_env_example == [], (
         "Variables used in docker-compose.yml but missing in .env.example:\n"

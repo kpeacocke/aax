@@ -152,7 +152,7 @@ services:
       [
         "/bin/bash",
         "-c",
-        "mkdir -p /etc/tower /etc/nginx/conf.d\ncat > /etc/tower/settings.py << 'PYEOF'\nimport os\nALLOW_PLACEHOLDER_SECRETS = os.getenv('AAX_ALLOW_PLACEHOLDER_SECRETS', 'false').lower() == 'true'\nif not ALLOW_PLACEHOLDER_SECRETS:\n    for _name in ('DATABASE_PASSWORD', 'SECRET_KEY', 'AWX_ADMIN_PASSWORD'):\n        _value = os.getenv(_name, '')\n        if _value.startswith('REPLACE_WITH_') or _value.startswith('CHANGE_ME_'):\n            raise RuntimeError(f'{_name} contains placeholder value; set AAX_ALLOW_PLACEHOLDER_SECRETS=true only for local dev')\nDATABASES = {\n    'default': {\n        'ENGINE': 'django.db.backends.postgresql',\n        'NAME': os.getenv('DATABASE_NAME', 'awx'),\n        'USER': os.getenv('DATABASE_USER', 'awx'),\n        'PASSWORD': os.environ['DATABASE_PASSWORD'],\n        'HOST': os.getenv('DATABASE_HOST', 'awx-postgres'),\n        'PORT': int(os.getenv('DATABASE_PORT', 5432)),\n        'ATOMIC_REQUESTS': True,\n        'CONN_MAX_AGE': 0,\n    }\n}\nSECRET_KEY = os.environ['SECRET_KEY']\nALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]\nDEBUG = False\nCSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.getenv('AWX_CSRF_TRUSTED_ORIGINS', 'http://localhost:8080,http://localhost,http://127.0.0.1:8080,http://localhost:8088,http://127.0.0.1:8088').split(',') if origin.strip()]\nALLOW_INSECURE_COOKIES = os.getenv('AWX_ALLOW_INSECURE_COOKIES', 'false').lower() == 'true'\nSESSION_COOKIE_SECURE = not ALLOW_INSECURE_COOKIES\nCSRF_COOKIE_SECURE = not ALLOW_INSECURE_COOKIES\nSESSION_COOKIE_SAMESITE = 'Lax'\nCSRF_COOKIE_SAMESITE = 'Lax'\nREDIS_HOST = os.getenv('REDIS_SERVICE_HOST', 'awx-redis')\nREDIS_PORT = int(os.getenv('REDIS_SERVICE_PORT', 6379))\nCHANNELS = {\n    'default': {\n        'BACKEND': 'channels_redis.core.RedisChannelLayer',\n        'CONFIG': {'hosts': [(REDIS_HOST, REDIS_PORT)]},\n    },\n}\nPYEOF\ncat > /etc/nginx/conf.d/awx.conf << 'NGEOF'\nserver {\n    listen 8052 default_server;\n    listen [::]:8052 default_server;\n    server_name _;\n    client_max_body_size 0;\n\n    location /static/ {\n        alias /var/lib/awx/public/static/;\n        expires 1h;\n        add_header Cache-Control \"public\";\n    }\n\n    location /media/ {\n        alias /var/lib/awx/public/media/;\n        expires 1h;\n        add_header Cache-Control \"public\";\n    }\n\n    location / {\n        include uwsgi_params;\n        uwsgi_pass 127.0.0.1:8050;\n        uwsgi_read_timeout 120s;\n        uwsgi_send_timeout 120s;\n    }\n}\nNGEOF\nsed -i 's/autostart=true/autostart=false/g' /etc/supervisord_web.conf\nsed -i 's/programs=nginx,uwsgi,daphne,awx-cache-clear,ws-heartbeat/programs=nginx,uwsgi,awx-cache-clear/g' /etc/supervisord_web.conf\nsed -i '/\\[program:daphne\\]/a autostart=false' /etc/supervisord_web.conf\nsed -i '/\\[program:ws-heartbeat\\]/a autostart=false' /etc/supervisord_web.conf\n/usr/bin/launch_awx_web.sh",
+        "mkdir -p /etc/tower\ncat > /etc/tower/settings.py << 'PYEOF'\nimport os\nALLOW_PLACEHOLDER_SECRETS = os.getenv('AAX_ALLOW_PLACEHOLDER_SECRETS', 'false').lower() == 'true'\nif not ALLOW_PLACEHOLDER_SECRETS:\n    for _name in ('DATABASE_PASSWORD', 'SECRET_KEY', 'AWX_ADMIN_PASSWORD'):\n        _value = os.getenv(_name, '')\n        if _value.startswith('REPLACE_WITH_') or _value.startswith('CHANGE_ME_'):\n            raise RuntimeError(f'{_name} contains placeholder value; set AAX_ALLOW_PLACEHOLDER_SECRETS=true only for local dev')\nDATABASES = {\n    'default': {\n        'ENGINE': 'django.db.backends.postgresql',\n        'NAME': os.getenv('DATABASE_NAME', 'awx'),\n        'USER': os.getenv('DATABASE_USER', 'awx'),\n        'PASSWORD': os.environ['DATABASE_PASSWORD'],\n        'HOST': os.getenv('DATABASE_HOST', 'awx-postgres'),\n        'PORT': int(os.getenv('DATABASE_PORT', 5432)),\n        'ATOMIC_REQUESTS': True,\n        'CONN_MAX_AGE': 0,\n    }\n}\nSECRET_KEY = os.environ['SECRET_KEY']\nALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]\nDEBUG = False\nCSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.getenv('AWX_CSRF_TRUSTED_ORIGINS', 'http://localhost:18080,http://localhost,http://127.0.0.1:18080,http://localhost:18088,http://127.0.0.1:18088').split(',') if origin.strip()]\nALLOW_INSECURE_COOKIES = os.getenv('AWX_ALLOW_INSECURE_COOKIES', 'false').lower() == 'true'\nSESSION_COOKIE_SECURE = not ALLOW_INSECURE_COOKIES\nCSRF_COOKIE_SECURE = not ALLOW_INSECURE_COOKIES\nSESSION_COOKIE_SAMESITE = 'Lax'\nCSRF_COOKIE_SAMESITE = 'Lax'\nREDIS_HOST = os.getenv('REDIS_SERVICE_HOST', 'awx-redis')\nREDIS_PORT = int(os.getenv('REDIS_SERVICE_PORT', 6379))\nBROKER_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/0'\nCACHES = {'default': {'BACKEND': 'awx.main.cache.AWXRedisCache', 'LOCATION': f'redis://{REDIS_HOST}:{REDIS_PORT}/1'}}\nCHANNEL_LAYERS = {'default': {'BACKEND': 'channels_redis.core.RedisChannelLayer', 'CONFIG': {'hosts': [BROKER_URL], 'capacity': 10000, 'group_expiry': 157784760}}}\nPYEOF\nexec /usr/local/bin/entrypoint-web.sh",
       ]
     environment:
       DATABASE_HOST: ${DATABASE_HOST:-awx-postgres}
@@ -166,13 +166,13 @@ services:
       AWX_ADMIN_PASSWORD: ${AWX_ADMIN_PASSWORD:?AWX_ADMIN_PASSWORD must be set (non-empty) in .env or environment}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set (non-empty) in .env or environment}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
-      AWX_CSRF_TRUSTED_ORIGINS: ${AWX_CSRF_TRUSTED_ORIGINS:-http://localhost:8080,http://localhost,http://127.0.0.1:8080,http://localhost:8088,http://127.0.0.1:8088}
+      AWX_CSRF_TRUSTED_ORIGINS: ${AWX_CSRF_TRUSTED_ORIGINS:-http://localhost:18080,http://localhost,http://127.0.0.1:18080,http://localhost:18088,http://127.0.0.1:18088}
       AWX_ALLOW_INSECURE_COOKIES: ${AWX_ALLOW_INSECURE_COOKIES:-false}
       AAX_ALLOW_PLACEHOLDER_SECRETS: ${AAX_ALLOW_PLACEHOLDER_SECRETS:-false}
       RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-true}
       DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-aax/ee-base:1.0.0}
     ports:
-      - "${HOST_BIND:-127.0.0.1}:${AWX_WEB_PORT:-8080}:8052"
+      - "${HOST_BIND:-127.0.0.1}:${AWX_WEB_PORT:-18080}:8052"
     volumes:
       - awx_projects:/var/lib/awx/projects
       - awx_rsyslog:/var/log/tower
@@ -209,7 +209,7 @@ services:
       [
         "/bin/bash",
         "-c",
-        "mkdir -p /etc/tower && cat > /etc/tower/settings.py << 'PYEOF'\nimport os\nALLOW_PLACEHOLDER_SECRETS = os.getenv('AAX_ALLOW_PLACEHOLDER_SECRETS', 'false').lower() == 'true'\nif not ALLOW_PLACEHOLDER_SECRETS:\n    for _name in ('DATABASE_PASSWORD', 'SECRET_KEY'):\n        _value = os.getenv(_name, '')\n        if _value.startswith('REPLACE_WITH_') or _value.startswith('CHANGE_ME_'):\n            raise RuntimeError(f'{_name} contains placeholder value; set AAX_ALLOW_PLACEHOLDER_SECRETS=true only for local dev')\nDATABASES = {'default': {'ENGINE': 'django.db.backends.postgresql', 'NAME': os.getenv('DATABASE_NAME', 'awx'), 'USER': os.getenv('DATABASE_USER', 'awx'), 'PASSWORD': os.environ['DATABASE_PASSWORD'], 'HOST': os.getenv('DATABASE_HOST', 'awx-postgres'), 'PORT': int(os.getenv('DATABASE_PORT', 5432))}}\nSECRET_KEY = os.environ['SECRET_KEY']\nDEBUG = False\nALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]\nBROADCAST_WEBSOCKET_SECRET = os.environ['SECRET_KEY']\nPYEOF\nexec /usr/local/bin/dumb-init -- /usr/bin/launch_awx_task.sh",
+        "mkdir -p /etc/receptor && cat > /etc/receptor/receptor.conf << 'RECEOF'\n---\n- node:\n    id: awx-task\n- control-service:\n    service: control\n    filename: /var/lib/receptor/receptor.sock\n    permissions: \"0660\"\n- tcp-peer:\n    address: awx-receptor:8888\n- log-level:\n    level: info\nRECEOF\nmkdir -p /etc/tower && cat > /etc/tower/settings.py << 'PYEOF'\nimport os\nALLOW_PLACEHOLDER_SECRETS = os.getenv('AAX_ALLOW_PLACEHOLDER_SECRETS', 'false').lower() == 'true'\nif not ALLOW_PLACEHOLDER_SECRETS:\n    for _name in ('DATABASE_PASSWORD', 'SECRET_KEY'):\n        _value = os.getenv(_name, '')\n        if _value.startswith('REPLACE_WITH_') or _value.startswith('CHANGE_ME_'):\n            raise RuntimeError(f'{_name} contains placeholder value; set AAX_ALLOW_PLACEHOLDER_SECRETS=true only for local dev')\nDATABASES = {'default': {'ENGINE': 'django.db.backends.postgresql', 'NAME': os.getenv('DATABASE_NAME', 'awx'), 'USER': os.getenv('DATABASE_USER', 'awx'), 'PASSWORD': os.environ['DATABASE_PASSWORD'], 'HOST': os.getenv('DATABASE_HOST', 'awx-postgres'), 'PORT': int(os.getenv('DATABASE_PORT', 5432))}}\nSECRET_KEY = os.environ['SECRET_KEY']\nDEBUG = False\nALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]\nREDIS_HOST = os.getenv('REDIS_HOST', 'awx-redis')\nREDIS_PORT = int(os.getenv('REDIS_PORT', 6379))\nBROKER_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/0'\nCACHES = {'default': {'BACKEND': 'awx.main.cache.AWXRedisCache', 'LOCATION': f'redis://{REDIS_HOST}:{REDIS_PORT}/1'}}\nCHANNEL_LAYERS = {'default': {'BACKEND': 'channels_redis.core.RedisChannelLayer', 'CONFIG': {'hosts': [BROKER_URL], 'capacity': 10000, 'group_expiry': 157784760}}}\nBROADCAST_WEBSOCKET_SECRET = os.environ['SECRET_KEY']\nPYEOF\nexec /usr/local/bin/entrypoint-task.sh",
       ]
     # yamllint enable rule:line-length
     environment:
@@ -224,13 +224,14 @@ services:
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
       AWX_SKIP_MIGRATIONS: ${AWX_SKIP_MIGRATIONS:-false}
       DJANGO_SETTINGS_MODULE: awx.settings.production
-      AWX_SETTINGS_FILE: /dev/null
+      AWX_SETTINGS_FILE: /etc/tower/settings.py
       AAX_ALLOW_PLACEHOLDER_SECRETS: ${AAX_ALLOW_PLACEHOLDER_SECRETS:-false}
       RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-true}
       DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-aax/ee-base:1.0.0}
     volumes:
       - awx_projects:/var/lib/awx/projects
       - awx_rsyslog:/var/log/tower
+      - receptor_data:/var/lib/receptor
     networks:
       - awx-network
       - hub-network
@@ -240,7 +241,7 @@ services:
       awx-redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "awx-manage check || exit 1"]
+      test: ["CMD-SHELL", "python /var/lib/awx/manage.py check || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -282,7 +283,7 @@ services:
     networks:
       - awx-network
     ports:
-      - "${HOST_BIND:-127.0.0.1}:${AWX_RECEPTOR_PORT:-8888}:8888"
+      - "${HOST_BIND:-127.0.0.1}:${AWX_RECEPTOR_PORT:-18888}:8888"
     healthcheck:
       test:
         [
@@ -415,10 +416,9 @@ services:
       - eda
     security_opt:
       - no-new-privileges:true
-    cap_drop:
-      - ALL
+    restart: unless-stopped
     ports:
-      - "${HOST_BIND:-127.0.0.1}:${GATEWAY_PORT:-8088}:8080"
+      - "${HOST_BIND:-127.0.0.1}:${GATEWAY_PORT:-18088}:8080"
     networks:
       - awx-network
       - hub-network
@@ -499,12 +499,15 @@ services:
       REDIS_HOST: hub-redis
       REDIS_PORT: 6379
       PULP_SECRET_KEY: "${PULP_SECRET_KEY:?PULP_SECRET_KEY must be set (non-empty) in .env or environment}"
-      PULP_ALLOWED_HOSTS: ${PULP_ALLOWED_HOSTS:-localhost,127.0.0.1,::1,pulp-api,pulp-content}
+      ALLOWED_HOSTS: localhost,127.0.0.1,[::1],pulp-api,pulp-content,galaxy-ng,gateway
       PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://localhost:24816}
-      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:5001}
+      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:15001}
       PULP_SETTINGS: /etc/pulp/settings.py
       DJANGO_SETTINGS_MODULE: pulpcore.app.settings
       PULP_WORKERS: ${PULP_WORKERS:-2}
+      GALAXY_ADMIN_USERNAME: ${GALAXY_ADMIN_USERNAME:-admin}
+      GALAXY_ADMIN_PASSWORD: ${HUB_ADMIN_PASSWORD:?HUB_ADMIN_PASSWORD must be set (non-empty) in .env or environment}
+      GALAXY_ADMIN_EMAIL: ${GALAXY_ADMIN_EMAIL:-admin@example.com}
     volumes:
       - hub_pulp_storage:/var/lib/pulp
     networks:
@@ -540,9 +543,9 @@ services:
       REDIS_HOST: hub-redis
       REDIS_PORT: 6379
       PULP_SECRET_KEY: "${PULP_SECRET_KEY:?PULP_SECRET_KEY must be set (non-empty) in .env or environment}"
-      PULP_ALLOWED_HOSTS: ${PULP_ALLOWED_HOSTS:-localhost,127.0.0.1,::1,pulp-api,pulp-content}
+      ALLOWED_HOSTS: localhost,127.0.0.1,[::1],pulp-api,pulp-content,galaxy-ng,gateway
       PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://localhost:24816}
-      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:5001}
+      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:15001}
       PULP_SETTINGS: /etc/pulp/settings.py
       DJANGO_SETTINGS_MODULE: pulpcore.app.settings
     volumes:
@@ -578,9 +581,9 @@ services:
       REDIS_HOST: hub-redis
       REDIS_PORT: 6379
       PULP_SECRET_KEY: "${PULP_SECRET_KEY:?PULP_SECRET_KEY must be set (non-empty) in .env or environment}"
-      PULP_ALLOWED_HOSTS: ${PULP_ALLOWED_HOSTS:-localhost,127.0.0.1,::1,pulp-api,pulp-content}
+      ALLOWED_HOSTS: localhost,127.0.0.1,[::1],pulp-api,pulp-content,galaxy-ng,gateway
       PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://localhost:24816}
-      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:5001}
+      PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:15001}
       PULP_SETTINGS: /etc/pulp/settings.py
       DJANGO_SETTINGS_MODULE: pulpcore.app.settings
     volumes:
@@ -591,7 +594,11 @@ services:
       pulp-api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "pgrep", "-f", "pulpcore-worker"]
+      test:
+        [
+          "CMD-SHELL",
+          "pgrep -f 'pulpcore-worker|pulpcore.tasking.entrypoint' >/dev/null",
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -621,7 +628,7 @@ services:
       POSTGRES_DB: hub
       REDIS_HOST: hub-redis
       REDIS_PORT: 6379
-      PULP_API_ROOT: http://pulp-api:24817
+      HUB_PULP_API_URL: http://pulp-api:24817
       PULP_CONTENT_ORIGIN: ${PULP_CONTENT_ORIGIN:-http://pulp-content:24816}
       PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://galaxy-ng:8000}
       GALAXY_ADMIN_USERNAME: ${GALAXY_ADMIN_USERNAME:-admin}
@@ -634,7 +641,8 @@ services:
       GALAXY_AUTO_SIGN_COLLECTIONS: ${GALAXY_AUTO_SIGN_COLLECTIONS:-false}
       GALAXY_COLLECTION_SIGNING_SERVICE: ${GALAXY_COLLECTION_SIGNING_SERVICE:-}
       GALAXY_CONTAINER_SIGNING_SERVICE: ${GALAXY_CONTAINER_SIGNING_SERVICE:-}
-      DJANGO_SETTINGS_MODULE: galaxy_ng.app.settings
+      PULP_SETTINGS: /etc/pulp/settings.py
+      DJANGO_SETTINGS_MODULE: pulpcore.app.settings
       DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
       PULP_LOGGING_LEVEL: ${PULP_LOGGING_LEVEL:-INFO}
     volumes:
@@ -648,13 +656,17 @@ services:
       pulp-content:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/galaxy/"]
+      test:
+        [
+          "CMD-SHELL",
+          "code=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/galaxy/); echo $$code | grep -Eq '^(200|301|302|307|308|401|403)$$'",
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 90s
     ports:
-      - "${HOST_BIND:-127.0.0.1}:${GALAXY_PORT:-5001}:8000"
+      - "${HOST_BIND:-127.0.0.1}:${GALAXY_PORT:-15001}:8000"
 
   eda-postgres:
     image: postgres:15
@@ -733,7 +745,7 @@ services:
       - eda_projects:/home/eda/projects
       - eda_logs:/var/log/eda
     ports:
-      - "${HOST_BIND:-127.0.0.1}:${EDA_PORT:-5000}:5000"
+      - "${HOST_BIND:-127.0.0.1}:${EDA_PORT:-15000}:5000"
     networks:
       - awx-network
       - eda-network
@@ -745,7 +757,6 @@ services:
           import os
           import socket
           import sys
-          import urllib.request
 
           checks = [
               (os.getenv('EDA_DB_HOST', 'eda-postgres'), int(os.getenv('EDA_DB_PORT', '5432'))),
@@ -760,11 +771,6 @@ services:
                   sys.exit(1)
               finally:
                   sock.close()
-
-          urllib.request.urlopen(
-              f"http://127.0.0.1:{os.getenv('EDA_PORT', '5000')}/health",
-              timeout=2,
-          )
           PY
       interval: 30s
       timeout: 10s

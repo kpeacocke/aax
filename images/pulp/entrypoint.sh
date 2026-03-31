@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-# Allow command override for testing
-if [ "$#" -gt 0 ]; then
-  exec "$@"
+# Default to API service when no command is provided.
+if [ "$#" -eq 0 ]; then
+  set -- pulpcore-api
 fi
 
 # Wait for PostgreSQL
@@ -41,6 +41,40 @@ if [ "$1" = "pulpcore-api" ]; then
 
   echo "Creating default access policy..."
   pulpcore-manager create-access-policy || true
+
+  if [ -n "${GALAXY_ADMIN_PASSWORD:-}" ]; then
+    echo "Ensuring Hub admin user exists..."
+    python - <<'PY'
+import os
+import django
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "pulpcore.app.settings")
+django.setup()
+
+from django.contrib.auth import get_user_model
+
+username = os.getenv("GALAXY_ADMIN_USERNAME", "admin")
+password = os.environ["GALAXY_ADMIN_PASSWORD"]
+email = os.getenv("GALAXY_ADMIN_EMAIL", "admin@example.com")
+
+User = get_user_model()
+user, _ = User.objects.get_or_create(
+    username=username,
+    defaults={
+        "email": email,
+        "is_staff": True,
+        "is_superuser": True,
+        "is_active": True,
+    },
+)
+user.email = email
+user.is_staff = True
+user.is_superuser = True
+user.is_active = True
+user.set_password(password)
+user.save()
+PY
+  fi
 fi
 
 # Start the requested service

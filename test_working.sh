@@ -1,15 +1,31 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 echo "==============================================="
 echo "AAX Stack Integration Test (Working Components)"
 echo "==============================================="
 echo ""
 
-AWX_URL="http://localhost:8080"
-AWX_USER="admin"
-AWX_PASS="password"
-PULP_API_URL="http://localhost:24817"
+# Read credentials from .env if not already set in environment
+if [ -f "$(dirname "$0")/.env" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "$(dirname "$0")/.env"
+    set +a
+fi
+
+AWX_USER="${AWX_ADMIN_USER:-admin}"
+AWX_PASS="${AWX_ADMIN_PASSWORD:-password}"
+HUB_USER="${GALAXY_ADMIN_USERNAME:-admin}"
+HUB_PASS="${HUB_ADMIN_PASSWORD:-changeme}"
+AWX_WEB_PORT="${AWX_WEB_PORT:-18080}"
+AWX_RECEPTOR_PORT="${AWX_RECEPTOR_PORT:-18888}"
+GATEWAY_PORT="${GATEWAY_PORT:-18088}"
+GALAXY_PORT="${GALAXY_PORT:-15001}"
+EDA_PORT="${EDA_PORT:-15000}"
+AWX_URL="http://localhost:${AWX_WEB_PORT}"
+GALAXY_URL="http://localhost:${GALAXY_PORT}"
+GATEWAY_URL="http://localhost:${GATEWAY_PORT}"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -20,11 +36,31 @@ pass() { echo -e "${GREEN}✓${NC} $1"; }
 fail() { echo -e "${RED}✗${NC} $1"; exit 1; }
 info() { echo -e "${YELLOW}→${NC} $1"; }
 
+wait_for_awx_api() {
+    local attempts="${1:-60}"
+    local delay_seconds="${2:-5}"
+    local i
+
+    for ((i=1; i<=attempts; i++)); do
+        if curl -sf "$AWX_URL/api/v2/ping/" > /dev/null; then
+            return 0
+        fi
+        info "AWX not ready yet (attempt ${i}/${attempts}), waiting ${delay_seconds}s..."
+        sleep "$delay_seconds"
+    done
+
+    return 1
+}
+
 echo "=== Testing AWX Controller ==="
 echo ""
 
 info "1. Checking AWX API health..."
-curl -sf "$AWX_URL/api/v2/ping/" > /dev/null || fail "AWX API not responding"
+if ! docker ps --format '{{.Names}}' | grep -qx 'awx-web'; then
+    fail "awx-web container is not running. Start stack with: docker compose up -d"
+fi
+
+wait_for_awx_api 60 5 || fail "AWX API not responding after 300s. Check logs with: docker compose logs awx-web awx-task"
 pass "AWX API is operational"
 
 info "2. Testing AWX authentication..."
@@ -43,29 +79,53 @@ info "5. Checking AWX instances..."
 instance_count=$(curl -s -u "$AWX_USER:$AWX_PASS" "$AWX_URL/api/v2/instances/" | grep -o '"count":[0-9]*' | cut -d: -f2)
 pass "Found $instance_count AWX instance(s) registered"
 
-info "6. Testing Receptor connectivity..."
-if timeout 2 bash -c "cat < /dev/null > /dev/tcp/localhost/8888" 2>/dev/null; then
-    pass "Receptor is accessible on port 8888"
+info "6. Testing Receptor mesh connectivity..."
+mesh_data=$(curl -s -u "$AWX_USER:$AWX_PASS" "$AWX_URL/api/v2/mesh_visualizer/")
+node_count=$(echo "$mesh_data" | grep -o '"hostname":"[^"]*"' | wc -l | tr -d ' ')
+if [ "$node_count" -ge 1 ]; then
+    pass "Receptor mesh has $node_count node(s)"
 else
-    fail "Receptor port not accessible"
+    fail "Receptor mesh communication issue"
 fi
 
 echo ""
 echo "=== Testing Private Automation Hub ==="
 echo ""
 
-info "7. Checking Pulp API..."
-curl -sf "$PULP_API_URL/pulp/api/v3/status/" > /dev/null || fail "Pulp API not responding"
-pass "Pulp API is operational"
+# Pulp API/content have no host ports — they're internal-only.
+# Access via Gateway (port ${GATEWAY_PORT}) which proxies:
+#   /pulp/api/      → pulp-api:24817
+#   /pulp/content/  → pulp-content:24816
+#   /api/galaxy/    → galaxy-ng:8000
 
-info "8. Checking Pulp workers..."
-worker_count=$(curl -s "$PULP_API_URL/pulp/api/v3/status/" | grep -o '"online_workers":[0-9]*' | cut -d: -f2)
-pass "Found $worker_count online Pulp worker(s)"
+info "7. Checking Galaxy NG API..."
+# Galaxy NG returns 403 for unauthenticated — that still means the service is up
+http_code=$(curl -s -o /dev/null -w "%{http_code}" "$GALAXY_URL/api/galaxy/")
+if [[ "$http_code" =~ ^(200|403)$ ]]; then
+    pass "Galaxy NG API is operational (HTTP $http_code)"
+else
+    fail "Galaxy NG API returned unexpected HTTP $http_code (expected 200 or 403)"
+fi
 
-info "9. Checking Pulp content server..."
-curl -sf "http://localhost:24816/pulp/content/" > /dev/null || \
-    curl -sf -I "http://localhost:24816/pulp/content/" > /dev/null || true
-pass "Pulp content server is operational"
+info "8. Checking Pulp workers (via gateway)..."
+pulp_status=$(curl -s "${GATEWAY_URL}/pulp/api/v3/status/")
+# online_workers is a JSON array in Pulp API v3 — count its entries via python3
+worker_count=$(echo "$pulp_status" | python3 -c \
+    "import sys,json; d=json.load(sys.stdin); print(len(d.get('online_workers', [])))" \
+    2>/dev/null || echo 0)
+if [ -n "$worker_count" ] && [ "$worker_count" -ge 1 ]; then
+    pass "Pulp has $worker_count online worker(s)"
+else
+    fail "No Pulp workers online"
+fi
+
+info "9. Checking Pulp content server (via gateway)..."
+content_code=$(curl -s -o /dev/null -w "%{http_code}" "${GATEWAY_URL}/pulp/content/")
+if [[ "$content_code" =~ ^(200|404)$ ]]; then
+    pass "Pulp content server is operational (HTTP $content_code)"
+else
+    fail "Pulp content server returned unexpected HTTP $content_code"
+fi
 
 echo ""
 echo "=== Testing Infrastructure ==="
@@ -77,32 +137,37 @@ hub_db=$(docker exec aax-hub-postgres psql -U galaxy -d hub -c "SELECT 1;" 2>&1 
 if [ "$awx_db" -ge 1 ] && [ "$hub_db" -ge 1 ]; then
     pass "PostgreSQL databases operational (AWX has $awx_db org(s))"
 else
-    fail "Database connectivity issue"
+    fail "Database connectivity issue (awx_orgs=$awx_db hub_rows=$hub_db)"
 fi
 
 info "11. Checking Redis..."
-awx_redis=$(docker exec awx-redis redis-cli ping 2>/dev/null)
-hub_redis=$(docker exec aax-hub-redis redis-cli ping 2>/dev/null)
+awx_redis=$(docker exec awx-redis redis-cli ping 2>/dev/null || echo "FAIL")
+hub_redis=$(docker exec aax-hub-redis redis-cli ping 2>/dev/null || echo "FAIL")
 if [ "$awx_redis" = "PONG" ] && [ "$hub_redis" = "PONG" ]; then
     pass "All Redis instances responding"
 else
-    fail "Redis connectivity issue"
+    fail "Redis connectivity issue (awx=$awx_redis hub=$hub_redis)"
 fi
 
 info "12. Checking container health..."
 healthy=$(docker ps --filter "health=healthy" --format "{{.Names}}" | wc -l)
+unhealthy=$(docker ps --filter "health=unhealthy" --format "{{.Names}}" | tr '\n' ' ')
 pass "$healthy containers report healthy status"
+if [ -n "$unhealthy" ]; then
+    echo -e "${YELLOW}  Warning: unhealthy containers: $unhealthy${NC}"
+fi
 
 echo ""
 echo "=== Functional Tests ==="
 echo ""
 
 info "13. Creating test inventory..."
+inv_name="integration-test-inventory-$(date +%s)"
 inv_response=$(curl -s -u "$AWX_USER:$AWX_PASS" \
     -H "Content-Type: application/json" \
     -X POST "$AWX_URL/api/v2/inventories/" \
-    -d '{"name":"integration-test-inventory","organization":1}')
-inv_id=$(echo "$inv_response" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+    -d '{"name":"'"$inv_name"'","organization":1}')
+inv_id=$(echo "$inv_response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
 
 if [ -n "$inv_id" ] && [ "$inv_id" != "null" ]; then
     pass "Created test inventory (ID: $inv_id)"
@@ -112,7 +177,7 @@ if [ -n "$inv_id" ] && [ "$inv_id" != "null" ]; then
         -H "Content-Type: application/json" \
         -X POST "$AWX_URL/api/v2/inventories/$inv_id/hosts/" \
         -d '{"name":"test-host","variables":"ansible_connection: local"}')
-    host_id=$(echo "$host_response" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
+    host_id=$(echo "$host_response" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
 
     if [ -n "$host_id" ]; then
         pass "Added test host (ID: $host_id)"
@@ -124,37 +189,31 @@ if [ -n "$inv_id" ] && [ "$inv_id" != "null" ]; then
     curl -s -u "$AWX_USER:$AWX_PASS" -X DELETE "$AWX_URL/api/v2/inventories/$inv_id/" > /dev/null
     pass "Test inventory removed"
 else
-    fail "Failed to create test inventory"
+    fail "Failed to create test inventory: $inv_response"
 fi
 
 echo ""
 echo "==============================================="
-echo -e "${GREEN}✓ Integration Tests Complete!${NC}"
+echo -e "${GREEN}All tests passed!${NC}"
 echo "==============================================="
 echo ""
-
 echo "Working Services:"
-echo "  ✓ AWX Controller (http://localhost:8080)"
-echo "  ✓ AWX API (authenticated)"
-echo "  ✓ AWX Receptor (port 8888)"
-echo "  ✓ Pulp API (http://localhost:24817)"
-echo "  ✓ Pulp Content Server (http://localhost:24816)"
-echo "  ✓ PostgreSQL (AWX & Hub)"
-echo "  ✓ Redis (AWX & Hub)"
+echo "  AWX Controller  http://localhost:${AWX_WEB_PORT}  (${AWX_USER} / ${AWX_PASS})"
+echo "  AWX Receptor    port ${AWX_RECEPTOR_PORT}"
+echo "  Galaxy NG Hub   http://localhost:${GALAXY_PORT}   (${HUB_USER} / ${HUB_PASS})"
+echo "  EDA Controller  http://localhost:${EDA_PORT}"
+echo "  Gateway (all)   http://localhost:${GATEWAY_PORT}"
+echo "    /api/galaxy/    -> Galaxy NG"
+echo "    /pulp/api/      -> Pulp API"
+echo "    /pulp/content/  -> Pulp content"
+echo "    /eda/           -> EDA Controller"
+echo "    /               -> AWX Web UI"
+echo "  PostgreSQL      AWX & Hub/Pulp"
+echo "  Redis           AWX & Hub"
 echo ""
-
-echo "Known Issues:"
-echo "  ⚠ Galaxy NG (port 5001) - redis-cli missing in container"
-echo "    Workaround: Pulp API can be used directly for content management"
-echo ""
-
 echo "Next Steps:"
-echo "  1. Login to AWX: http://localhost:8080 (admin/password)"
-echo "  2. Create a project from Git"
-echo "  3. Create credentials"
-echo "  4. Create job templates"
-echo "  5. Run automation jobs"
-echo ""
-
-echo "To fix Galaxy NG, add 'redis' package to images/galaxy-ng/Dockerfile"
+echo "  1. Login to AWX:  http://localhost:${AWX_WEB_PORT}"
+echo "  2. Login to Hub:  http://localhost:${GALAXY_PORT}"
+echo "  3. Create a project, credentials, and job templates"
+echo "  4. Run automation jobs"
 echo ""
