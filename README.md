@@ -51,6 +51,11 @@ To run the hub stack:
 docker compose --profile hub up -d
 ```
 
+Profile note:
+
+- If `COMPOSE_PROFILES` is set in `.env`, Docker Compose combines it with any CLI `--profile` flags.
+- To run a single stack predictably (for example hub-only), keep `COMPOSE_PROFILES` empty and pass explicit `--profile` flags in the command.
+
 ## Common Commands
 
 ```bash
@@ -80,6 +85,8 @@ Use Portainer's **Git repository** stack mode with the single compose file.
 
 - `COMPOSE_PROFILES=controller` (or `controller,hub,eda`)
 - `AWX_CSRF_TRUSTED_ORIGINS=http://<nas-ip>:18080,https://<your-domain>`
+
+Use only the profiles you want to run. Avoid setting broad defaults in `.env` and then adding extra `--profile` flags during manual runs, because Compose unions them.
 
 1. Deploy and monitor:
 
