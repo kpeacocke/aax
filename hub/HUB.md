@@ -72,8 +72,8 @@ export GALAXY_SIGNATURE_UPLOAD_ENABLED=false
 export GALAXY_REQUIRE_CONTENT_APPROVAL=true
 export GALAXY_AUTO_SIGN_COLLECTIONS=false
 
-# Pulp configuration
-export PULP_CONTENT_ORIGIN=http://localhost:24816
+# Pulp configuration (must match the origin clients use for /pulp/content/)
+export PULP_CONTENT_ORIGIN=http://localhost:18088
 export PULP_ANSIBLE_API_HOSTNAME=http://localhost:15001
 ```
 

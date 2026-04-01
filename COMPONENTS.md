@@ -23,7 +23,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
   - Workflow orchestration
   - Execution history and logging
 - **Deployment:** Docker Compose (`docker-compose.yml`, `controller` profile)
-- **Access:** `http://localhost:8080`
+- **Access:** `http://localhost:18080`
 
 #### 3.3. Private Automation Hub
 
@@ -39,7 +39,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
   - API for programmatic access
   - Web UI for content discovery
 - **Deployment:** Docker Compose (`docker-compose.yml`, `hub` profile)
-- **Access:** `http://localhost:5001`
+- **Access:** `http://localhost:15001`
 - **Content Sources:** Can pull from galaxy.ansible.com, GitHub, or other registries
 
 #### 3.6. Automation Mesh
@@ -151,7 +151,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
   - Webhook endpoint for external event submission
   - Real-time event streaming via WebSocket
 - **Deployment:** Docker Compose (`docker-compose.yml`, `eda` profile)
-- **Access:** REST API on `http://localhost:5000`
+- **Access:** REST API on `http://localhost:15000`
 - **Documentation:** [images/eda-controller/EDA.md](./images/eda-controller/EDA.md) with rulebook examples and AWX integration patterns
 
 ---
@@ -248,7 +248,7 @@ What AAX does not provide is the full AAP product surface:
 
 ```bash
 docker compose --profile hub up -d
-# Access at http://localhost:5001
+# Access at http://localhost:15001
 ```
 
 For the main platform building blocks, yes.

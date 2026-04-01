@@ -105,7 +105,7 @@ GET /api/v2/ping/
 **Test:**
 
 ```bash
-curl http://localhost:8080/api/v2/ping/
+curl http://localhost:18080/api/v2/ping/
 ```
 
 ---
@@ -123,7 +123,7 @@ GET /api/v2/system_jobs/
 **Test:**
 
 ```bash
-curl -u admin:password http://localhost:8080/api/v2/system_jobs/
+curl -u admin:password http://localhost:18080/api/v2/system_jobs/
 ```
 
 ---
@@ -157,7 +157,7 @@ GET /api/galaxy/v3/status/
 **Test:**
 
 ```bash
-curl http://localhost:8000/api/galaxy/v3/status/
+curl http://localhost:15001/api/galaxy/v3/status/
 ```
 
 ---
@@ -175,7 +175,7 @@ curl http://localhost:8000/api/galaxy/v3/status/
 **Test:**
 
 ```bash
-curl http://localhost:8000/-/ready/
+curl http://localhost:15001/-/ready/
 ```
 
 ---
@@ -215,7 +215,7 @@ GET /pulp/api/v3/status/
 **Test:**
 
 ```bash
-curl http://localhost:8088/pulp/api/v3/status/
+curl http://localhost:18088/pulp/api/v3/status/
 ```
 
 ---
@@ -247,7 +247,7 @@ GET /health
 **Test:**
 
 ```bash
-curl http://localhost:5000/health
+curl http://localhost:15000/health
 ```
 
 ---
