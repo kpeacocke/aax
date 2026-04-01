@@ -36,6 +36,10 @@ pass() { echo -e "${GREEN}✓${NC} $1"; }
 fail() { echo -e "${RED}✗${NC} $1"; exit 1; }
 info() { echo -e "${YELLOW}→${NC} $1"; }
 
+compose_exec() {
+    docker compose exec -T "$@"
+}
+
 wait_for_awx_api() {
     local attempts="${1:-60}"
     local delay_seconds="${2:-5}"
@@ -132,8 +136,8 @@ echo "=== Testing Infrastructure ==="
 echo ""
 
 info "10. Checking PostgreSQL databases..."
-awx_db=$(docker exec awx-postgres psql -U awx -d awx -c "SELECT count(*) FROM main_organization;" 2>&1 | grep -E "^\s+[0-9]+$" | tr -d ' ' || echo "0")
-hub_db=$(docker exec aax-hub-postgres psql -U galaxy -d hub -c "SELECT 1;" 2>&1 | grep -c "1 row" || echo "0")
+awx_db=$(compose_exec awx-postgres psql -U awx -d awx -c "SELECT count(*) FROM main_organization;" 2>&1 | grep -E "^\s+[0-9]+$" | tr -d ' ' || echo "0")
+hub_db=$(compose_exec hub-postgres psql -U galaxy -d hub -c "SELECT 1;" 2>&1 | grep -c "1 row" || echo "0")
 if [ "$awx_db" -ge 1 ] && [ "$hub_db" -ge 1 ]; then
     pass "PostgreSQL databases operational (AWX has $awx_db org(s))"
 else
@@ -141,8 +145,8 @@ else
 fi
 
 info "11. Checking Redis..."
-awx_redis=$(docker exec awx-redis redis-cli ping 2>/dev/null || echo "FAIL")
-hub_redis=$(docker exec aax-hub-redis redis-cli ping 2>/dev/null || echo "FAIL")
+awx_redis=$(compose_exec awx-redis redis-cli ping 2>/dev/null || echo "FAIL")
+hub_redis=$(compose_exec hub-redis redis-cli ping 2>/dev/null || echo "FAIL")
 if [ "$awx_redis" = "PONG" ] && [ "$hub_redis" = "PONG" ]; then
     pass "All Redis instances responding"
 else
@@ -150,7 +154,7 @@ else
 fi
 
 info "12. Checking container health..."
-healthy=$(docker ps --filter "health=healthy" --format "{{.Names}}" | wc -l)
+healthy=$(docker ps --filter "health=healthy" --format "{{.Names}}" | grep -c . || true)
 unhealthy=$(docker ps --filter "health=unhealthy" --format "{{.Names}}" | tr '\n' ' ')
 pass "$healthy containers report healthy status"
 if [ -n "$unhealthy" ]; then

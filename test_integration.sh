@@ -39,6 +39,10 @@ pass() { echo -e "${GREEN}✓ PASS:${NC} $1"; }
 fail() { echo -e "${RED}✗ FAIL:${NC} $1"; exit 1; }
 info() { echo -e "${YELLOW}ℹ INFO:${NC} $1"; }
 
+compose_exec() {
+    docker compose exec -T "$@"
+}
+
 # Test 1: AWX API Health
 echo "Test 1: AWX API Health Check"
 response=$(curl -s -o /dev/null -w "%{http_code}" "$AWX_URL/api/v2/ping/")
@@ -142,11 +146,10 @@ fi
 echo ""
 
 # Test 11: Database Connectivity
-# Container names: awx-postgres, aax-hub-postgres
 # Hub DB: user=galaxy, db=hub
 echo "Test 11: PostgreSQL Connectivity"
-awx_db_test=$(docker exec awx-postgres psql -U awx -d awx -c "SELECT 1;" 2>&1 | grep -c "1 row" || echo "0")
-hub_db_test=$(docker exec aax-hub-postgres psql -U galaxy -d hub -c "SELECT 1;" 2>&1 | grep -c "1 row" || echo "0")
+awx_db_test=$(compose_exec awx-postgres psql -U awx -d awx -c "SELECT 1;" 2>&1 | grep -c "1 row" || echo "0")
+hub_db_test=$(compose_exec hub-postgres psql -U galaxy -d hub -c "SELECT 1;" 2>&1 | grep -c "1 row" || echo "0")
 if [ "$awx_db_test" -ge 1 ] && [ "$hub_db_test" -ge 1 ]; then
     pass "Both PostgreSQL databases are accessible"
 else
@@ -155,10 +158,9 @@ fi
 echo ""
 
 # Test 12: Redis Connectivity
-# Container names: awx-redis, aax-hub-redis
 echo "Test 12: Redis Connectivity"
-awx_redis=$(docker exec awx-redis redis-cli ping 2>/dev/null || echo "FAIL")
-hub_redis=$(docker exec aax-hub-redis redis-cli ping 2>/dev/null || echo "FAIL")
+awx_redis=$(compose_exec awx-redis redis-cli ping 2>/dev/null || echo "FAIL")
+hub_redis=$(compose_exec hub-redis redis-cli ping 2>/dev/null || echo "FAIL")
 if [ "$awx_redis" = "PONG" ] && [ "$hub_redis" = "PONG" ]; then
     pass "Both Redis instances are responding"
 else
@@ -168,8 +170,8 @@ echo ""
 
 # Test 13: Container Health Status
 echo "Test 13: Container Health Status"
-unhealthy=$(docker ps --filter "health=unhealthy" --format "{{.Names}}" | wc -l)
-healthy=$(docker ps --filter "health=healthy" --format "{{.Names}}" | wc -l)
+unhealthy=$(docker ps --filter "health=unhealthy" --format "{{.Names}}" | grep -c . || true)
+healthy=$(docker ps --filter "health=healthy" --format "{{.Names}}" | grep -c . || true)
 info "Healthy containers: $healthy"
 info "Unhealthy containers: $unhealthy"
 if [ "$healthy" -ge 6 ]; then

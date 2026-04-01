@@ -69,6 +69,11 @@ CORS_ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
+# Keep this setting actively consumed in-module and enforce safer defaults when
+# wildcard CORS is disabled.
+if not CORS_ALLOW_ALL_ORIGINS and not CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS = ["http://localhost:15001", "http://127.0.0.1:15001"]
+
 DEFAULT_FILE_STORAGE = "pulpcore.app.models.storage.FileSystem"
 WORKER_TTL = 300
 TASK_SERIALIZER = "json"
