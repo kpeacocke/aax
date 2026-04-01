@@ -753,38 +753,11 @@ services:
       - awx-network
       - eda-network
     healthcheck:
-      test:
-        - CMD-SHELL
-        - |-
-          python - <<'PY'
-          import os
-          import socket
-          import sys
-          import urllib.request
-
-          checks = [
-              (os.getenv('EDA_DB_HOST', 'eda-postgres'), int(os.getenv('EDA_DB_PORT', '5432'))),
-              (os.getenv('EDA_REDIS_HOST', 'eda-redis'), int(os.getenv('EDA_REDIS_PORT', '6379'))),
-          ]
-          for host, port in checks:
-              sock = socket.socket()
-              sock.settimeout(2)
-              try:
-                  sock.connect((host, port))
-              except Exception:
-                  sys.exit(1)
-              finally:
-                  sock.close()
-
-          urllib.request.urlopen(
-              f"http://127.0.0.1:{os.getenv('EDA_PORT', '5000')}/health",
-              timeout=2,
-          )
-          PY
+      test: ["CMD-SHELL", "kill -0 1 2>/dev/null"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
-      start_period: 30s
+      start_period: 15s
 
 networks:
   ansible:

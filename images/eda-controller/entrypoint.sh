@@ -44,41 +44,7 @@ fi
 # This container serves as a template for running ansible-rulebook rules
 echo "Starting Event-Driven Ansible Controller..."
 echo "EDA controller is ready to execute rulebooks"
-echo ""
-echo "Starting HTTP health endpoint on port ${EDA_PORT:-5000}..."
-
-# Start a minimal HTTP health server so the compose/k8s healthcheck can pass.
-# Runs in the background so the main loop continues.
-python3 - <<'PYEOF' &
-import http.server
-import json
-import os
-
-class HealthHandler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == '/health':
-            body = json.dumps({"status": "running"}).encode()
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Content-Length', str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-        else:
-            self.send_response(404)
-            self.end_headers()
-    def log_message(self, *args):
-        pass  # suppress access logs
-
-port = int(os.getenv('EDA_PORT', '5000'))
-httpd = http.server.HTTPServer(('0.0.0.0', port), HealthHandler)
-httpd.serve_forever()
-PYEOF
-
-echo "To run a rulebook:"
-echo "  docker exec eda-controller ansible-rulebook -r /path/to/rulebook.yml"
-echo ""
-echo "Or use the AWX integration to trigger rulebooks from events"
-echo ""
+echo "To run a rulebook: docker exec eda-controller ansible-rulebook -r /path/to/rulebook.yml"
 
 # Keep container alive for rulebook execution requests
 while true; do

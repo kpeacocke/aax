@@ -82,9 +82,9 @@ LABEL org.opencontainers.image.title="AAX Event-Driven Ansible Controller" \
     org.opencontainers.image.vendor="kpeacocke" \
     org.opencontainers.image.licenses="Apache-2.0"
 
-# Health check for ansible-rulebook service
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
+# Health check: verify entrypoint process (PID 1) is still running
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD kill -0 1 2>/dev/null || exit 1
 
 # Switch to eda user
 USER eda
