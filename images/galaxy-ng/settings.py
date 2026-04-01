@@ -57,16 +57,17 @@ _cors_allow_all_origins = (
     os.getenv("GALAXY_CORS_ALLOW_ALL_ORIGINS", "false").lower() == "true"
 )
 CORS_ALLOW_ALL_ORIGINS = _cors_allow_all_origins
-if not _cors_allow_all_origins:
-    _cors_allowed_origins_env = os.getenv(
-        "GALAXY_CORS_ALLOWED_ORIGINS",
-        "http://localhost:15001,http://127.0.0.1:15001",
-    )
-    CORS_ALLOWED_ORIGINS = [
-        origin.strip()
-        for origin in _cors_allowed_origins_env.split(",")
-        if origin.strip()
-    ]
+
+# Always define CORS_ALLOWED_ORIGINS list (used by Django REST framework even when CORS_ALLOW_ALL_ORIGINS=True)
+_cors_allowed_origins_env = os.getenv(
+    "GALAXY_CORS_ALLOWED_ORIGINS",
+    "http://localhost:15001,http://127.0.0.1:15001",
+)
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in _cors_allowed_origins_env.split(",")
+    if origin.strip()
+]
 
 DEFAULT_FILE_STORAGE = "pulpcore.app.models.storage.FileSystem"
 WORKER_TTL = 300
