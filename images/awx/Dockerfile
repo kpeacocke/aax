@@ -10,6 +10,9 @@ ARG VCS_REF
 # Set working directory
 WORKDIR /tmp
 
+# pip runs as root during Docker builds by design; suppress noisy warning.
+ENV PIP_ROOT_USER_ACTION=ignore
+
 # Install build dependencies
 # hadolint ignore=DL3008
 RUN apt-get update && \
@@ -29,6 +32,8 @@ RUN apt-get update && \
   libxslt1-dev \
   curl \
   xmlsec1 \
+  nodejs \
+  npm \
   && rm -rf /var/lib/apt/lists/*
 
 # Clone AWX at specific version
@@ -45,8 +50,24 @@ WORKDIR /awx
 RUN python3 -m pip install --no-cache-dir --prefix=/install \
   -r requirements/requirements.txt \
   -r requirements/requirements_git.txt \
+  drf-yasg==1.21.10 \
   gunicorn==22.0.0 \
   psycopg2-binary==2.9.9
+
+# Patch awx/sso/backends.py: wrap the module-level SAML import with try/except
+# so that an xmlsec/lxml libxml2 version mismatch doesn't crash every request
+# that touches authentication backends.  The stub BaseSAMLAuth keeps
+# load_backends() happy; SAMLAuth.authenticate() already returns None when
+# SAML credentials are unconfigured, so no SAML functionality is lost.
+COPY patch-saml-import.py /tmp/patch-saml-import.py
+RUN python3 /tmp/patch-saml-import.py
+
+# Build and stage frontend assets so Django serves compiled UI instead of raw templates.
+RUN mkdir -p /awx/awx/ui/build/static /awx/awx/ui_next/build/awx && \
+  npm --prefix /awx/awx/ui --loglevel warn ci --legacy-peer-deps && \
+  npm --prefix /awx/awx/ui --loglevel warn run compile-strings && \
+  NODE_OPTIONS=--max-old-space-size=4096 npm --prefix /awx/awx/ui --loglevel warn run build && \
+  cp /awx/awx/ui_next/placeholder_index_awx.html /awx/awx/ui_next/build/awx/index_awx.html
 
 # Final stage
 FROM python:3.11-slim

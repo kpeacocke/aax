@@ -15,6 +15,12 @@ docker-compose.*.local.yml
 *.tar
 *.tar.gz
 
+# Local curl cookie jars
+/400
+/600
+*.cookiejar
+cookies.txt
+
 # ==================== Python ====================
 # Byte-compiled / optimized / DLL files
 __pycache__/

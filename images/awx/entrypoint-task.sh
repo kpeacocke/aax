@@ -15,4 +15,4 @@ sleep 10
 
 # Start AWX task dispatcher
 echo "Starting AWX task dispatcher..."
-exec awx-manage run_dispatcher
+exec python /var/lib/awx/manage.py run_dispatcher

@@ -15,11 +15,11 @@ echo "Database is ready"
 
 # Run migrations
 echo "Running database migrations..."
-awx-manage migrate --noinput
+python /var/lib/awx/manage.py migrate --noinput
 
 # Create admin user if it doesn't exist
 echo "Checking for admin user..."
-awx-manage shell <<'EOF'
+python /var/lib/awx/manage.py shell <<'EOF'
 import os
 from django.contrib.auth import get_user_model
 
@@ -28,12 +28,12 @@ username = os.environ.get("AWX_ADMIN_USER", "admin")
 password = os.environ["AWX_ADMIN_PASSWORD"]
 
 if not User.objects.filter(username=username).exists():
-  User.objects.create_superuser(username, '', password)
-  print("Admin user created")
+    User.objects.create_superuser(username, '', password)
+    print("Admin user created")
 else:
     print("Admin user already exists")
 EOF
 
 # Start AWX web service
 echo "Starting AWX web service..."
-exec awx-manage runserver 0.0.0.0:8052
+exec /usr/bin/launch_awx_web.sh

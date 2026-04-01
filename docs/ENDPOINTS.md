@@ -10,20 +10,20 @@ This is the canonical source for externally reachable endpoints and compose prof
 
 ## Compose Endpoint Defaults
 
-| Service | Profile(s) | Host Variable | Default Host Port | Container Port | URL |
-| ------- | ---------- | ------------- | ----------------- | -------------- | --- |
-| AWX UI/API | controller | `AWX_WEB_PORT` | `8080` | `8052` | `http://localhost:8080` |
-| Receptor Mesh Listener | controller | `AWX_RECEPTOR_PORT` | `8888` | `8888` | `tcp://localhost:8888` |
-| Unified Gateway | controller, hub, eda | `GATEWAY_PORT` | `8088` | `8080` | `http://localhost:8088` |
-| Galaxy NG UI/API | hub | `GALAXY_PORT` | `5001` | `8000` | `http://localhost:5001` |
-| EDA Controller | eda | `EDA_PORT` | `5000` | `5000` | `http://localhost:5000` |
+| Service                | Profile(s)           | Host Variable       | Default Host Port | Container Port | URL                      |
+| ---------------------- | -------------------- | ------------------- | ----------------- | -------------- | ------------------------ |
+| AWX UI/API             | controller           | `AWX_WEB_PORT`      | `18080`           | `8052`         | `http://localhost:18080` |
+| Receptor Mesh Listener | controller           | `AWX_RECEPTOR_PORT` | `18888`           | `8888`         | `tcp://localhost:18888`  |
+| Unified Gateway        | controller, hub, eda | `GATEWAY_PORT`      | `18088`           | `8080`         | `http://localhost:18088` |
+| Galaxy NG UI/API       | hub                  | `GALAXY_PORT`       | `15001`           | `8000`         | `http://localhost:15001` |
+| EDA Controller         | eda                  | `EDA_PORT`          | `15000`           | `5000`         | `http://localhost:15000` |
 
 ## Gateway-Routed Hub Endpoints
 
 Use the gateway for Pulp endpoints by default:
 
-- `http://localhost:8088/pulp/api/v3/`
-- `http://localhost:8088/pulp/content/`
+- `http://localhost:18088/pulp/api/v3/`
+- `http://localhost:18088/pulp/content/`
 
 ## Operator Notes
 
