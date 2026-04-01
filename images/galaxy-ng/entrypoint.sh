@@ -27,7 +27,14 @@ echo "Redis is ready"
 
 # Wait for Pulp API (use a dedicated URL var to avoid Django settings collisions)
 PULP_STATUS_URL="${HUB_PULP_API_URL:-http://pulp-api:24817}"
-until curl -f "${PULP_STATUS_URL}/pulp/api/v3/status/" 2>/dev/null; do
+until python3 -c "
+import urllib.request, sys
+try:
+    urllib.request.urlopen('${PULP_STATUS_URL}/pulp/api/v3/status/', timeout=5)
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+" 2>/dev/null; do
   echo "Waiting for Pulp API..."
   sleep 5
 done
