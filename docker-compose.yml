@@ -512,6 +512,7 @@ services:
       GALAXY_ADMIN_EMAIL: ${GALAXY_ADMIN_EMAIL:-admin@example.com}
     volumes:
       - hub_pulp_storage:/var/lib/pulp
+      - hub_assets:/app/static
     networks:
       - hub-network
     depends_on:

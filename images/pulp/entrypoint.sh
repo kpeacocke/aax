@@ -58,7 +58,7 @@ password = os.environ["GALAXY_ADMIN_PASSWORD"]
 email = os.getenv("GALAXY_ADMIN_EMAIL", "admin@example.com")
 
 User = get_user_model()
-user, _ = User.objects.get_or_create(
+user, created = User.objects.get_or_create(
     username=username,
     defaults={
         "email": email,
@@ -71,7 +71,8 @@ user.email = email
 user.is_staff = True
 user.is_superuser = True
 user.is_active = True
-user.set_password(password)
+if created:
+    user.set_password(password)
 user.save()
 PY
   fi

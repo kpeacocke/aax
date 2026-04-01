@@ -7,7 +7,7 @@ from pathlib import Path
 # Build paths
 BASE_DIR = Path('/var/lib/pulp')
 MEDIA_ROOT = BASE_DIR / 'media'
-STATIC_ROOT = BASE_DIR / 'assets'
+STATIC_ROOT = Path('/app/static')
 FILE_UPLOAD_TEMP_DIR = BASE_DIR / 'tmp'
 
 # Ensure directories exist

@@ -347,6 +347,33 @@ def test_eda_healthchecks_validate_dependencies() -> None:
         assert token in k8s_eda
 
 
+def test_hub_static_assets_are_shared_between_pulp_api_and_galaxy_ng() -> None:
+    """Hub static assets should be collected into the shared volume served by galaxy-ng."""
+    compose = _read("docker-compose.yml")
+    galaxy_settings = _read("images/galaxy-ng/settings.py")
+    pulp_settings = _read("images/pulp/settings.py")
+
+    assert compose.count("hub_assets:/app/static") >= 2
+    assert 'STATIC_ROOT = Path("/app/static")' in galaxy_settings
+    assert "STATIC_ROOT = Path('/app/static')" in pulp_settings
+
+
+def test_hub_admin_password_is_not_reset_on_every_restart() -> None:
+    """Pulp API bootstrap should only seed the admin password during initial creation."""
+    entrypoint = _read("images/pulp/entrypoint.sh")
+
+    assert "user, created = User.objects.get_or_create(" in entrypoint
+    assert "if created:" in entrypoint
+    assert "    user.set_password(password)" in entrypoint
+
+
+def test_galaxy_wsgi_redirect_covers_ui_path_without_trailing_slash() -> None:
+    """Legacy /ui requests should redirect even when the slash is omitted."""
+    wrapper = _read("images/galaxy-ng/aax_wsgi.py")
+
+    assert 'path == "/ui"' in wrapper
+
+
 def test_release_workflow_records_digest_and_signing_provenance() -> None:
     """Release workflow should publish digest-level provenance with signing and SBOM attestation."""
     content = _read(".github/workflows/release.yml")
