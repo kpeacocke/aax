@@ -11,7 +11,10 @@ echo "Database is ready"
 
 # Wait for migrations to complete (web container handles this)
 echo "Waiting for migrations..."
-sleep 10
+until python /var/lib/awx/manage.py migrate --check 2>/dev/null; do
+  sleep 5
+done
+echo "Migrations complete"
 
 # Start AWX task dispatcher
 echo "Starting AWX task dispatcher..."
