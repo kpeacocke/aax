@@ -36,4 +36,9 @@ EOF
 
 # Start AWX web service
 echo "Starting AWX web service..."
-exec /usr/bin/launch_awx_web.sh
+exec gunicorn awx.wsgi:application \
+  --bind 0.0.0.0:8052 \
+  --workers "${API_WORKER_PROCESSES:-1}" \
+  --keepalive 90 \
+  --limit-max-requests 1000 \
+  --timeout 300
