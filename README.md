@@ -79,7 +79,7 @@ Use Portainer's **Git repository** stack mode with the single compose file.
 1. Environment variables:
 
 - `COMPOSE_PROFILES=controller` (or `controller,hub,eda`)
-- `AWX_CSRF_TRUSTED_ORIGINS=http://<nas-ip>:18088,https://<your-domain>`
+- `AWX_CSRF_TRUSTED_ORIGINS=http://<nas-ip>:18080,https://<your-domain>`
 
 1. Deploy and monitor:
 

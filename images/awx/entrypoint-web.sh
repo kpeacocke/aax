@@ -28,8 +28,8 @@ username = os.environ.get("AWX_ADMIN_USER", "admin")
 password = os.environ["AWX_ADMIN_PASSWORD"]
 
 if not User.objects.filter(username=username).exists():
-  User.objects.create_superuser(username, '', password)
-  print("Admin user created")
+    User.objects.create_superuser(username, '', password)
+    print("Admin user created")
 else:
     print("Admin user already exists")
 EOF

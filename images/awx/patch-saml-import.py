@@ -37,7 +37,7 @@ except Exception as _saml_exc:
         backend_name = "saml"
 
     class BaseSAMLIdentityProvider:  # type: ignore[no-redef]
-        pass\
+        pass
 """
 
 for label, target in [("OID_USERID", OLD1), ("SAMLAuth", OLD2), ("SAMLIdentityProvider", OLD3)]:
