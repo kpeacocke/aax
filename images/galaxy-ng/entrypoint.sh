@@ -27,6 +27,8 @@ echo "Redis is ready"
 
 # Wait for Pulp API (use a dedicated URL var to avoid Django settings collisions)
 PULP_STATUS_URL="${HUB_PULP_API_URL:-http://pulp-api:24817}"
+_pulp_retries=0
+_pulp_max_retries=72  # 72 * 5s = 6 minutes, then exit and let Docker restart us
 until python3 -c "
 import urllib.request, sys
 try:
@@ -35,7 +37,12 @@ try:
 except Exception:
     sys.exit(1)
 " 2>/dev/null; do
-  echo "Waiting for Pulp API..."
+  _pulp_retries=$((_pulp_retries + 1))
+  if [ "${_pulp_retries}" -ge "${_pulp_max_retries}" ]; then
+    echo "Pulp API at ${PULP_STATUS_URL} did not become ready after ${_pulp_max_retries} attempts. Exiting."
+    exit 1
+  fi
+  echo "Waiting for Pulp API... (${_pulp_retries}/${_pulp_max_retries})"
   sleep 5
 done
 
