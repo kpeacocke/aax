@@ -90,8 +90,9 @@ RUN apt-get update && \
 RUN groupadd -g 1000 pulp && \
   useradd -u 1000 -g pulp -m -d /var/lib/pulp -s /bin/bash pulp && \
   mkdir -p /var/lib/pulp/media /var/lib/pulp/assets /var/lib/pulp/tmp && \
+  mkdir -p /app/static && \
   mkdir -p /etc/pulp && \
-  chown -R pulp:pulp /var/lib/pulp /etc/pulp
+  chown -R pulp:pulp /var/lib/pulp /etc/pulp /app/static
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv

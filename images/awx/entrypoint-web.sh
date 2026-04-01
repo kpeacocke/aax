@@ -36,4 +36,4 @@ EOF
 
 # Start AWX web service
 echo "Starting AWX web service..."
-exec python /var/lib/awx/manage.py runserver --insecure 0.0.0.0:8052
+exec /usr/bin/launch_awx_web.sh

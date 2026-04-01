@@ -36,8 +36,8 @@ RUN apt-get update && \
   npm \
   && rm -rf /var/lib/apt/lists/*
 
-# Clone AWX at specific version (full history to avoid shallow-repo warnings)
-RUN git clone --branch ${AWX_VERSION} https://github.com/ansible/awx.git /awx
+# Clone AWX at specific version
+RUN git clone --depth 1 --branch ${AWX_VERSION} https://github.com/ansible/awx.git /awx
 
 # Keep Django in sync with django-ansible-base dependency constraints
 RUN sed -i 's/^Django==4.2.10/Django==4.2.26/' /awx/requirements/requirements.txt && \
