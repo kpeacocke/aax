@@ -227,22 +227,22 @@ What AAX does not provide is the full AAP product surface:
 
 ## Strict Mapping Matrix
 
-| AAP area | AAP component | AAX status | AAX implementation | Notes |
-| --- | --- | --- | --- | --- |
-| Core control plane | Automation Controller | Mapped | AWX (`awx-web`, `awx-task`, `awx-postgres`, `awx-redis`) | Core controller role is present: UI, API, jobs, inventories, credentials, workflows, RBAC. |
-| Content platform | Private Automation Hub | Mapped | Galaxy NG + Pulp (`galaxy-ng`, `pulp-api`, `pulp-content`, `pulp-worker`, `hub-postgres`, `hub-redis`) | Core private content hosting and distribution role is present. |
-| Event-driven automation | Event-Driven Ansible controller | Mapped | EDA controller stack (`eda-controller`, `eda-postgres`, `eda-redis`) | Bundled as a dedicated profile in Compose. |
-| Execution runtime | Automation Execution Environments | Mapped | `ee-base`, `ee-builder`, `dev-tools` | Covers build and runtime model for containerized Ansible execution. |
-| Distributed execution | Automation Mesh | Partial | Receptor (`awx-receptor`) | Receptor is present, but the default stack is a single-node deployment. Multi-node mesh exists as an extension pattern, not as a turnkey topology. |
-| Community content source | Ansible Galaxy | External | Integration through Galaxy NG / Ansible Galaxy tooling | AAX does not host community Galaxy itself; it consumes it as an upstream source. |
-| CLI/TUI content tooling | Automation Content Navigator | Mapped | ansible-navigator and ansible-lint in `dev-tools` | Present as tooling, not as a standalone service. |
-| Data store | PostgreSQL | Mapped | `awx-postgres`, `hub-postgres`, `eda-postgres` | Present for controller, hub, and EDA. |
-| Caching / broker | Redis | Mapped | `awx-redis`, `hub-redis`, `eda-redis` | Present for controller, hub, and EDA. |
-| Certified partner / Red Hat content | Automation Hub certified content | Commercial only | None bundled | AAX cannot reproduce Red Hat certification and subscription-backed content. |
-| Unified ingress / API front door | Automation Gateway | No equivalent | None bundled | AAX currently exposes component services directly or through external reverse proxying. |
-| Default HA deployment model | High Availability Automation Hub / multi-node topology | Partial | Documented separately in [docs/HA-DEPLOYMENT.md](docs/HA-DEPLOYMENT.md) | HA is not the default Compose deployment. It requires external infrastructure or Kubernetes-style replication patterns. |
-| Installer / operator experience | Productized AAP install and lifecycle tooling | No equivalent | None bundled | AAX uses Docker Compose and repo docs, not the AAP installer/operator packaging model. |
-| Subscription / support / certification | Red Hat support lifecycle | Commercial only | None bundled | Outside the scope of an upstream-assembled project. |
+| AAP area                               | AAP component                                          | AAX status      | AAX implementation                                                                                     | Notes                                                                                                                                              |
+| -------------------------------------- | ------------------------------------------------------ | --------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core control plane                     | Automation Controller                                  | Mapped          | AWX (`awx-web`, `awx-task`, `awx-postgres`, `awx-redis`)                                               | Core controller role is present: UI, API, jobs, inventories, credentials, workflows, RBAC.                                                         |
+| Content platform                       | Private Automation Hub                                 | Mapped          | Galaxy NG + Pulp (`galaxy-ng`, `pulp-api`, `pulp-content`, `pulp-worker`, `hub-postgres`, `hub-redis`) | Core private content hosting and distribution role is present.                                                                                     |
+| Event-driven automation                | Event-Driven Ansible controller                        | Mapped          | EDA controller stack (`eda-controller`, `eda-postgres`, `eda-redis`)                                   | Bundled as a dedicated profile in Compose.                                                                                                         |
+| Execution runtime                      | Automation Execution Environments                      | Mapped          | `ee-base`, `ee-builder`, `dev-tools`                                                                   | Covers build and runtime model for containerized Ansible execution.                                                                                |
+| Distributed execution                  | Automation Mesh                                        | Partial         | Receptor (`awx-receptor`)                                                                              | Receptor is present, but the default stack is a single-node deployment. Multi-node mesh exists as an extension pattern, not as a turnkey topology. |
+| Community content source               | Ansible Galaxy                                         | External        | Integration through Galaxy NG / Ansible Galaxy tooling                                                 | AAX does not host community Galaxy itself; it consumes it as an upstream source.                                                                   |
+| CLI/TUI content tooling                | Automation Content Navigator                           | Mapped          | ansible-navigator and ansible-lint in `dev-tools`                                                      | Present as tooling, not as a standalone service.                                                                                                   |
+| Data store                             | PostgreSQL                                             | Mapped          | `awx-postgres`, `hub-postgres`, `eda-postgres`                                                         | Present for controller, hub, and EDA.                                                                                                              |
+| Caching / broker                       | Redis                                                  | Mapped          | `awx-redis`, `hub-redis`, `eda-redis`                                                                  | Present for controller, hub, and EDA.                                                                                                              |
+| Certified partner / Red Hat content    | Automation Hub certified content                       | Commercial only | None bundled                                                                                           | AAX cannot reproduce Red Hat certification and subscription-backed content.                                                                        |
+| Unified ingress / API front door       | Automation Gateway                                     | No equivalent   | None bundled                                                                                           | AAX currently exposes component services directly or through external reverse proxying.                                                            |
+| Default HA deployment model            | High Availability Automation Hub / multi-node topology | Partial         | Documented separately in [docs/HA-DEPLOYMENT.md](docs/HA-DEPLOYMENT.md)                                | HA is not the default Compose deployment. It requires external infrastructure or Kubernetes-style replication patterns.                            |
+| Installer / operator experience        | Productized AAP install and lifecycle tooling          | No equivalent   | None bundled                                                                                           | AAX uses Docker Compose and repo docs, not the AAP installer/operator packaging model.                                                             |
+| Subscription / support / certification | Red Hat support lifecycle                              | Commercial only | None bundled                                                                                           | Outside the scope of an upstream-assembled project.                                                                                                |
 
 ## Upstream Project Inventory
 
@@ -253,17 +253,17 @@ docker compose --profile hub up -d
 
 For the main platform building blocks, yes.
 
-| Capability in AAX | Primary upstream project(s) | Where it appears in AAX |
-| --- | --- | --- |
-| Automation Controller | AWX | [controller/CONTROLLER.md](controller/CONTROLLER.md), [docker-compose.yml](docker-compose.yml) |
-| Private Automation Hub UI / API | Galaxy NG | [hub/HUB.md](hub/HUB.md), [docker-compose.yml](docker-compose.yml) |
-| Private Automation Hub content backend | Pulp | [hub/HUB.md](hub/HUB.md), [docker-compose.yml](docker-compose.yml) |
-| Event-driven automation engine | ansible-rulebook / EDA controller stack | [images/eda-controller/EDA.md](images/eda-controller/EDA.md), [docker-compose.yml](docker-compose.yml) |
-| Distributed execution / mesh | Receptor | [controller/CONTROLLER.md](controller/CONTROLLER.md), [docker-compose.yml](docker-compose.yml) |
-| Execution environment build pipeline | ansible-builder | `ee-builder`, [README.md](README.md) |
-| Execution environment runtime | ansible-core plus EE images | `ee-base`, `dev-tools`, controller defaults |
-| Content CLI / TUI | ansible-navigator, ansible-lint | `dev-tools` |
-| Datastores | PostgreSQL, Redis | controller, hub, and EDA backing services |
+| Capability in AAX                      | Primary upstream project(s)             | Where it appears in AAX                                                                                |
+| -------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Automation Controller                  | AWX                                     | [controller/CONTROLLER.md](controller/CONTROLLER.md), [docker-compose.yml](docker-compose.yml)         |
+| Private Automation Hub UI / API        | Galaxy NG                               | [hub/HUB.md](hub/HUB.md), [docker-compose.yml](docker-compose.yml)                                     |
+| Private Automation Hub content backend | Pulp                                    | [hub/HUB.md](hub/HUB.md), [docker-compose.yml](docker-compose.yml)                                     |
+| Event-driven automation engine         | ansible-rulebook / EDA controller stack | [images/eda-controller/EDA.md](images/eda-controller/EDA.md), [docker-compose.yml](docker-compose.yml) |
+| Distributed execution / mesh           | Receptor                                | [controller/CONTROLLER.md](controller/CONTROLLER.md), [docker-compose.yml](docker-compose.yml)         |
+| Execution environment build pipeline   | ansible-builder                         | `ee-builder`, [README.md](README.md)                                                                   |
+| Execution environment runtime          | ansible-core plus EE images             | `ee-base`, `dev-tools`, controller defaults                                                            |
+| Content CLI / TUI                      | ansible-navigator, ansible-lint         | `dev-tools`                                                                                            |
+| Datastores                             | PostgreSQL, Redis                       | controller, hub, and EDA backing services                                                              |
 
 ### Event-Driven Automation
 
