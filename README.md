@@ -5,7 +5,7 @@
 
 > **Note:** This project is maintained independently. While the author current works at Red Hat, AAX is not an official Red Hat project, product, or service. For production use, Red Hat recommends their commercial [Ansible Automation Platform](https://www.ansible.com/products/automation-platform). And so does the author.
 
-A containerised, open-source alternative to Red Hat Ansible Automation Platform, built from upstream projects and run with Docker Compose.
+A containerised, open-source alternative to Red Hat Ansible Automation Platform, built from upstream projects and run with Docker Compose. Where practical, AAX uses official upstream runtime images and keeps project-specific customization at the Compose/settings layer.
 
 The project now uses a single, flattened [docker-compose.yml](docker-compose.yml) for all services, with Compose profiles for the controller, hub, and EDA stacks.
 
@@ -72,28 +72,62 @@ docker compose logs -f
 docker compose down
 ```
 
+Controller note:
+
+- `awx-web` and `awx-task` default to the official `quay.io/ansible/awx:24.6.1` image.
+- If you switch from an older custom AWX image, redeploy so the controller services pull the official image.
+
 ## Portainer Deployment (Synology/NAS)
 
-Use Portainer's **Git repository** stack mode with the single compose file.
+Use Portainer Git repository stack mode with the single compose file.
 
 1. Stack source:
 
 - Repository URL: your AAX fork/repo
-- Compose path: `docker-compose.yml`
+- Compose path: docker-compose.yml
 
-1. Environment variables:
+1. Required Portainer environment variables (minimum):
 
-- `COMPOSE_PROFILES=controller` (or `controller,hub,eda`)
-- `AWX_CSRF_TRUSTED_ORIGINS=http://<nas-ip>:18080,https://<your-domain>`
+- COMPOSE_PROFILES=controller,hub
+- HOST_BIND=127.0.0.1
+- DATABASE_PASSWORD=your-awx-db-password
+- SECRET_KEY=your-awx-secret-key
+- AWX_ADMIN_PASSWORD=your-awx-admin-password
+- HUB_DB_PASSWORD=your-hub-db-password
+- HUB_ADMIN_PASSWORD=your-hub-admin-password
+- GALAXY_SECRET_KEY=your-galaxy-secret-key
+- PULP_SECRET_KEY=your-pulp-secret-key
 
-Use only the profiles you want to run. Avoid setting broad defaults in `.env` and then adding extra `--profile` flags during manual runs, because Compose unions them.
+1. Synology reverse proxy hostnames (recommended):
+
+- ALLOWED_HOSTS=awx.example.com,hub.example.com,localhost,127.0.0.1
+- AWX_CSRF_TRUSTED_ORIGINS=https://awx.example.com,https://hub.example.com
+- GALAXY_ALLOWED_HOSTS=hub.example.com,galaxy-ng,gateway,localhost,127.0.0.1
+- PULP_ALLOWED_HOSTS=awx.example.com,hub.example.com,localhost,127.0.0.1,[::1],pulp-api,pulp-content,galaxy-ng,gateway
+- PULP_CONTENT_ORIGIN=https://awx.example.com
+- PULP_ANSIBLE_API_HOSTNAME=https://hub.example.com
+
+1. Synology DSM Login Portal reverse proxy rules:
+
+- Rule 1: https://awx.example.com -> http://127.0.0.1:18088
+- Rule 2: https://hub.example.com -> http://127.0.0.1:15001
+
+1. Certificates in DSM:
+
+- Create or import certificates for awx.example.com and hub.example.com in Control Panel -> Security -> Certificate.
+- Assign each certificate to the matching reverse proxy rule.
 
 1. Deploy and monitor:
 
-- Portainer will build local images from source during stack deployment.
-- Redeploy after changes to rebuild and run updated services.
+- Portainer builds local images during stack deployment.
+- After changes, use Update the stack and Re-pull image and redeploy.
+- Check container health before testing URLs.
 
-If you use a reverse proxy, include the external URL in `AWX_CSRF_TRUSTED_ORIGINS` to avoid AWX login/API CSRF failures.
+Operational notes:
+
+- Keep COMPOSE_PROFILES empty in .env for local CLI runs, then set profiles explicitly in Portainer variables.
+- Do not expose raw Pulp ports on the router.
+- Keep HOST_BIND=127.0.0.1 when DSM reverse proxy is on the same NAS.
 
 ## Requirements
 
