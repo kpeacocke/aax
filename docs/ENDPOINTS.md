@@ -12,7 +12,7 @@ This is the canonical source for externally reachable endpoints and compose prof
 
 | Service                | Profile(s)           | Host Variable       | Default Host Port | Container Port | URL                      |
 | ---------------------- | -------------------- | ------------------- | ----------------- | -------------- | ------------------------ |
-| AWX UI/API             | controller           | `AWX_WEB_PORT`      | `18080`           | `8052`         | `http://localhost:18080` |
+| AWX UI/API             | controller           | `AWX_WEB_PORT`      | `18080`           | `80`           | `http://localhost:18080` |
 | Receptor Mesh Listener | controller           | `AWX_RECEPTOR_PORT` | `18888`           | `8888`         | `tcp://localhost:18888`  |
 | Unified Gateway        | controller, hub, eda | `GATEWAY_PORT`      | `18088`           | `8080`         | `http://localhost:18088` |
 | Galaxy NG UI/API       | hub                  | `GALAXY_PORT`       | `15001`           | `8000`         | `http://localhost:15001` |
