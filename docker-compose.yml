@@ -185,7 +185,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 600s
 
   awx-task:
     profiles:
@@ -235,7 +235,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 120s
+      start_period: 600s
 
   awx-receptor:
     image: ${RECEPTOR_IMAGE:-quay.io/ansible/receptor:1.5.7}
