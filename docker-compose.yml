@@ -408,6 +408,8 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
     restart: unless-stopped
     ports:
       - "${HOST_BIND:-127.0.0.1}:${GATEWAY_PORT:-18088}:8080"
