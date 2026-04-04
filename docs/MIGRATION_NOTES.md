@@ -38,7 +38,7 @@ After:
 
 ```bash
 VERSION=1.0.0
-AWX_IMAGE=aax/awx:1.0.0
+AWX_IMAGE=quay.io/ansible/awx:24.6.1
 DEFAULT_EXECUTION_ENVIRONMENT=aax/ee-base:1.0.0
 ```
 

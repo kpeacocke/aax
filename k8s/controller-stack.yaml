@@ -376,7 +376,7 @@ spec:
     spec:
       containers:
         - name: awx-receptor
-          image: quay.io/ansible/receptor:latest
+          image: quay.io/ansible/receptor:v1.6.4
           imagePullPolicy: IfNotPresent
           command: ["receptor", "--config", "/etc/receptor/receptor.conf"]
           ports:
@@ -455,7 +455,7 @@ spec:
     spec:
       containers:
         - name: receptor-hop
-          image: quay.io/ansible/receptor:latest
+          image: quay.io/ansible/receptor:v1.6.4
           imagePullPolicy: IfNotPresent
           command: ["receptor", "--config", "/etc/receptor/receptor.conf"]
           ports:
@@ -534,7 +534,7 @@ spec:
     spec:
       containers:
         - name: receptor-execution
-          image: quay.io/ansible/receptor:latest
+          image: quay.io/ansible/receptor:v1.6.4
           imagePullPolicy: IfNotPresent
           command: ["receptor", "--config", "/etc/receptor/receptor.conf"]
           ports:

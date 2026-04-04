@@ -6,6 +6,16 @@ if [ "$#" -eq 0 ]; then
   set -- pulpcore-api
 fi
 
+# For ad-hoc commands (tests, debug shells), skip service startup waits
+# and run the command directly.
+case "$1" in
+  pulpcore-api|pulpcore-content|pulpcore-worker)
+    ;;
+  *)
+    exec "$@"
+    ;;
+esac
+
 # Wait for PostgreSQL
 until PGPASSWORD="${POSTGRES_PASSWORD}" psql -h "${POSTGRES_HOST}" -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c '\q' 2>/dev/null; do
   echo "Waiting for PostgreSQL..."
