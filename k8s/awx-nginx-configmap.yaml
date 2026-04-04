@@ -10,7 +10,7 @@ metadata:
 data:
   awx.conf: |
     # AWX nginx vhost for non-operator deployments.
-    # This mirrors the compose mount at images/awx/nginx-awx.conf.
+    # Compose generates equivalent content in the awx-web entrypoint.
     server {
         listen 8052 default_server;
         server_name _;
