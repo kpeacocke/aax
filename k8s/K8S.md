@@ -109,6 +109,15 @@ Data:
 
 ## Accessing Services
 
+## AWX Web Pattern (Compose + Kubernetes)
+
+AWX web traffic requires an nginx vhost that proxies Django requests to uWSGI (`127.0.0.1:8050`) and websocket traffic to daphne (`127.0.0.1:8051`).
+
+- In Compose, this is mounted from `images/awx/nginx-awx.conf` to `/etc/nginx/conf.d/awx.conf`.
+- In Kubernetes, the same vhost content is delivered via ConfigMap `awx-nginx` in `awx-nginx-configmap.yaml` and mounted at `/etc/nginx/conf.d/awx.conf` in `awx-web`.
+
+This keeps AWX behavior consistent across both deployment targets and avoids falling back to the default nginx static-file server.
+
 ### Exec into containers
 
 ```bash

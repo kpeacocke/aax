@@ -218,6 +218,9 @@ spec:
             - name: awx-settings
               mountPath: /etc/tower/settings.py
               subPath: settings.py
+            - name: awx-nginx
+              mountPath: /etc/nginx/conf.d/awx.conf
+              subPath: awx.conf
           readinessProbe:
             httpGet:
               path: /api/v2/ping/
@@ -240,6 +243,9 @@ spec:
         - name: awx-settings
           configMap:
             name: awx-settings
+        - name: awx-nginx
+          configMap:
+            name: awx-nginx
 ---
 apiVersion: v1
 kind: Service

@@ -9,6 +9,7 @@ resources:
   - configmap.yaml
   - secret.yaml
   - awx-settings-configmap.yaml
+  - awx-nginx-configmap.yaml
   - receptor-configs.yaml
   - persistent-volumes.yaml
   - ee-base-deployment.yaml

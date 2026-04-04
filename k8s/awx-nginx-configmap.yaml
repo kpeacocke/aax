@@ -1,0 +1,53 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: awx-nginx
+  namespace: aax
+  labels:
+    app.kubernetes.io/name: awx-nginx
+    app.kubernetes.io/part-of: aax
+data:
+  awx.conf: |
+    # AWX nginx vhost for non-operator deployments.
+    # This mirrors the compose mount at images/awx/nginx-awx.conf.
+    server {
+        listen 8052 default_server;
+        server_name _;
+
+        root /var/lib/awx/public;
+        keepalive_timeout 65;
+
+        location /static/ {
+            alias /var/lib/awx/public/static/;
+            expires max;
+            add_header Cache-Control "public, immutable";
+        }
+
+        error_page 404 /custom_404.html;
+        error_page 502 /custom_502.html;
+        error_page 504 /custom_504.html;
+        location = /custom_404.html { root /var/lib/awx/public; internal; }
+        location = /custom_502.html { root /var/lib/awx/public; internal; }
+        location = /custom_504.html { root /var/lib/awx/public; internal; }
+
+        location / {
+            uwsgi_read_timeout 120s;
+            uwsgi_pass 127.0.0.1:8050;
+            include /etc/nginx/uwsgi_params;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header Host $http_host;
+        }
+
+        location /websocket {
+            proxy_pass http://127.0.0.1:8051;
+            proxy_http_version 1.1;
+            proxy_buffering off;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header Host $http_host;
+        }
+    }
