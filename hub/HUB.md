@@ -77,6 +77,16 @@ export PULP_CONTENT_ORIGIN=http://localhost:18088
 export PULP_ANSIBLE_API_HOSTNAME=http://localhost:15001
 ```
 
+Synology DSM / reverse proxy example:
+
+```bash
+export HOST_BIND=127.0.0.1
+export GALAXY_ALLOWED_HOSTS=hub.example.com,galaxy-ng,gateway,localhost,127.0.0.1
+export PULP_ALLOWED_HOSTS=awx.example.com,hub.example.com,localhost,127.0.0.1,[::1],pulp-api,pulp-content,galaxy-ng,gateway
+export PULP_CONTENT_ORIGIN=https://awx.example.com
+export PULP_ANSIBLE_API_HOSTNAME=https://hub.example.com
+```
+
 ### 2. Start the Hub Stack
 
 ```bash
@@ -101,6 +111,8 @@ Notes:
 - In this AAX image, `http://localhost:15001/ui/` is a compatibility path and redirects to `/api/galaxy/`.
 - The supported browser flow is login at `/auth/login/` and then session-authenticated access to `/api/galaxy/`.
 - A full interactive Automation Hub web console is not exposed at `/ui/` in this packaging.
+- A plain `403` from `/api/galaxy/` before login is a healthy unauthenticated response, not a startup failure.
+- Keep Pulp under the gateway or AWX-facing hostname; do not publish raw Pulp ports directly.
 
 Default credentials:
 
@@ -125,6 +137,15 @@ curl -I 'http://localhost:15001/auth/login/?next=/api/galaxy/'
 # Test Pulp access through the unified gateway
 curl http://localhost:18088/pulp/api/v3/status/
 ```
+
+For a public reverse-proxied deployment, the equivalent checks are:
+
+```bash
+curl -I https://hub.example.com/api/galaxy/
+curl -I https://awx.example.com/pulp/api/v3/status/
+```
+
+Expect `403` from the first request before login and `200` from the second when the stack is healthy.
 
 ## Configuration
 

@@ -158,6 +158,18 @@ docker compose ps
 docker compose --profile hub up -d
 ```
 
+For a Synology DSM or other reverse-proxied deployment, these public responses are expected when the stack is healthy:
+
+```bash
+curl -I https://awx.example.com/api/v2/ping/
+# Expect: HTTP 200
+
+curl -I https://hub.example.com/api/galaxy/
+# Expect: HTTP 403 before login
+```
+
+Keep Pulp behind the gateway or AWX-facing hostname, for example `https://awx.example.com/pulp/api/v3/`.
+
 ---
 
 ### Q: Docker socket permission denied in ee-builder

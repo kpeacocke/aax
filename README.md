@@ -76,6 +76,7 @@ Controller note:
 
 - `awx-web` and `awx-task` default to the official `quay.io/ansible/awx:24.6.1` image.
 - If you switch from an older custom AWX image, redeploy so the controller services pull the official image.
+- Public AWX traffic should terminate at the gateway on `GATEWAY_PORT`; `AWX_WEB_PORT` remains useful for local direct validation.
 
 ## Portainer Deployment (Synology/NAS)
 
@@ -112,6 +113,12 @@ Use Portainer Git repository stack mode with the single compose file.
 - Rule 1: https://awx.example.com -> http://127.0.0.1:18088
 - Rule 2: https://hub.example.com -> http://127.0.0.1:15001
 
+1. Expected public health signals after deployment:
+
+- `https://awx.example.com/api/v2/ping/` returns `200` when controller traffic is correctly routed through the gateway.
+- `https://hub.example.com/api/galaxy/` returns `403` before login; this is a healthy unauthenticated hub response.
+- Pulp remains gateway-routed under the AWX hostname, for example `https://awx.example.com/pulp/api/v3/` and `https://awx.example.com/pulp/content/`.
+
 1. Certificates in DSM:
 
 - Create or import certificates for awx.example.com and hub.example.com in Control Panel -> Security -> Certificate.
@@ -128,6 +135,7 @@ Operational notes:
 - Keep COMPOSE_PROFILES empty in .env for local CLI runs, then set profiles explicitly in Portainer variables.
 - Do not expose raw Pulp ports on the router.
 - Keep HOST_BIND=127.0.0.1 when DSM reverse proxy is on the same NAS.
+- After editing stack variables in Portainer, use re-pull and redeploy so stale environment values do not survive the update.
 
 ## Requirements
 

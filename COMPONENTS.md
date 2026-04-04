@@ -388,9 +388,20 @@ The repo contains HA guidance in [docs/HA-DEPLOYMENT.md](docs/HA-DEPLOYMENT.md),
 
 ### 7. Automation Gateway
 
-`No equivalent`
+`Partial`
 
-There is no separate gateway service or upstream gateway project bundled in AAX. If a unified ingress or API front door is required, it needs to be provided externally with a reverse proxy or additional infrastructure.
+AAX includes a bundled `gateway` service that provides a unified ingress layer for AWX, Pulp, and optional EDA routes. This is useful operationally, especially for Compose and NAS-style deployments, but it is still a project-specific reverse-proxy layer rather than a like-for-like upstream AAP gateway component.
+
+What exists:
+
+- bundled nginx-based `gateway` service in Compose and Kubernetes manifests
+- documented gateway-first routing for AWX, Pulp, and EDA paths
+- validated deployment pattern for DSM/Cloudflare style public ingress
+
+What is not equivalent:
+
+- no upstream standalone Automation Gateway project is being mirrored here
+- no claim of AAP gateway feature parity or product lifecycle parity
 
 ### 8. Certified Content
 
