@@ -126,8 +126,8 @@ class TestDockerCompose:
         for service in expected_services:
             assert service in services, f"Service {service} not found in compose config"
 
-    def test_awx_uses_local_image_default(self):
-        """Test that AWX defaults to the locally built image tag."""
+    def test_awx_uses_official_image_default(self):
+        """Test that AWX defaults to the supported upstream image tag."""
         result = subprocess.run(
             ["docker", "compose", "--profile", "controller", "config"],
             capture_output=True,
@@ -136,7 +136,7 @@ class TestDockerCompose:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "image: aax/awx:" in result.stdout
+        assert "image: quay.io/ansible/awx:24.6.1" in result.stdout
 
     def test_default_execution_environment_uses_local_image(self):
         """Test that the controller default EE points at the local ee-base image."""

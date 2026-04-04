@@ -113,7 +113,7 @@ def test_version_matrix_doc_exists_with_pinned_defaults() -> None:
         "eda-controller",
         "gateway",
         "1.0.0",
-        "1.5.7",
+        "latest",
     ]
     for token in required_tokens:
         assert token in content
