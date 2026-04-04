@@ -14,7 +14,7 @@ This document is the canonical tested version matrix for the current AAX baselin
 | pulp           | `1.0.0`     | compose + kustomize             |
 | eda-controller | `1.0.0`     | compose + kustomize             |
 | gateway        | `1.0.0`     | compose + kustomize             |
-| receptor       | `1.5.7`     | `RECEPTOR_IMAGE`                |
+| receptor       | `latest`    | `RECEPTOR_IMAGE`                |
 
 ## Runtime Base Dependencies
 
