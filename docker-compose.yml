@@ -238,7 +238,7 @@ services:
       start_period: 600s
 
   awx-receptor:
-    image: ${RECEPTOR_IMAGE:-quay.io/ansible/receptor:latest}
+    image: quay.io/ansible/receptor:latest
     container_name: awx-receptor
     profiles:
       - controller
@@ -288,7 +288,7 @@ services:
       retries: 3
 
   receptor-hop:
-    image: ${RECEPTOR_IMAGE:-quay.io/ansible/receptor:latest}
+    image: quay.io/ansible/receptor:latest
     container_name: receptor-hop
     profiles:
       - controller
@@ -338,7 +338,7 @@ services:
       retries: 3
 
   receptor-execution:
-    image: ${RECEPTOR_IMAGE:-quay.io/ansible/receptor:latest}
+    image: quay.io/ansible/receptor:latest
     container_name: receptor-execution
     profiles:
       - controller
