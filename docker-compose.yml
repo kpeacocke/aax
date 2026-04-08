@@ -1,12 +1,6 @@
 name: aax
 services:
   ee-base:
-    build:
-      context: ./images/ee-base
-      args:
-        BUILD_DATE: ${BUILD_DATE:-}
-        VCS_REF: ${VCS_REF:-}
-        VERSION: ${VERSION:-1.0.0}
     image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-base:${VERSION:-latest}
     pull_policy: always
     working_dir: /workspace
@@ -29,13 +23,6 @@ services:
     command: ["sleep", "infinity"]
 
   ee-builder:
-    build:
-      context: ./images/ee-builder
-      args:
-        BUILD_DATE: ${BUILD_DATE:-}
-        VCS_REF: ${VCS_REF:-}
-        VERSION: ${VERSION:-1.0.0}
-        BASE_IMAGE: aax/ee-base:${VERSION:-1.0.0}
     image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-builder:${VERSION:-latest}
     pull_policy: always
     depends_on:
@@ -63,13 +50,6 @@ services:
     command: ["sleep", "infinity"]
 
   dev-tools:
-    build:
-      context: ./images/dev-tools
-      args:
-        BUILD_DATE: ${BUILD_DATE:-}
-        VCS_REF: ${VCS_REF:-}
-        VERSION: ${VERSION:-1.0.0}
-        BASE_IMAGE: aax/ee-base:${VERSION:-1.0.0}
     image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-dev-tools:${VERSION:-latest}
     pull_policy: always
     depends_on:
@@ -391,12 +371,6 @@ services:
       retries: 3
 
   gateway:
-    build:
-      context: ./images/gateway
-      args:
-        BUILD_DATE: ${BUILD_DATE:-}
-        VCS_REF: ${VCS_REF:-}
-        VERSION: ${VERSION:-1.0.0}
     image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-gateway:${VERSION:-latest}
     pull_policy: always
     container_name: aax-gateway
@@ -473,13 +447,6 @@ services:
   pulp-api:
     profiles:
       - hub
-    build:
-      context: ./images/pulp
-      dockerfile: Dockerfile.pulp
-      args:
-        BUILD_DATE: ${BUILD_DATE:-}
-        VCS_REF: ${VCS_REF:-}
-        VERSION: ${VERSION:-1.0.0}
     image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${VERSION:-latest}
     pull_policy: always
     container_name: aax-pulp-api
@@ -609,12 +576,6 @@ services:
   galaxy-ng:
     profiles:
       - hub
-    build:
-      context: ./images/galaxy-ng
-      args:
-        BUILD_DATE: ${BUILD_DATE:-}
-        VCS_REF: ${VCS_REF:-}
-        VERSION: ${VERSION:-1.0.0}
     image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-galaxy-ng:${VERSION:-latest}
     pull_policy: always
     container_name: aax-galaxy-ng
@@ -710,14 +671,6 @@ services:
       retries: 5
 
   eda-controller:
-    build:
-      context: images/eda-controller
-      dockerfile: Dockerfile
-      args:
-        VERSION: ${VERSION:-1.0.0}
-        BUILD_DATE: ${BUILD_DATE:-unknown}
-        VCS_REF: ${VCS_REF:-unknown}
-        EDA_VERSION: 1.1.3
     image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${VERSION:-latest}
     pull_policy: always
     container_name: eda-controller
