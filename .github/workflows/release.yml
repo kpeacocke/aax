@@ -212,6 +212,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [test, security-scan, policy-checks]
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
