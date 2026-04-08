@@ -773,6 +773,14 @@ volumes:
     labels:
       com.aax.description: "Static assets for Galaxy NG UI"
   eda_postgres_data:
+    labels:
+      com.aax.description: "PostgreSQL database for Event Driven Automation"
   eda_redis_data:
+    labels:
+      com.aax.description: "Redis cache for Event Driven Automation"
   eda_projects:
+    labels:
+      com.aax.description: "Project workspace for Event Driven Automation"
   eda_logs:
+    labels:
+      com.aax.description: "Controller logs for Event Driven Automation"
