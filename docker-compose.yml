@@ -259,7 +259,7 @@ services:
         set -e
         mkdir -p /etc/receptor
         printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
-        receptor --config /etc/receptor/receptor.conf
+        receptor --data-dir /var/lib/receptor --config /etc/receptor/receptor.conf
     volumes:
       - receptor_data:/var/lib/receptor
       - awx_projects:/var/lib/awx/projects
@@ -309,7 +309,7 @@ services:
         set -e
         mkdir -p /etc/receptor
         printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
-        receptor --config /etc/receptor/receptor.conf
+        receptor --data-dir /var/lib/receptor --config /etc/receptor/receptor.conf
     volumes:
       - receptor_hop_data:/var/lib/receptor
     networks:
@@ -362,7 +362,7 @@ services:
         set -e
         mkdir -p /etc/receptor
         printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
-        receptor --config /etc/receptor/receptor.conf
+        receptor --data-dir /var/lib/receptor --config /etc/receptor/receptor.conf
     volumes:
       - receptor_execution_data:/var/lib/receptor
     networks:
