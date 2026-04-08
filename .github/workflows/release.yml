@@ -214,20 +214,18 @@ jobs:
     needs: [test, security-scan, policy-checks]
     permissions:
       contents: write
-      pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-
       - uses: googleapis/release-please-action@7987652d64b4581673a76e33ad5e98e3dd56832f # v4.1.3
         id: release
         with:
-         token: ${{ github.token }}
-         release-type: simple
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          command: github-release
+          release-type: simple
+          target-branch: main
 
   build-base-image:
     name: Build and Push Base Image
