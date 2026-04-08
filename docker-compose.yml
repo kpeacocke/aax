@@ -236,6 +236,7 @@ services:
         ---
         - node:
             id: receptor-controller
+          datadir: /var/lib/receptor
         - control-service:
             service: control
             filename: /var/lib/receptor/receptor.sock
@@ -259,7 +260,7 @@ services:
         set -e
         mkdir -p /etc/receptor
         printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
-        receptor --data-dir /var/lib/receptor --config /etc/receptor/receptor.conf
+        receptor --config /etc/receptor/receptor.conf
     volumes:
       - receptor_data:/var/lib/receptor
       - awx_projects:/var/lib/awx/projects
@@ -293,6 +294,7 @@ services:
         ---
         - node:
             id: receptor-hop
+          datadir: /var/lib/receptor
         - control-service:
             service: control
             filename: /var/lib/receptor/receptor.sock
@@ -309,7 +311,7 @@ services:
         set -e
         mkdir -p /etc/receptor
         printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
-        receptor --data-dir /var/lib/receptor --config /etc/receptor/receptor.conf
+        receptor --config /etc/receptor/receptor.conf
     volumes:
       - receptor_hop_data:/var/lib/receptor
     networks:
@@ -339,6 +341,7 @@ services:
         ---
         - node:
             id: receptor-execution
+          datadir: /var/lib/receptor
         - control-service:
             service: control
             filename: /var/lib/receptor/receptor.sock
@@ -362,7 +365,7 @@ services:
         set -e
         mkdir -p /etc/receptor
         printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
-        receptor --data-dir /var/lib/receptor --config /etc/receptor/receptor.conf
+        receptor --config /etc/receptor/receptor.conf
     volumes:
       - receptor_execution_data:/var/lib/receptor
     networks:
