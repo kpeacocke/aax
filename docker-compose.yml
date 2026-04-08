@@ -262,6 +262,8 @@ services:
         receptor --config /etc/receptor/receptor.conf
     volumes:
       - receptor_data:/var/lib/receptor
+      - awx_projects:/var/lib/awx/projects
+      - awx_rsyslog:/var/log/tower
     networks:
       - awx-network
     ports:
