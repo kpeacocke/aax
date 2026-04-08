@@ -223,9 +223,9 @@ jobs:
         id: release
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
-          command: github-release
           release-type: simple
           target-branch: main
+          skip-github-pull-request: true
 
   build-base-image:
     name: Build and Push Base Image
