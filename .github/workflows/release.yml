@@ -84,15 +84,25 @@ jobs:
         if: matrix.image != 'ee-base'
 
       - name: Build ${{ matrix.image }} image
-        uses: docker/build-push-action@5cd11c3a4ced054e52742c5fd54dca954e0edd85 # v6.7.0
-        with:
-          context: ./images/${{ matrix.image == 'ee-base' && 'ee-base' || matrix.image }}
-          file: ${{ matrix.image == 'pulp' && './images/pulp/Dockerfile.pulp' || format('./images/{0}/Dockerfile', matrix.image) }}
-          tags: aax/${{ matrix.image }}:1.0.0
-          build-args: ${{ matrix.image != 'ee-base' && 'BASE_IMAGE=aax/ee-base:1.0.0' || '' }}
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
-          load: true
+        run: |
+          if [ "${{ matrix.image }}" = "ee-base" ]; then
+            docker build \
+              --build-arg VERSION=1.0.0 \
+              --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+              --build-arg VCS_REF=${GITHUB_SHA} \
+              -f ./images/ee-base/Dockerfile \
+              -t aax/ee-base:1.0.0 \
+              ./images/ee-base
+          else
+            docker build \
+              --build-arg BASE_IMAGE=aax/ee-base:1.0.0 \
+              --build-arg VERSION=1.0.0 \
+              --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+              --build-arg VCS_REF=${GITHUB_SHA} \
+              -f ./images/${{ matrix.image }}/Dockerfile \
+              -t aax/${{ matrix.image }}:1.0.0 \
+              ./images/${{ matrix.image }}
+          fi
 
       - name: Run pytest tests
         run: |
@@ -139,14 +149,25 @@ jobs:
         if: matrix.image != 'ee-base'
 
       - name: Build ${{ matrix.image }} image
-        uses: docker/build-push-action@5cd11c3a4ced054e52742c5fd54dca954e0edd85 # v6.7.0
-        with:
-          context: ./images/${{ matrix.image == 'ee-base' && 'ee-base' || matrix.image }}
-          file: ./images/${{ matrix.image }}/Dockerfile
-          tags: aax/${{ matrix.image }}:1.0.0
-          build-args: ${{ matrix.image != 'ee-base' && 'BASE_IMAGE=aax/ee-base:1.0.0' || '' }}
-          cache-from: type=gha,scope=${{ matrix.image }}
-          load: true
+        run: |
+          if [ "${{ matrix.image }}" = "ee-base" ]; then
+            docker build \
+              --build-arg VERSION=1.0.0 \
+              --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+              --build-arg VCS_REF=${GITHUB_SHA} \
+              -f ./images/ee-base/Dockerfile \
+              -t aax/ee-base:1.0.0 \
+              ./images/ee-base
+          else
+            docker build \
+              --build-arg BASE_IMAGE=aax/ee-base:1.0.0 \
+              --build-arg VERSION=1.0.0 \
+              --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+              --build-arg VCS_REF=${GITHUB_SHA} \
+              -f ./images/${{ matrix.image }}/Dockerfile \
+              -t aax/${{ matrix.image }}:1.0.0 \
+              ./images/${{ matrix.image }}
+          fi
 
       - name: Run Trivy vulnerability scanner (blocking)
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
