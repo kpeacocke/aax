@@ -240,7 +240,7 @@ services:
             datadir: /var/lib/receptor
         - control-service:
             service: control
-          filename: /var/lib/receptor/receptor.sock
+            filename: /var/lib/receptor/receptor.sock
             permissions: "0660"
         - tcp-listener:
             port: 8888
