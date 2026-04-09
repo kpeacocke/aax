@@ -145,7 +145,7 @@ services:
       AWX_SETTINGS_FILE: /etc/tower/settings.py
       DJANGO_SETTINGS_MODULE: awx.settings.production
       AAX_ALLOW_PLACEHOLDER_SECRETS: ${AAX_ALLOW_PLACEHOLDER_SECRETS:-false}
-      RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-true}
+      RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-false}
       DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-ghcr.io/kpeacocke/aax-ee-base:latest}
     ports:
       - "${HOST_BIND:-127.0.0.1}:${AWX_WEB_PORT:-18080}:8052"
@@ -196,7 +196,7 @@ services:
       DJANGO_SETTINGS_MODULE: awx.settings.production
       AWX_SETTINGS_FILE: /etc/tower/settings.py
       AAX_ALLOW_PLACEHOLDER_SECRETS: ${AAX_ALLOW_PLACEHOLDER_SECRETS:-false}
-      RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-true}
+      RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-false}
       DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-ghcr.io/kpeacocke/aax-ee-base:latest}
     volumes:
       - awx_projects:/var/lib/awx/projects

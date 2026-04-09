@@ -206,7 +206,7 @@ spec:
             - name: DEFAULT_EXECUTION_ENVIRONMENT
               value: aax/ee-base:1.0.0
             - name: RECEPTOR_RELEASE_WORK
-              value: "true"
+              value: "false"
           ports:
             - containerPort: 8052
               name: http
@@ -321,7 +321,7 @@ spec:
             - name: DEFAULT_EXECUTION_ENVIRONMENT
               value: aax/ee-base:1.0.0
             - name: RECEPTOR_RELEASE_WORK
-              value: "true"
+              value: "false"
           volumeMounts:
             - name: awx-projects
               mountPath: /var/lib/awx/projects
