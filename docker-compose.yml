@@ -236,7 +236,7 @@ services:
         ---
         - node:
             id: receptor-controller
-          datadir: /var/lib/receptor
+            datadir: /var/lib/receptor
         - control-service:
             service: control
             filename: /var/lib/receptor/receptor.sock
@@ -294,7 +294,7 @@ services:
         ---
         - node:
             id: receptor-hop
-          datadir: /var/lib/receptor
+            datadir: /var/lib/receptor
         - control-service:
             service: control
             filename: /var/lib/receptor/receptor.sock
@@ -341,7 +341,7 @@ services:
         ---
         - node:
             id: receptor-execution
-          datadir: /var/lib/receptor
+            datadir: /var/lib/receptor
         - control-service:
             service: control
             filename: /var/lib/receptor/receptor.sock
