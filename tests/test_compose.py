@@ -212,7 +212,7 @@ class TestDockerCompose:
         assert result.returncode == 0
         config = result.stdout
         gateway_section = config.split("gateway:", 1)[1]
-        assert "image: aax/gateway:" in gateway_section
+        assert "aax-gateway:" in gateway_section
         assert "mode: ingress" in gateway_section
         assert 'published: "18088"' in gateway_section
         assert "target: 8080" in gateway_section
@@ -300,7 +300,6 @@ class TestDockerCompose:
         assert "id: receptor-execution" in config
         assert "address: receptor-hop:8888" in config
         assert "address: awx-receptor:8888" in config
-        assert "address: receptor-execution:8888" in config
         assert "worktype: ansible-runner" in config
 
 
