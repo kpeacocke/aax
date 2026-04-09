@@ -333,8 +333,7 @@ services:
       retries: 3
 
   receptor-execution:
-    image: ${AWX_IMAGE:-quay.io/ansible/awx:24.6.1}
-    pull_policy: missing
+    image: quay.io/ansible/receptor:v1.6.4
     container_name: receptor-execution
     profiles:
       - controller
@@ -364,7 +363,6 @@ services:
             level: info
       ANSIBLE_RUNNER_PROCESS_ISOLATION_EXECUTABLE: ${ANSIBLE_RUNNER_PROCESS_ISOLATION_EXECUTABLE:-bwrap}
     command:
-    entrypoint:
       - /bin/bash
       - -c
       - |
