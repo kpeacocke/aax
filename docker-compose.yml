@@ -333,7 +333,8 @@ services:
       retries: 3
 
   receptor-execution:
-    image: quay.io/ansible/receptor:v1.6.4
+    image: ${AWX_IMAGE:-quay.io/ansible/awx:24.6.1}
+    pull_policy: missing
     container_name: receptor-execution
     profiles:
       - controller
@@ -363,15 +364,17 @@ services:
             level: info
       ANSIBLE_RUNNER_PROCESS_ISOLATION_EXECUTABLE: ${ANSIBLE_RUNNER_PROCESS_ISOLATION_EXECUTABLE:-bwrap}
     command:
-      - sh
+    entrypoint:
+      - /bin/bash
       - -c
       - |
         set -e
         mkdir -p /etc/receptor
         printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
-        receptor --config /etc/receptor/receptor.conf
+        exec receptor --config /etc/receptor/receptor.conf
     volumes:
       - receptor_execution_data:/var/lib/receptor
+      - awx_projects:/var/lib/awx/projects
     networks:
       - awx-network
     healthcheck:
