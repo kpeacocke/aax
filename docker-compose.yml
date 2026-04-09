@@ -147,6 +147,7 @@ services:
       AAX_ALLOW_PLACEHOLDER_SECRETS: ${AAX_ALLOW_PLACEHOLDER_SECRETS:-false}
       RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-false}
       DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-ghcr.io/kpeacocke/aax-ee-base:latest}
+      ANSIBLE_RUNNER_PROCESS_ISOLATION_EXECUTABLE: ${ANSIBLE_RUNNER_PROCESS_ISOLATION_EXECUTABLE:-bwrap}
     ports:
       - "${HOST_BIND:-127.0.0.1}:${AWX_WEB_PORT:-18080}:8052"
     volumes:
@@ -253,6 +254,7 @@ services:
             allowruntimeparams: true
         - log-level:
             level: info
+      ANSIBLE_RUNNER_PROCESS_ISOLATION_EXECUTABLE: ${ANSIBLE_RUNNER_PROCESS_ISOLATION_EXECUTABLE:-bwrap}
     command:
       - sh
       - -c
@@ -304,6 +306,7 @@ services:
             bindaddr: 0.0.0.0
         - log-level:
             level: info
+      ANSIBLE_RUNNER_PROCESS_ISOLATION_EXECUTABLE: ${ANSIBLE_RUNNER_PROCESS_ISOLATION_EXECUTABLE:-bwrap}
     command:
       - sh
       - -c
@@ -358,6 +361,7 @@ services:
             allowruntimeparams: true
         - log-level:
             level: info
+      ANSIBLE_RUNNER_PROCESS_ISOLATION_EXECUTABLE: ${ANSIBLE_RUNNER_PROCESS_ISOLATION_EXECUTABLE:-bwrap}
     command:
       - sh
       - -c
