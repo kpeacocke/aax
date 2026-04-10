@@ -252,14 +252,7 @@ services:
             allowruntimeparams: true
         - log-level:
             level: info
-    command:
-      - /bin/bash
-      - -c
-      - |
-        set -e
-        mkdir -p /etc/receptor
-        printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
-        python3 << 'PATCH'
+      AAX_PATCH_SCRIPT: |
         import glob
         from pathlib import Path
         for pat in glob.glob('/usr/local/lib/python3.*/site-packages/ansible_runner/interface.py'):
@@ -277,7 +270,14 @@ services:
                     print(f'patch-interface: done for {f}')
             else:
                 print(f'patch-interface: already patched in {f}')
-        PATCH
+    command:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        mkdir -p /etc/receptor
+        printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
+        printf '%s' "$$AAX_PATCH_SCRIPT" | python3
         exec receptor --config /etc/receptor/receptor.conf
     volumes:
       - receptor_data:/var/lib/receptor
@@ -376,14 +376,7 @@ services:
             allowruntimeparams: true
         - log-level:
             level: info
-    command:
-      - /bin/bash
-      - -c
-      - |
-        set -e
-        mkdir -p /etc/receptor
-        printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
-        python3 << 'PATCH'
+      AAX_PATCH_SCRIPT: |
         import glob
         from pathlib import Path
         for pat in glob.glob('/usr/local/lib/python3.*/site-packages/ansible_runner/interface.py'):
@@ -401,7 +394,14 @@ services:
                     print(f'patch-interface: done for {f}')
             else:
                 print(f'patch-interface: already patched in {f}')
-        PATCH
+    command:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        mkdir -p /etc/receptor
+        printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
+        printf '%s' "$$AAX_PATCH_SCRIPT" | python3
         exec receptor --config /etc/receptor/receptor.conf
     volumes:
       - receptor_execution_data:/var/lib/receptor
