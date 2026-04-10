@@ -280,7 +280,7 @@ services:
         printf '%s' "$$AAX_PATCH_SCRIPT" | python3
         exec receptor --config /etc/receptor/receptor.conf
     volumes:
-      - receptor_data:/var/lib/receptor
+      - receptor_controller_data:/var/lib/receptor
       - awx_projects:/var/lib/awx/projects
       - awx_rsyslog:/var/log/tower
     networks:
@@ -807,6 +807,8 @@ volumes:
     name: awx_rsyslog
   receptor_data:
     name: receptor_data
+  receptor_controller_data:
+    name: receptor_controller_data
   receptor_hop_data:
     name: receptor_hop_data
   receptor_execution_data:
