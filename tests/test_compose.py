@@ -295,11 +295,10 @@ class TestDockerCompose:
         assert "awx-receptor:" in config
         assert "receptor-hop:" in config
         assert "receptor-execution:" in config
-        assert "id: receptor-controller" in config
+        assert "id: awx" in config  # awx-receptor acts as sidecar with node id 'awx'
         assert "id: receptor-hop" in config
         assert "id: receptor-execution" in config
         assert "address: receptor-hop:8888" in config
-        assert "address: awx-receptor:8888" in config
         assert "worktype: ansible-runner" in config
 
 
