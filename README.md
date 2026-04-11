@@ -78,6 +78,11 @@ Controller note:
 - If you switch from an older custom AWX image, redeploy so the controller services pull the official image.
 - Public AWX traffic should terminate at the gateway on `GATEWAY_PORT`; `AWX_WEB_PORT` remains useful for local direct validation.
 
+Receptor mesh note:
+
+- The Docker Compose receptor mesh connects `awx-receptor` directly to `receptor-execution`, bypassing the `receptor-hop` service. The awx-ee image bundles receptor 1.4.8, while the standalone receptor image ships 1.6.4; relaying work through the version-mismatched hop caused jobs to fail silently. On a single-host Compose deployment the hop adds no value since all containers share the same Docker network.
+- The Kubernetes manifests retain the three-node mesh (controller → hop → execution) for multi-zone deployments where network segmentation matters.
+
 ## Portainer Deployment (Synology/NAS)
 
 Use Portainer Git repository stack mode with the single compose file.
@@ -102,16 +107,16 @@ Use Portainer Git repository stack mode with the single compose file.
 1. Synology reverse proxy hostnames (recommended):
 
 - ALLOWED_HOSTS=awx.example.com,hub.example.com,localhost,127.0.0.1
-- AWX_CSRF_TRUSTED_ORIGINS=https://awx.example.com,https://hub.example.com
+- AWX_CSRF_TRUSTED_ORIGINS=<https://awx.example.com,https://hub.example.com>
 - GALAXY_ALLOWED_HOSTS=hub.example.com,galaxy-ng,gateway,localhost,127.0.0.1
 - PULP_ALLOWED_HOSTS=awx.example.com,hub.example.com,localhost,127.0.0.1,[::1],pulp-api,pulp-content,galaxy-ng,gateway
-- PULP_CONTENT_ORIGIN=https://awx.example.com
-- PULP_ANSIBLE_API_HOSTNAME=https://hub.example.com
+- PULP_CONTENT_ORIGIN=<https://awx.example.com>
+- PULP_ANSIBLE_API_HOSTNAME=<https://hub.example.com>
 
 1. Synology DSM Login Portal reverse proxy rules:
 
-- Rule 1: https://awx.example.com -> http://127.0.0.1:18088
-- Rule 2: https://hub.example.com -> http://127.0.0.1:15001
+- Rule 1: <https://awx.example.com> -> <http://127.0.0.1:18088>
+- Rule 2: <https://hub.example.com> -> <http://127.0.0.1:15001>
 
 1. Expected public health signals after deployment:
 

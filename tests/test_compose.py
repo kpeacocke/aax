@@ -282,7 +282,7 @@ class TestDockerCompose:
             assert all(port.get("host_ip") == "127.0.0.1" for port in ports)
 
     def test_receptor_mesh_is_multi_node(self):
-        """Test that the controller profile renders a controller-hop-execution receptor mesh."""
+        """Test that the controller profile renders a direct control-execution receptor mesh."""
         result = subprocess.run(
             ["docker", "compose", "--profile", "controller", "config"],
             capture_output=True,
@@ -293,12 +293,10 @@ class TestDockerCompose:
         assert result.returncode == 0
         config = result.stdout
         assert "awx-receptor:" in config
-        assert "receptor-hop:" in config
         assert "receptor-execution:" in config
         assert "id: awx" in config  # awx-receptor acts as sidecar with node id 'awx'
-        assert "id: receptor-hop" in config
         assert "id: receptor-execution" in config
-        assert "address: receptor-hop:8888" in config
+        assert "address: awx-receptor:8888" in config
         assert "worktype: ansible-runner" in config
 
 
