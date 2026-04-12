@@ -282,7 +282,7 @@ class TestDockerCompose:
             assert all(port.get("host_ip") == "127.0.0.1" for port in ports)
 
     def test_receptor_mesh_is_multi_node(self):
-        """Test that the controller profile renders a hybrid-node mesh with local execution."""
+        """Test that the controller profile renders a multi-node receptor mesh with direct execution topology."""
         result = subprocess.run(
             ["docker", "compose", "--profile", "controller", "config"],
             capture_output=True,
@@ -298,7 +298,7 @@ class TestDockerCompose:
         assert "id: receptor-execution" in config
         assert "address: awx-receptor:8888" in config
         assert "worktype: ansible-runner" in config
-        assert "node_type=hybrid" in config
+        assert "node_type=control" in config
 
 
 class TestServiceOrchestration:
