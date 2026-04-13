@@ -13,11 +13,13 @@ addopts = [
     "--cov-report=term-missing:skip-covered",
     "--cov-report=html:htmlcov",
     "--cov-report=xml",
-    "--cov-branch"
+    "--cov-branch",
+    "-m", "not integration"
 ]
 markers = [
     "slow: marks tests as slow",
-    "docker: marks tests that require Docker"
+    "docker: marks tests that require Docker",
+    "integration: marks tests requiring a running AWX stack"
 ]
 
 [tool.coverage.run]

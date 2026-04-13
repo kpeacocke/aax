@@ -299,6 +299,10 @@ class TestDockerCompose:
         assert "address: awx-receptor:8888" in config
         assert "worktype: ansible-runner" in config
         assert "node_type=control" in config
+        # Verify stderr→stdout wrapper for worker error visibility
+        assert "ansible-runner-worker" in config
+        # Verify only_transmit_kwargs patch (sidecar can't share /tmp)
+        assert "only_transmit_kwargs" in config
 
 
 class TestServiceOrchestration:

@@ -9,3 +9,8 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "docker: marks tests that require Docker"
     )
+    config.addinivalue_line(
+        "markers",
+        "integration: marks tests requiring a running AWX stack "
+        "(deselect with '-m \"not integration\"')",
+    )
