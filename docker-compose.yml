@@ -416,8 +416,10 @@ services:
       - |
         set -e
         # Install mDNS resolver so .local hostnames work with host networking
-        dnf install -y nss-mdns avahi-tools 2>/dev/null && \
-          sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf || true
+        dnf install -y nss-mdns avahi avahi-tools dbus 2>/dev/null && \
+          sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf && \
+          mkdir -p /run/dbus && dbus-daemon --system 2>/dev/null && \
+          avahi-daemon --no-drop-root --daemonize 2>/dev/null || true
         mkdir -p /etc/receptor
         cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
         #!/bin/sh
