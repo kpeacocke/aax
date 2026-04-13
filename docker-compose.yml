@@ -417,6 +417,8 @@ services:
       - -c
       - |
         set -e
+        # Pin ansible-runner to match awx-task (2.4.1.dev6+gc3e8cdb)
+        pip install --no-cache-dir git+https://github.com/ansible/ansible-runner.git@c3e8cdb24f784a70328f1bfb54eb9c886148acef 2>/dev/null
         mkdir -p /etc/receptor
         cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
         #!/bin/sh
