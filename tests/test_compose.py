@@ -296,7 +296,7 @@ class TestDockerCompose:
         assert "receptor-execution:" in config
         assert "id: awx" in config  # awx-receptor acts as sidecar with node id 'awx'
         assert "id: receptor-execution" in config
-        assert "address: 127.0.0.1:" in config  # host-network peer via published port
+        assert "address: awx-receptor:8888" in config
         assert "worktype: ansible-runner" in config
         assert "node_type=control" in config
         # Verify stderr→stdout wrapper for worker error visibility

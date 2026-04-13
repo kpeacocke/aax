@@ -372,7 +372,6 @@ services:
     profiles:
       - controller
     hostname: receptor-execution
-    network_mode: host
     user: "0"
     environment:
       RECEPTOR_CONFIG: |
@@ -384,8 +383,11 @@ services:
             service: control
             filename: /var/lib/receptor/receptor.sock
             permissions: "0660"
+        - tcp-listener:
+            port: 8888
+            bindaddr: 0.0.0.0
         - tcp-peer:
-            address: 127.0.0.1:${AWX_RECEPTOR_PORT:-18888}
+            address: awx-receptor:8888
         - work-command:
             worktype: ansible-runner
             command: /usr/local/bin/ansible-runner-worker
@@ -415,11 +417,6 @@ services:
       - -c
       - |
         set -e
-        # Install mDNS resolver so .local hostnames work with host networking
-        dnf install -y nss-mdns avahi avahi-tools dbus 2>/dev/null && \
-          sed -i 's/^hosts:.*/hosts: files mdns4_minimal [NOTFOUND=return] dns/' /etc/nsswitch.conf && \
-          mkdir -p /run/dbus && dbus-daemon --system 2>/dev/null && \
-          avahi-daemon --no-drop-root --daemonize 2>/dev/null || true
         mkdir -p /etc/receptor
         cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
         #!/bin/sh
@@ -432,6 +429,8 @@ services:
     volumes:
       - receptor_execution_data:/var/lib/receptor
       - awx_projects:/var/lib/awx/projects
+    networks:
+      - awx-network
     healthcheck:
       test:
         [
@@ -443,7 +442,6 @@ services:
         ]
       interval: 30s
       timeout: 10s
-      start_period: 300s
       retries: 3
 
   gateway:
