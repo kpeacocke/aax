@@ -50,7 +50,7 @@ jobs:
     name: Welcome First Time Contributors
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: github.event_name == 'pull_request_target' && github.event.action == 'opened'
+    if: github.event_name == 'pull_request_target' && github.event.action == 'opened' && github.event.pull_request.user.type == 'User' && !contains(github.event.pull_request.user.login, '[bot]')
     steps:
       - name: Welcome message
         uses: actions/first-interaction@34f15e814fe6a47a91c8e7c0dfc5e5c62fe3cb20 # v1.3.0
