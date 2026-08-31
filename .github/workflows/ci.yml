@@ -242,7 +242,7 @@ jobs:
           output-file: sbom-${{ matrix.image }}.spdx.json
 
       - name: Scan SBOM with Grype
-        uses: anchore/scan-action@d43cc1dfea6a99ed123bf8f3133f1797c9b44492 # v4.1.2
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v4.1.2
         with:
           sbom: sbom-${{ matrix.image }}.spdx.json
           fail-build: false
