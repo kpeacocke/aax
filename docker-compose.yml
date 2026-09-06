@@ -16,7 +16,7 @@ x-watchtower-monitor: &watchtower-monitor
 services:
   ee-base:
     <<: *service-defaults
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-base:${AAX_VERSION:-1.0.0}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-base:${AAX_VERSION:-latest}
     pull_policy: missing
     restart: "no"
     profiles: [tools]
@@ -41,7 +41,7 @@ services:
 
   ee-builder:
     <<: *service-defaults
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-builder:${AAX_VERSION:-1.0.0}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-builder:${AAX_VERSION:-latest}
     pull_policy: missing
     restart: "no"
     profiles: [tools]
@@ -71,7 +71,7 @@ services:
 
   dev-tools:
     <<: *service-defaults
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-dev-tools:${AAX_VERSION:-1.0.0}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-dev-tools:${AAX_VERSION:-latest}
     pull_policy: missing
     restart: "no"
     profiles: [tools]
@@ -174,7 +174,7 @@ services:
       DJANGO_SETTINGS_MODULE: awx.settings.production
       AAX_ALLOW_PLACEHOLDER_SECRETS: ${AAX_ALLOW_PLACEHOLDER_SECRETS:-false}
       RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-false}
-      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-ghcr.io/kpeacocke/aax-ee-base:1.0.0}
+      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-ghcr.io/kpeacocke/aax-ee-base:latest}
     ports:
       - "${HOST_BIND:-127.0.0.1}:${AWX_WEB_PORT:-18080}:8052"
     volumes:
@@ -226,7 +226,7 @@ services:
       AWX_SETTINGS_FILE: /etc/tower/settings.py
       AAX_ALLOW_PLACEHOLDER_SECRETS: ${AAX_ALLOW_PLACEHOLDER_SECRETS:-false}
       RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-false}
-      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-ghcr.io/kpeacocke/aax-ee-base:1.0.0}
+      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-ghcr.io/kpeacocke/aax-ee-base:latest}
       RECEPTOR_CONFIG: |
         ---
         - node:
@@ -477,7 +477,7 @@ services:
 
   gateway:
     <<: *service-defaults
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-gateway:${AAX_VERSION:-1.0.0}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-gateway:${AAX_VERSION:-latest}
     pull_policy: missing
     container_name: aax-gateway
     profiles:
@@ -555,7 +555,7 @@ services:
     <<: *service-defaults
     profiles:
       - hub
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${AAX_VERSION:-1.0.0}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${AAX_VERSION:-latest}
     pull_policy: missing
     container_name: aax-pulp-api
     command: ["pulpcore-api"]
@@ -604,7 +604,7 @@ services:
     <<: *service-defaults
     profiles:
       - hub
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${AAX_VERSION:-1.0.0}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${AAX_VERSION:-latest}
     container_name: aax-pulp-content
     pull_policy: missing
     command: ["pulpcore-content"]
@@ -646,7 +646,7 @@ services:
     <<: *service-defaults
     profiles:
       - hub
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${AAX_VERSION:-1.0.0}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${AAX_VERSION:-latest}
     container_name: aax-pulp-worker
     pull_policy: missing
     command: ["pulpcore-worker"]
@@ -692,7 +692,7 @@ services:
     <<: *service-defaults
     profiles:
       - hub
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-galaxy-ng:${AAX_VERSION:-1.0.0}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-galaxy-ng:${AAX_VERSION:-latest}
     pull_policy: missing
     container_name: aax-galaxy-ng
     security_opt:
@@ -793,7 +793,7 @@ services:
 
   eda-controller:
     <<: *service-defaults
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${AAX_VERSION:-1.0.0}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${AAX_VERSION:-latest}
     pull_policy: missing
     container_name: eda-controller
     profiles:
