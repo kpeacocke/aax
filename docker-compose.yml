@@ -9,6 +9,10 @@ x-service-defaults: &service-defaults
       max-size: ${AAX_LOG_MAX_SIZE:-10m}
       max-file: ${AAX_LOG_MAX_FILES:-3}
 
+x-watchtower-monitor: &watchtower-monitor
+  com.centurylinklabs.watchtower.enable: "true"
+  com.centurylinklabs.watchtower.monitor-only: "true"
+
 services:
   ee-base:
     <<: *service-defaults
@@ -96,7 +100,8 @@ services:
 
   awx-postgres:
     <<: *service-defaults
-    image: postgres:${AWX_POSTGRES_VERSION:-15.14}
+    image: postgres:${AWX_POSTGRES_VERSION:-15}
+    labels: *watchtower-monitor
     container_name: awx-postgres
     profiles:
       - controller
@@ -119,7 +124,8 @@ services:
 
   awx-redis:
     <<: *service-defaults
-    image: redis:${AWX_REDIS_VERSION:-7.4.5}
+    image: redis:${AWX_REDIS_VERSION:-7.4}
+    labels: *watchtower-monitor
     container_name: awx-redis
     command: redis-server --appendonly yes
     profiles:
@@ -505,7 +511,8 @@ services:
 
   hub-postgres:
     <<: *service-defaults
-    image: postgres:${HUB_POSTGRES_VERSION:-16.10-alpine}
+    image: postgres:${HUB_POSTGRES_VERSION:-16-alpine}
+    labels: *watchtower-monitor
     container_name: aax-hub-postgres
     profiles:
       - hub
@@ -527,7 +534,8 @@ services:
 
   hub-redis:
     <<: *service-defaults
-    image: redis:${HUB_REDIS_VERSION:-7.4.5-alpine}
+    image: redis:${HUB_REDIS_VERSION:-7.4-alpine}
+    labels: *watchtower-monitor
     container_name: aax-hub-redis
     profiles:
       - hub
@@ -743,7 +751,8 @@ services:
 
   eda-postgres:
     <<: *service-defaults
-    image: postgres:${EDA_POSTGRES_VERSION:-15.14}
+    image: postgres:${EDA_POSTGRES_VERSION:-15}
+    labels: *watchtower-monitor
     container_name: eda-postgres
     profiles:
       - eda
@@ -766,7 +775,8 @@ services:
 
   eda-redis:
     <<: *service-defaults
-    image: redis:${EDA_REDIS_VERSION:-7.4.5}
+    image: redis:${EDA_REDIS_VERSION:-7.4}
+    labels: *watchtower-monitor
     container_name: eda-redis
     command: redis-server --appendonly yes
     profiles:

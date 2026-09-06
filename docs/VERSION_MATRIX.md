@@ -19,11 +19,11 @@ This document is the canonical tested version matrix for the current AAX baselin
 
 ## Runtime Base Dependencies
 
-| Dependency            | Default          |
-| --------------------- | ---------------- |
-| PostgreSQL (AWX, EDA) | `15.14`              |
-| PostgreSQL (Hub)      | `16.10-alpine`       |
-| Redis                 | `7.4.5` / `7.4.5-alpine` |
+| Dependency            | Default channel                         |
+| --------------------- | --------------------------------------- |
+| PostgreSQL (AWX, EDA) | `15` (floats to the newest `15.x`)      |
+| PostgreSQL (Hub)      | `16-alpine` (newest Alpine `16.x`)      |
+| Redis                 | `7.4` / `7.4-alpine` (newest `7.4.x`) |
 
 ## Update Rules
 
@@ -36,6 +36,9 @@ This document is the canonical tested version matrix for the current AAX baselin
 - Use immutable digest pinning for externally sourced base/runtime images where practical.
 - Keep local project image tags pinned to tested release versions through
   Portainer's `AAX_VERSION` variable.
-- Watchtower can detect a changed digest behind the selected tag; it cannot
-  discover a new semantic tag. Dependabot PRs are the version-update signal.
+- PostgreSQL and Redis intentionally use upstream-maintained floating channels.
+  Watchtower is label-enabled but monitor-only for these stateful services: it
+  reports a changed digest and Portainer remains the manual deployment gate.
+- AWX, AWX EE, Receptor, and AAX use exact versions because verified floating
+  tags are unavailable or upgrades require coordinated compatibility testing.
 - Introduce digest enforcement incrementally after validating multi-arch release behavior.
