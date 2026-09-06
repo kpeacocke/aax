@@ -154,10 +154,11 @@ Operational notes:
 - Keep the `tools` profile disabled during normal operation. Enable it only
   while using `ee-builder` or the interactive developer containers; the builder
   has deliberate Docker socket access.
-- PostgreSQL and Redis use upstream floating channels constrained to the selected
-  major/minor policy. They carry Watchtower's enable and monitor-only labels, so
-  an available patch is reported but never installed automatically. Approve it
-  by updating the Portainer stack with **Re-pull image and redeploy**.
+- PostgreSQL uses upstream major channels (`15` means the newest `15.x` and
+  `16-alpine` the newest Alpine-based `16.x`). Redis uses minor channels (`7.4`
+  means the newest `7.4.x`). They carry Watchtower's enable and monitor-only
+  labels, so an available update is reported but never installed automatically.
+  Approve it by updating the Portainer stack with **Re-pull image and redeploy**.
 - AWX, AWX EE, Receptor, and AAX remain fully pinned. Their publishers do not all
   provide safe floating tags, so select new releases deliberately by changing
   the matching Portainer version variable.

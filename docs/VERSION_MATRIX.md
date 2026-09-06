@@ -19,11 +19,11 @@ This document is the canonical tested version matrix for the current AAX baselin
 
 ## Runtime Base Dependencies
 
-| Dependency            | Default          |
-| --------------------- | ---------------- |
-| PostgreSQL (AWX, EDA) | `15`                    |
-| PostgreSQL (Hub)      | `16-alpine`             |
-| Redis                 | `7.4` / `7.4-alpine`    |
+| Dependency            | Default channel                         |
+| --------------------- | --------------------------------------- |
+| PostgreSQL (AWX, EDA) | `15` (floats to the newest `15.x`)      |
+| PostgreSQL (Hub)      | `16-alpine` (newest Alpine `16.x`)      |
+| Redis                 | `7.4` / `7.4-alpine` (newest `7.4.x`) |
 
 ## Update Rules
 
