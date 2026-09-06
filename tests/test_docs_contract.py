@@ -100,8 +100,8 @@ def test_privilege_model_doc_tracks_root_and_socket_surface() -> None:
         assert token in content
 
 
-def test_version_matrix_doc_exists_with_pinned_defaults() -> None:
-    """Version matrix docs should define current pinned default tags."""
+def test_version_matrix_doc_exists_with_controlled_defaults() -> None:
+    """Version matrix docs should define current controlled deployment tags."""
     content = _read("docs/VERSION_MATRIX.md")
     required_tokens = [
         "awx",
@@ -112,6 +112,7 @@ def test_version_matrix_doc_exists_with_pinned_defaults() -> None:
         "pulp",
         "eda-controller",
         "gateway",
+        "latest",
         "1.0.0",
         "v1.6.4",
     ]

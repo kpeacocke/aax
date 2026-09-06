@@ -39,6 +39,26 @@ def test_release_workflow_does_not_publish_latest_tags() -> None:
     assert ":latest" not in content
 
 
+def test_compose_main_channel_defaults_match_published_images() -> None:
+    """Compose defaults must resolve to tags published by the main workflow."""
+    compose = _read("docker-compose.yml")
+    env_example = _read(".env.example")
+    publish_workflow = _read(".github/workflows/publish-images.yml")
+
+    assert "${AAX_VERSION:-1.0.0}" not in compose
+    assert "${AAX_VERSION:-latest}" in compose
+    assert "AAX_VERSION=latest" in env_example
+    assert "type=raw,value=latest" in publish_workflow
+
+
+def test_gateway_uses_supported_nginx_patch_channel() -> None:
+    """Gateway should follow a maintained nginx minor channel, not an EOL one."""
+    dockerfile = _read("images/gateway/Dockerfile")
+    assert "ARG NGINX_VERSION=1.30-alpine" in dockerfile
+    assert "FROM nginx:${NGINX_VERSION}" in dockerfile
+    assert "nginx:1.27-alpine" not in dockerfile
+
+
 def test_release_workflow_has_secret_scan_gate() -> None:
     """Release workflow should run a blocking secret scan before release gates."""
     content = _read(".github/workflows/release.yml")

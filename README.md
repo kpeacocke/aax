@@ -96,7 +96,7 @@ Use Portainer Git repository stack mode with the single compose file.
 
 - COMPOSE_PROFILES=controller,hub
 - HOST_BIND=127.0.0.1
-- AAX_VERSION=1.0.0
+- AAX_VERSION=latest
 - AWX_VERSION=24.6.1
 - AWX_EE_VERSION=24.6.1
 - RECEPTOR_VERSION=v1.6.4
@@ -141,7 +141,7 @@ Use Portainer Git repository stack mode with the single compose file.
 
 1. Deploy and monitor:
 
-- Portainer builds local images during stack deployment.
+- Portainer pulls the prebuilt AAX images selected by `AAX_VERSION`.
 - After changes, use Update the stack and Re-pull image and redeploy.
 - Check container health before testing URLs.
 
@@ -159,9 +159,11 @@ Operational notes:
   means the newest `7.4.x`). They carry Watchtower's enable and monitor-only
   labels, so an available update is reported but never installed automatically.
   Approve it by updating the Portainer stack with **Re-pull image and redeploy**.
-- AWX, AWX EE, Receptor, and AAX remain fully pinned. Their publishers do not all
-  provide safe floating tags, so select new releases deliberately by changing
-  the matching Portainer version variable.
+- AWX, AWX EE, and Receptor remain fully pinned. Select their upgrades
+  deliberately by changing the matching Portainer version variable. The lab
+  deployment follows the tested AAX `latest` main-branch channel; replace
+  `AAX_VERSION` with a semantic release tag when an immutable release is
+  available.
 
 ## Requirements
 
