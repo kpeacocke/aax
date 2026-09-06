@@ -2,7 +2,7 @@
 
 This document is the canonical tested version matrix for the current AAX baseline.
 
-## AAX Component Images
+## Compose and Portainer Component Images
 
 | Component      | Default Tag | Source                          |
 | -------------- | ----------- | ------------------------------- |
@@ -17,6 +17,12 @@ This document is the canonical tested version matrix for the current AAX baselin
 | gateway        | `latest`    | `AAX_VERSION`                   |
 | receptor       | `v1.6.4`    | `RECEPTOR_VERSION`              |
 
+## Kubernetes Component Images
+
+The Kubernetes manifests remain pinned to the locally built `aax/*:1.0.0`
+baseline. They do not follow the Compose/Portainer `AAX_VERSION` channel and
+must be advanced deliberately as a separate deployment target.
+
 ## Runtime Base Dependencies
 
 | Dependency            | Default channel                         |
@@ -27,7 +33,8 @@ This document is the canonical tested version matrix for the current AAX baselin
 
 ## Update Rules
 
-- Update this file whenever changing default image tags in compose, k8s, or `.env.example`.
+- Update this file whenever changing default image tags in Compose, Kubernetes,
+  or `.env.example`.
 - Keep CI/release workflows aligned with these defaults.
 - Run policy and docs contract tests after any version change.
 

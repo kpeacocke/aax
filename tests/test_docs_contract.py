@@ -113,6 +113,7 @@ def test_version_matrix_doc_exists_with_controlled_defaults() -> None:
         "eda-controller",
         "gateway",
         "latest",
+        "1.0.0",
         "v1.6.4",
     ]
     for token in required_tokens:
