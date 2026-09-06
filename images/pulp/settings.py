@@ -21,7 +21,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('POSTGRES_DB', 'hub'),
         'USER': os.getenv('POSTGRES_USER', 'galaxy'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'hubpassword'),
+        'PASSWORD': os.environ['POSTGRES_PASSWORD'],
         'HOST': os.getenv('POSTGRES_HOST', 'hub-postgres'),
         'PORT': os.getenv('POSTGRES_PORT', '5432'),
         'CONN_MAX_AGE': 0,
@@ -54,7 +54,7 @@ API_ROOT = '/pulp/'
 DB_ENCRYPTION_KEY = os.getenv('DB_ENCRYPTION_KEY', '/var/lib/pulp/db-encryption.key')
 
 # Security settings
-SECRET_KEY = os.getenv('PULP_SECRET_KEY', os.getenv('SECRET_KEY', 'change-me-to-a-long-random-string'))
+SECRET_KEY = os.environ['PULP_SECRET_KEY']
 DEFAULT_ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
 # Parse ALLOWED_HOSTS from environment, defaulting to localhost-only for safety.
 _allowed_hosts_env = os.getenv('PULP_ALLOWED_HOSTS', os.getenv('ALLOWED_HOSTS', '')).strip()
@@ -71,11 +71,15 @@ DEBUG = os.getenv('DJANGO_DEBUG', 'false').lower() == 'true'
 CONTENT_PATH_PREFIX = '/pulp/content/'
 
 # CORS settings
+CORS_ALLOW_ALL_ORIGINS = os.getenv('PULP_CORS_ALLOW_ALL_ORIGINS', 'false').lower() == 'true'
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5001",
-    "http://galaxy-ng:8000",
+    origin.strip()
+    for origin in os.getenv(
+        'PULP_CORS_ALLOWED_ORIGINS',
+        'http://localhost:5001,http://galaxy-ng:8000',
+    ).split(',')
+    if origin.strip()
 ]
-CORS_ALLOW_ALL_ORIGINS = True  # Restrict in production
 
 # Storage backend
 DEFAULT_FILE_STORAGE = 'pulpcore.app.models.storage.FileSystem'

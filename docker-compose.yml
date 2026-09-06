@@ -1,8 +1,21 @@
 name: aax
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  pids_limit: ${AAX_PIDS_LIMIT:-512}
+  logging:
+    driver: json-file
+    options:
+      max-size: ${AAX_LOG_MAX_SIZE:-10m}
+      max-file: ${AAX_LOG_MAX_FILES:-3}
+
 services:
   ee-base:
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-base:${VERSION:-latest}
-    pull_policy: always
+    <<: *service-defaults
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-base:${AAX_VERSION:-1.0.0}
+    pull_policy: missing
+    restart: "no"
+    profiles: [tools]
     working_dir: /workspace
     volumes:
       - workspace:/workspace:rw
@@ -23,8 +36,11 @@ services:
     command: ["sleep", "infinity"]
 
   ee-builder:
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-builder:${VERSION:-latest}
-    pull_policy: always
+    <<: *service-defaults
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-builder:${AAX_VERSION:-1.0.0}
+    pull_policy: missing
+    restart: "no"
+    profiles: [tools]
     depends_on:
       ee-base:
         condition: service_healthy
@@ -50,8 +66,11 @@ services:
     command: ["sleep", "infinity"]
 
   dev-tools:
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-dev-tools:${VERSION:-latest}
-    pull_policy: always
+    <<: *service-defaults
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-dev-tools:${AAX_VERSION:-1.0.0}
+    pull_policy: missing
+    restart: "no"
+    profiles: [tools]
     depends_on:
       ee-base:
         condition: service_healthy
@@ -76,7 +95,8 @@ services:
     command: ["sleep", "infinity"]
 
   awx-postgres:
-    image: postgres:15
+    <<: *service-defaults
+    image: postgres:${AWX_POSTGRES_VERSION:-15.14}
     container_name: awx-postgres
     profiles:
       - controller
@@ -98,7 +118,8 @@ services:
       start_period: 10s
 
   awx-redis:
-    image: redis:7
+    <<: *service-defaults
+    image: redis:${AWX_REDIS_VERSION:-7.4.5}
     container_name: awx-redis
     command: redis-server --appendonly yes
     profiles:
@@ -114,9 +135,10 @@ services:
       retries: 5
 
   awx-web:
+    <<: *service-defaults
     profiles:
       - controller
-    image: ${AWX_IMAGE:-quay.io/ansible/awx:24.6.1}
+    image: ${AWX_IMAGE_REPOSITORY:-quay.io/ansible/awx}:${AWX_VERSION:-24.6.1}
     pull_policy: missing
     container_name: awx-web
     hostname: awx
@@ -146,7 +168,7 @@ services:
       DJANGO_SETTINGS_MODULE: awx.settings.production
       AAX_ALLOW_PLACEHOLDER_SECRETS: ${AAX_ALLOW_PLACEHOLDER_SECRETS:-false}
       RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-false}
-      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-ghcr.io/kpeacocke/aax-ee-base:latest}
+      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-ghcr.io/kpeacocke/aax-ee-base:1.0.0}
     ports:
       - "${HOST_BIND:-127.0.0.1}:${AWX_WEB_PORT:-18080}:8052"
     volumes:
@@ -168,9 +190,10 @@ services:
       start_period: 600s
 
   awx-task:
+    <<: *service-defaults
     profiles:
       - controller
-    image: ${AWX_IMAGE:-quay.io/ansible/awx:24.6.1}
+    image: ${AWX_IMAGE_REPOSITORY:-quay.io/ansible/awx}:${AWX_VERSION:-24.6.1}
     pull_policy: missing
     container_name: awx-task
     hostname: awx
@@ -197,7 +220,7 @@ services:
       AWX_SETTINGS_FILE: /etc/tower/settings.py
       AAX_ALLOW_PLACEHOLDER_SECRETS: ${AAX_ALLOW_PLACEHOLDER_SECRETS:-false}
       RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-false}
-      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-ghcr.io/kpeacocke/aax-ee-base:latest}
+      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-ghcr.io/kpeacocke/aax-ee-base:1.0.0}
       RECEPTOR_CONFIG: |
         ---
         - node:
@@ -224,7 +247,6 @@ services:
     networks:
       - awx-network
       - hub-network
-    restart: unless-stopped
     depends_on:
       awx-postgres:
         condition: service_healthy
@@ -241,7 +263,8 @@ services:
       start_period: 600s
 
   awx-receptor:
-    image: ${AWX_EE_IMAGE:-quay.io/ansible/awx-ee:24.6.1}
+    <<: *service-defaults
+    image: ${AWX_EE_IMAGE_REPOSITORY:-quay.io/ansible/awx-ee}:${AWX_EE_VERSION:-24.6.1}
     container_name: awx-receptor
     profiles:
       - controller
@@ -304,8 +327,6 @@ services:
       - awx_rsyslog:/var/log/tower
     networks:
       - awx-network
-    ports:
-      - "${HOST_BIND:-127.0.0.1}:${AWX_RECEPTOR_PORT:-18888}:8888"
     healthcheck:
       test:
         [
@@ -320,7 +341,8 @@ services:
       retries: 3
 
   receptor-hop:
-    image: quay.io/ansible/receptor:v1.6.4
+    <<: *service-defaults
+    image: quay.io/ansible/receptor:${RECEPTOR_VERSION:-v1.6.4}
     container_name: receptor-hop
     profiles:
       - controller
@@ -367,7 +389,8 @@ services:
       retries: 3
 
   receptor-execution:
-    image: ${AWX_EE_IMAGE:-quay.io/ansible/awx-ee:24.6.1}
+    <<: *service-defaults
+    image: ${AWX_EE_IMAGE_REPOSITORY:-quay.io/ansible/awx-ee}:${AWX_EE_VERSION:-24.6.1}
     container_name: receptor-execution
     profiles:
       - controller
@@ -447,8 +470,9 @@ services:
       retries: 3
 
   gateway:
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-gateway:${VERSION:-latest}
-    pull_policy: always
+    <<: *service-defaults
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-gateway:${AAX_VERSION:-1.0.0}
+    pull_policy: missing
     container_name: aax-gateway
     profiles:
       - controller
@@ -462,7 +486,6 @@ services:
       - CHOWN
       - SETGID
       - SETUID
-    restart: unless-stopped
     ports:
       - "${HOST_BIND:-127.0.0.1}:${GATEWAY_PORT:-18088}:8080"
     networks:
@@ -481,9 +504,9 @@ services:
       start_period: 5s
 
   hub-postgres:
-    image: postgres:16-alpine
+    <<: *service-defaults
+    image: postgres:${HUB_POSTGRES_VERSION:-16.10-alpine}
     container_name: aax-hub-postgres
-    restart: unless-stopped
     profiles:
       - hub
     environment:
@@ -503,9 +526,9 @@ services:
       start_period: 10s
 
   hub-redis:
-    image: redis:7-alpine
+    <<: *service-defaults
+    image: redis:${HUB_REDIS_VERSION:-7.4.5-alpine}
     container_name: aax-hub-redis
-    restart: unless-stopped
     profiles:
       - hub
     command: redis-server --appendonly yes
@@ -521,12 +544,12 @@ services:
       start_period: 5s
 
   pulp-api:
+    <<: *service-defaults
     profiles:
       - hub
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${VERSION:-latest}
-    pull_policy: always
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${AAX_VERSION:-1.0.0}
+    pull_policy: missing
     container_name: aax-pulp-api
-    restart: unless-stopped
     command: ["pulpcore-api"]
     security_opt:
       - no-new-privileges:true
@@ -546,6 +569,8 @@ services:
       PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:15001}
       PULP_SETTINGS: /etc/pulp/settings.py
       DJANGO_SETTINGS_MODULE: pulpcore.app.settings
+      PULP_CORS_ALLOW_ALL_ORIGINS: ${PULP_CORS_ALLOW_ALL_ORIGINS:-false}
+      PULP_CORS_ALLOWED_ORIGINS: ${PULP_CORS_ALLOWED_ORIGINS:-https://awx.ambitiouscake.com,https://hub.ambitiouscake.com}
       PULP_WORKERS: ${PULP_WORKERS:-2}
       GALAXY_ADMIN_USERNAME: ${GALAXY_ADMIN_USERNAME:-admin}
       GALAXY_ADMIN_PASSWORD: ${HUB_ADMIN_PASSWORD:?HUB_ADMIN_PASSWORD must be set (non-empty) in .env or environment}
@@ -568,11 +593,12 @@ services:
       start_period: 120s
 
   pulp-content:
+    <<: *service-defaults
     profiles:
       - hub
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${VERSION:-latest}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${AAX_VERSION:-1.0.0}
     container_name: aax-pulp-content
-    restart: unless-stopped
+    pull_policy: missing
     command: ["pulpcore-content"]
     security_opt:
       - no-new-privileges:true
@@ -592,6 +618,8 @@ services:
       PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:15001}
       PULP_SETTINGS: /etc/pulp/settings.py
       DJANGO_SETTINGS_MODULE: pulpcore.app.settings
+      PULP_CORS_ALLOW_ALL_ORIGINS: ${PULP_CORS_ALLOW_ALL_ORIGINS:-false}
+      PULP_CORS_ALLOWED_ORIGINS: ${PULP_CORS_ALLOWED_ORIGINS:-https://awx.ambitiouscake.com,https://hub.ambitiouscake.com}
     volumes:
       - hub_pulp_storage:/var/lib/pulp
     networks:
@@ -607,11 +635,12 @@ services:
       start_period: 30s
 
   pulp-worker:
+    <<: *service-defaults
     profiles:
       - hub
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${VERSION:-latest}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${AAX_VERSION:-1.0.0}
     container_name: aax-pulp-worker
-    restart: unless-stopped
+    pull_policy: missing
     command: ["pulpcore-worker"]
     security_opt:
       - no-new-privileges:true
@@ -631,6 +660,8 @@ services:
       PULP_ANSIBLE_API_HOSTNAME: ${PULP_ANSIBLE_API_HOSTNAME:-http://localhost:15001}
       PULP_SETTINGS: /etc/pulp/settings.py
       DJANGO_SETTINGS_MODULE: pulpcore.app.settings
+      PULP_CORS_ALLOW_ALL_ORIGINS: ${PULP_CORS_ALLOW_ALL_ORIGINS:-false}
+      PULP_CORS_ALLOWED_ORIGINS: ${PULP_CORS_ALLOWED_ORIGINS:-https://awx.ambitiouscake.com,https://hub.ambitiouscake.com}
     volumes:
       - hub_pulp_storage:/var/lib/pulp
     networks:
@@ -650,12 +681,12 @@ services:
       start_period: 30s
 
   galaxy-ng:
+    <<: *service-defaults
     profiles:
       - hub
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-galaxy-ng:${VERSION:-latest}
-    pull_policy: always
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-galaxy-ng:${AAX_VERSION:-1.0.0}
+    pull_policy: missing
     container_name: aax-galaxy-ng
-    restart: unless-stopped
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -676,6 +707,8 @@ services:
       GALAXY_ADMIN_EMAIL: ${GALAXY_ADMIN_EMAIL:-admin@example.com}
       GALAXY_SECRET_KEY: ${GALAXY_SECRET_KEY:?GALAXY_SECRET_KEY must be set (non-empty) in .env or environment}
       GALAXY_ALLOWED_HOSTS: ${GALAXY_ALLOWED_HOSTS:-localhost,127.0.0.1,galaxy-ng,gateway}
+      GALAXY_CORS_ALLOW_ALL_ORIGINS: ${GALAXY_CORS_ALLOW_ALL_ORIGINS:-false}
+      GALAXY_CORS_ALLOWED_ORIGINS: ${GALAXY_CORS_ALLOWED_ORIGINS:-https://hub.ambitiouscake.com}
       GALAXY_SIGNATURE_UPLOAD_ENABLED: ${GALAXY_SIGNATURE_UPLOAD_ENABLED:-false}
       GALAXY_REQUIRE_CONTENT_APPROVAL: ${GALAXY_REQUIRE_CONTENT_APPROVAL:-true}
       GALAXY_AUTO_SIGN_COLLECTIONS: ${GALAXY_AUTO_SIGN_COLLECTIONS:-false}
@@ -709,7 +742,8 @@ services:
       - "${HOST_BIND:-127.0.0.1}:${GALAXY_PORT:-15001}:8000"
 
   eda-postgres:
-    image: postgres:15
+    <<: *service-defaults
+    image: postgres:${EDA_POSTGRES_VERSION:-15.14}
     container_name: eda-postgres
     profiles:
       - eda
@@ -731,7 +765,8 @@ services:
       start_period: 10s
 
   eda-redis:
-    image: redis:7
+    <<: *service-defaults
+    image: redis:${EDA_REDIS_VERSION:-7.4.5}
     container_name: eda-redis
     command: redis-server --appendonly yes
     profiles:
@@ -747,8 +782,9 @@ services:
       retries: 5
 
   eda-controller:
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${VERSION:-latest}
-    pull_policy: always
+    <<: *service-defaults
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${AAX_VERSION:-1.0.0}
+    pull_policy: missing
     container_name: eda-controller
     profiles:
       - eda

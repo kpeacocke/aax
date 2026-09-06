@@ -135,7 +135,6 @@ def test_compose_published_ports_use_localhost_host_bind_default() -> None:
     content = _read("docker-compose.yml")
     required_bindings = [
         '"${HOST_BIND:-127.0.0.1}:${AWX_WEB_PORT:-18080}:8052"',
-        '"${HOST_BIND:-127.0.0.1}:${AWX_RECEPTOR_PORT:-18888}:8888"',
         '"${HOST_BIND:-127.0.0.1}:${GATEWAY_PORT:-18088}:8080"',
         '"${HOST_BIND:-127.0.0.1}:${GALAXY_PORT:-15001}:8000"',
         '"${HOST_BIND:-127.0.0.1}:${EDA_PORT:-15000}:5000"',
@@ -208,7 +207,6 @@ def test_compose_only_expected_services_publish_ports() -> None:
 
     expected_services = {
         "awx-web",
-        "awx-receptor",
         "gateway",
         "galaxy-ng",
         "eda-controller",

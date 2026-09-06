@@ -16,7 +16,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.getenv("POSTGRES_DB", "hub"),
         "USER": os.getenv("POSTGRES_USER", "galaxy"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "hubpassword"),
+        "PASSWORD": os.environ["POSTGRES_PASSWORD"],
         "HOST": os.getenv("POSTGRES_HOST", "hub-postgres"),
         "PORT": os.getenv("POSTGRES_PORT", "5432"),
         "CONN_MAX_AGE": 0,
@@ -42,7 +42,7 @@ CONTENT_PATH_PREFIX = "/pulp/content/"
 DB_ENCRYPTION_KEY = os.getenv(
     "DB_ENCRYPTION_KEY", "/etc/pulp/certs/database_fields.symmetric.key"
 )
-SECRET_KEY = os.getenv("GALAXY_SECRET_KEY", os.getenv("SECRET_KEY", "change-me"))
+SECRET_KEY = os.environ["GALAXY_SECRET_KEY"]
 
 _default_allowed_hosts = ["localhost", "127.0.0.1", "[::1]", "galaxy-ng", "gateway"]
 _allowed_hosts_env = os.getenv("GALAXY_ALLOWED_HOSTS", os.getenv("ALLOWED_HOSTS", "")).strip()
