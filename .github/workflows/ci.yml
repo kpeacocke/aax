@@ -247,6 +247,10 @@ jobs:
           sbom: sbom-${{ matrix.image }}.spdx.json
           fail-build: true
           severity-cutoff: critical
+          # Debian sometimes classifies inherited findings as critical before a
+          # patched package exists. Keep those visible in Trivy/GitHub Security,
+          # but gate changes on critical findings we can actually remediate.
+          only-fixed: true
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@89a39a4e59826350b863aa6b6252a07ad50cf83e # v4.32.4
