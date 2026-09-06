@@ -73,6 +73,19 @@ def test_release_workflow_has_secret_scan_gate() -> None:
         assert token in content
 
 
+def test_release_gate_blocks_only_fixable_critical_vulnerabilities() -> None:
+    """Unfixed upstream findings remain reported but must not deadlock releases."""
+    content = _read(".github/workflows/release.yml")
+    report_step, gate_step = content.split("- name: Gate on fixable critical vulnerabilities", 1)
+
+    assert "format: sarif" in report_step
+    assert "ignore-unfixed: true" not in report_step
+    assert "format: table" in gate_step
+    assert "severity: CRITICAL" in gate_step
+    assert "ignore-unfixed: true" in gate_step
+    assert "exit-code: 1" in gate_step
+
+
 def test_ci_workflow_does_not_use_latest_image_tags() -> None:
     """CI workflow should build and scan pinned image tags only."""
     content = _read(".github/workflows/ci.yml")
