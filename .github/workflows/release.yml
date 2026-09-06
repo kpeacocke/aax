@@ -176,7 +176,15 @@ jobs:
           image-ref: aax/${{ matrix.image }}:1.0.0
           format: sarif
           output: trivy-${{ matrix.image }}.sarif
+          severity: LOW,MEDIUM,HIGH,CRITICAL
+
+      - name: Gate on fixable critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
+        with:
+          image-ref: aax/${{ matrix.image }}:1.0.0
+          format: table
           severity: CRITICAL
+          ignore-unfixed: true
           exit-code: 1
 
       - name: Upload Trivy results to GitHub Security
