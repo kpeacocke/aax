@@ -55,8 +55,11 @@ jobs:
       - name: Welcome message
         uses: actions/first-interaction@1c4688942c71f71d4f5502a26ea67c331730fa4d # v3
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          pr-message: |
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          issue_message: |
+            Thanks for opening your first issue. Please include enough detail to
+            reproduce or evaluate the request.
+          pr_message: |
             👋 Thanks for opening your first pull request!
 
             Please make sure you've read our [contributing guidelines](https://github.com/${{ github.repository }}/blob/main/CONTRIBUTING.md).
