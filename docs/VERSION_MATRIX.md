@@ -6,23 +6,24 @@ This document is the canonical tested version matrix for the current AAX baselin
 
 | Component      | Default Tag | Source                          |
 | -------------- | ----------- | ------------------------------- |
-| awx            | `1.0.0`     | `AWX_IMAGE` / compose default   |
-| ee-base        | `1.0.0`     | `VERSION` / compose + kustomize |
-| ee-builder     | `1.0.0`     | `VERSION` / compose + kustomize |
-| dev-tools      | `1.0.0`     | `VERSION` / compose + kustomize |
+| awx            | `24.6.1`    | `AWX_VERSION`                   |
+| awx-ee         | `24.6.1`    | `AWX_EE_VERSION`                |
+| ee-base        | `1.0.0`     | `AAX_VERSION`                   |
+| ee-builder     | `1.0.0`     | `AAX_VERSION`                   |
+| dev-tools      | `1.0.0`     | `AAX_VERSION`                   |
 | galaxy-ng      | `1.0.0`     | compose + kustomize             |
 | pulp           | `1.0.0`     | compose + kustomize             |
 | eda-controller | `1.0.0`     | compose + kustomize             |
 | gateway        | `1.0.0`     | compose + kustomize             |
-| receptor       | `v1.6.4`    | compose default                 |
+| receptor       | `v1.6.4`    | `RECEPTOR_VERSION`              |
 
 ## Runtime Base Dependencies
 
 | Dependency            | Default          |
 | --------------------- | ---------------- |
-| PostgreSQL (AWX, EDA) | `15`             |
-| PostgreSQL (Hub)      | `16-alpine`      |
-| Redis                 | `7` / `7-alpine` |
+| PostgreSQL (AWX, EDA) | `15.14`              |
+| PostgreSQL (Hub)      | `16.10-alpine`       |
+| Redis                 | `7.4.5` / `7.4.5-alpine` |
 
 ## Update Rules
 
@@ -33,5 +34,8 @@ This document is the canonical tested version matrix for the current AAX baselin
 ## Digest Pinning Strategy
 
 - Use immutable digest pinning for externally sourced base/runtime images where practical.
-- Keep local project image tags pinned to tested release versions.
+- Keep local project image tags pinned to tested release versions through
+  Portainer's `AAX_VERSION` variable.
+- Watchtower can detect a changed digest behind the selected tag; it cannot
+  discover a new semantic tag. Dependabot PRs are the version-update signal.
 - Introduce digest enforcement incrementally after validating multi-arch release behavior.

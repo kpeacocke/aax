@@ -53,7 +53,7 @@ jobs:
     if: github.event_name == 'pull_request_target' && github.event.action == 'opened' && github.event.pull_request.user.type == 'User' && !contains(github.event.pull_request.user.login, '[bot]')
     steps:
       - name: Welcome message
-        uses: actions/first-interaction@34f15e814fe6a47a91c8e7c0dfc5e5c62fe3cb20 # v1.3.0
+        uses: actions/first-interaction@1c4688942c71f71d4f5502a26ea67c331730fa4d # v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           pr-message: |

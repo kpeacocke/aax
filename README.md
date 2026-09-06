@@ -96,6 +96,16 @@ Use Portainer Git repository stack mode with the single compose file.
 
 - COMPOSE_PROFILES=controller,hub
 - HOST_BIND=127.0.0.1
+- AAX_VERSION=1.0.0
+- AWX_VERSION=24.6.1
+- AWX_EE_VERSION=24.6.1
+- RECEPTOR_VERSION=v1.6.4
+- AWX_POSTGRES_VERSION=15.14
+- HUB_POSTGRES_VERSION=16.10-alpine
+- EDA_POSTGRES_VERSION=15.14
+- AWX_REDIS_VERSION=7.4.5
+- HUB_REDIS_VERSION=7.4.5-alpine
+- EDA_REDIS_VERSION=7.4.5
 - DATABASE_PASSWORD=your-awx-db-password
 - SECRET_KEY=your-awx-secret-key
 - AWX_ADMIN_PASSWORD=your-awx-admin-password
@@ -141,6 +151,12 @@ Operational notes:
 - Do not expose raw Pulp ports on the router.
 - Keep HOST_BIND=127.0.0.1 when DSM reverse proxy is on the same NAS.
 - After editing stack variables in Portainer, use re-pull and redeploy so stale environment values do not survive the update.
+- Keep the `tools` profile disabled during normal operation. Enable it only
+  while using `ee-builder` or the interactive developer containers; the builder
+  has deliberate Docker socket access.
+- A Watchtower notification only means the digest for the currently selected
+  tag changed. New semantic versions are surfaced through Dependabot, reviewed,
+  then selected by changing the matching Portainer version variable.
 
 ## Requirements
 

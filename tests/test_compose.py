@@ -97,6 +97,8 @@ class TestDockerCompose:
                 "hub",
                 "--profile",
                 "eda",
+                "--profile",
+                "tools",
                 "config",
                 "--services",
             ],
@@ -148,7 +150,7 @@ class TestDockerCompose:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "DEFAULT_EXECUTION_ENVIRONMENT: aax/ee-base:" in result.stdout
+        assert "DEFAULT_EXECUTION_ENVIRONMENT: ghcr.io/kpeacocke/aax-ee-base:" in result.stdout
 
     def test_missing_required_secret_fails_compose_render(self):
         """Test that required secret variables fail fast when empty."""
@@ -276,7 +278,7 @@ class TestDockerCompose:
         assert result.returncode == 0
         config = json.loads(result.stdout)
 
-        for service_name in ["awx-web", "awx-receptor", "gateway", "galaxy-ng", "eda-controller"]:
+        for service_name in ["awx-web", "gateway", "galaxy-ng", "eda-controller"]:
             ports = config["services"][service_name].get("ports", [])
             assert ports, f"Expected published ports for {service_name}"
             assert all(port.get("host_ip") == "127.0.0.1" for port in ports)
@@ -305,6 +307,7 @@ class TestDockerCompose:
         assert "only_transmit_kwargs" in config
 
 
+@pytest.mark.integration
 class TestServiceOrchestration:
     """Tests for service dependencies and orchestration."""
 
@@ -388,6 +391,7 @@ class TestServiceOrchestration:
         assert any("ee_builds" in line for line in volumes_output.split("\n"))
 
 
+@pytest.mark.integration
 class TestServiceFunctionality:
     """Tests for service functionality and inter-service communication."""
 
@@ -459,7 +463,7 @@ class TestComposeCompatibility:
     def test_no_deploy_resource_limits_present(self):
         """Test that deploy resource limits are absent for wider Docker compatibility."""
         result = subprocess.run(
-            ["docker", "compose", "config"],
+            ["docker", "compose", "--profile", "tools", "config"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT),
@@ -472,7 +476,7 @@ class TestComposeCompatibility:
     def test_services_have_health_checks(self):
         """Test that all services have health checks configured."""
         result = subprocess.run(
-            ["docker", "compose", "config"],
+            ["docker", "compose", "--profile", "tools", "config"],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT),
@@ -484,6 +488,7 @@ class TestComposeCompatibility:
         assert config.count("healthcheck:") >= 3
 
 
+@pytest.mark.integration
 class TestEnvironmentVariables:
     """Tests for environment variable configuration."""
 

@@ -18,14 +18,16 @@ This document defines baseline controls for local-dev and production-like AAX op
 - Required secrets must be strong operator-provided values.
 - No weak fallback passwords or secret defaults in runtime config.
 - Policy checks must pass (repo policy + docs contract tests).
-- Secret scanning and vulnerability scanning are treated as release gates.
+- Secret scanning and remediable critical vulnerabilities are treated as release gates.
 
 ## Mandatory CI Baseline Gates
 
 - `tests/test_repo_policy.py`
 - `tests/test_docs_contract.py`
 - Secret scanning workflow checks
-- Image vulnerability scanning in CI/release workflows
+- Image vulnerability scanning in CI/release workflows. All findings are retained
+  in GitHub Security; CI blocks critical findings when an upstream fix exists so
+  an unfixed distribution advisory cannot permanently freeze the lab.
 
 ## Operator Checklist
 
