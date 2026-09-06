@@ -100,12 +100,12 @@ Use Portainer Git repository stack mode with the single compose file.
 - AWX_VERSION=24.6.1
 - AWX_EE_VERSION=24.6.1
 - RECEPTOR_VERSION=v1.6.4
-- AWX_POSTGRES_VERSION=15.14
-- HUB_POSTGRES_VERSION=16.10-alpine
-- EDA_POSTGRES_VERSION=15.14
-- AWX_REDIS_VERSION=7.4.5
-- HUB_REDIS_VERSION=7.4.5-alpine
-- EDA_REDIS_VERSION=7.4.5
+- AWX_POSTGRES_VERSION=15
+- HUB_POSTGRES_VERSION=16-alpine
+- EDA_POSTGRES_VERSION=15
+- AWX_REDIS_VERSION=7.4
+- HUB_REDIS_VERSION=7.4-alpine
+- EDA_REDIS_VERSION=7.4
 - DATABASE_PASSWORD=your-awx-db-password
 - SECRET_KEY=your-awx-secret-key
 - AWX_ADMIN_PASSWORD=your-awx-admin-password
@@ -154,9 +154,13 @@ Operational notes:
 - Keep the `tools` profile disabled during normal operation. Enable it only
   while using `ee-builder` or the interactive developer containers; the builder
   has deliberate Docker socket access.
-- A Watchtower notification only means the digest for the currently selected
-  tag changed. New semantic versions are surfaced through Dependabot, reviewed,
-  then selected by changing the matching Portainer version variable.
+- PostgreSQL and Redis use upstream floating channels constrained to the selected
+  major/minor policy. They carry Watchtower's enable and monitor-only labels, so
+  an available patch is reported but never installed automatically. Approve it
+  by updating the Portainer stack with **Re-pull image and redeploy**.
+- AWX, AWX EE, Receptor, and AAX remain fully pinned. Their publishers do not all
+  provide safe floating tags, so select new releases deliberately by changing
+  the matching Portainer version variable.
 
 ## Requirements
 
