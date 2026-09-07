@@ -448,13 +448,11 @@ services:
         set -e
         # Pin ansible-runner to match awx-task (2.4.1.dev6+gc3e8cdb)
         pip install --no-cache-dir \
-          git+https://github.com/ansible/ansible-runner.git@c3e8cdb24f784a70328f1bfb54eb9c886148acef \
-          'ansible-pylibssh>=1.2,<2' 2>/dev/null
+          git+https://github.com/ansible/ansible-runner.git@c3e8cdb24f784a70328f1bfb54eb9c886148acef 2>/dev/null
         # Jobs execute in this receptor sidecar with process isolation disabled.
         # Install the GitOps-declared collection majors here so network and
         # Docker modules remain available after every container recreation.
         ansible-galaxy collection install \
-          'ansible.netcommon:>=8.6.1,<9.0.0' \
           'community.docker:>=5.2.2,<6.0.0'
         mkdir -p /etc/receptor
         cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
