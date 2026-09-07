@@ -1,0 +1,7 @@
+---
+pi_required_containers:
+  - pihole
+  - unbound
+dns_tcp_port: 53
+nebula_sync_container_name: nebula-sync
+nebula_sync_max_age_minutes: 20

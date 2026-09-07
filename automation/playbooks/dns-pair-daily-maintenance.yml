@@ -1,0 +1,77 @@
+---
+# The replica is patched first. The primary is never touched unless the replica
+# and the replication path both pass their gates.
+- name: Patch and validate the DNS replica
+  ansible.builtin.import_playbook: ../tasks/patch-wave.yml
+  vars:
+    pi_patch_wave: dns_replica
+
+- name: Gate primary maintenance on DNS and Nebula Sync health
+  hosts: dns_primary
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Verify DNS is accepting TCP queries on the replica
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[groups['dns_replica'][0]].ansible_host }}"
+        port: "{{ dns_tcp_port }}"
+        timeout: 20
+        state: started
+      delegate_to: localhost
+      become: false
+
+    - name: Inspect Nebula Sync on the primary
+      community.docker.docker_container_info:
+        name: "{{ nebula_sync_container_name }}"
+      register: nebula_sync
+
+    - name: Require Nebula Sync to be running and healthy
+      ansible.builtin.assert:
+        that:
+          - nebula_sync.exists
+          - nebula_sync.container.State.Running
+          - nebula_sync.container.State.Health.Status == 'healthy'
+
+    - name: Read recent Nebula Sync output
+      ansible.builtin.command:
+        argv:
+          - docker
+          - logs
+          - --since
+          - "{{ nebula_sync_max_age_minutes }}m"
+          - "{{ nebula_sync_container_name }}"
+      changed_when: false
+      register: nebula_sync_logs
+
+    - name: Require a recently completed replication cycle
+      ansible.builtin.assert:
+        that:
+          - "'Sync completed' in (nebula_sync_logs.stdout + nebula_sync_logs.stderr)"
+        fail_msg: >-
+          No successful Nebula Sync cycle was recorded in the last
+          {{ nebula_sync_max_age_minutes }} minutes; refusing to patch the primary.
+
+- name: Patch the DNS primary after the pair gate passes
+  ansible.builtin.import_playbook: ../tasks/patch-wave.yml
+  vars:
+    pi_patch_wave: dns_primary
+
+- name: Validate replication again after both DNS nodes are complete
+  hosts: dns_primary
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Wait for the next Nebula Sync cycle
+      ansible.builtin.command:
+        argv:
+          - docker
+          - logs
+          - --since
+          - 2m
+          - "{{ nebula_sync_container_name }}"
+      changed_when: false
+      register: final_sync_logs
+      retries: 10
+      delay: 90
+      until: "'Sync completed' in (final_sync_logs.stdout + final_sync_logs.stderr)"

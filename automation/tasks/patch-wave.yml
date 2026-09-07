@@ -63,6 +63,23 @@
       ansible.builtin.import_tasks: portainer-agent.yml
 
   post_tasks:
+    - name: Inspect required application containers
+      community.docker.docker_container_info:
+        name: "{{ item }}"
+      loop: "{{ pi_required_containers }}"
+      register: required_container_results
+
+    - name: Require application containers to be running and healthy
+      ansible.builtin.assert:
+        that:
+          - item.exists
+          - item.container.State.Running
+          - item.container.State.Health is not defined or item.container.State.Health.Status == 'healthy'
+        fail_msg: "Required container failed validation on {{ inventory_hostname }}"
+      loop: "{{ required_container_results.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
     - name: Verify the Portainer agent accepts connections
       ansible.builtin.wait_for:
         host: "{{ ansible_host | default(inventory_hostname) }}"
