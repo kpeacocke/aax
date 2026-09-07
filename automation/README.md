@@ -1,7 +1,7 @@
 # Home infrastructure automation
 
-This directory is an AWX project for the Raspberry Pi fleet and, once the exact
-models and supported management interfaces are known, DrayTek equipment.
+This directory is the AWX project for the Raspberry Pi fleet, Synology NAS and
+read-only discovery of the DrayTek network estate.
 
 ## Safety model
 
@@ -44,6 +44,17 @@ Create these once in AWX:
    job templates. Store the webhook/token in AWX, not this repository. The
    notification includes the failed job URL and the host/task that stopped the
    workflow.
+10. Job template **Home - Network Discovery** using
+    `automation/playbooks/network-discovery.yml`. It requires no device
+    credential and only probes TCP/HTTP(S) from the execution environment.
+11. Job template **Synology - Discovery** using
+    `automation/playbooks/synology-discovery.yml`. Attach a dedicated Synology
+    machine credential; do not use a personal DSM account. Start without
+    privilege escalation. This job is read-only.
+12. Optionally create **Home - Discovery Workflow** with **Home - Network
+    Discovery**, **Pi - Audit**, and **Synology - Discovery** as separate nodes.
+    Keeping them separate allows each node to carry only the credential it
+    needs and makes failures attributable.
 
 Run **Pi - Audit** first. Run both maintenance jobs manually before enabling
 their daily schedules. Schedule the agent-only job after a deliberate
@@ -55,16 +66,30 @@ To change the Portainer pin, edit `portainer_server_version` in
 project, then run **Pi - Portainer Agents**. Upgrade the Portainer Server first;
 never advance only the agents.
 
+## Discovery boundary
+
+`network-discovery.yml` records which common TCP and HTTP(S) management
+interfaces are reachable from the AWX execution container. It does not log in,
+use stored device credentials, send configuration commands, or prove that a
+reported firmware version is current. The version values in the inventory are
+the operator-observed baseline and are reported for comparison.
+
+`synology-discovery.yml` uses SSH to collect DSM release metadata, filesystem
+capacity, Linux software-RAID state, installed packages, and Docker status. It
+does not use `become`, modify DSM, inspect secrets, or export configuration.
+Create a dedicated `awx-automation` DSM account and restrict it before attaching
+its SSH key to the AWX template. DSM API and configuration-backup credentials
+belong in later, separately approved templates.
+
 ## DrayTek boundary
 
 DrayTek routers can expose a model-dependent SSH CLI and can be managed by
 VigorACS. Do not apply generic CLI mutations to the gateway: command syntax and
 transaction/rollback behavior vary by model and firmware.
 
-The `draytek` inventory group intentionally contains no hosts. Before enabling
-write automation, record each model, firmware release, management IP, SSH
-availability, HA topology, and an out-of-band recovery path. The first AWX job
-for each device must be a read-only facts/configuration backup. Changes should
-then use model-specific command fixtures, pre/post connectivity tests, and a
-manual approval workflow. Prefer VigorACS for heterogeneous fleets where it is
-already licensed and deployed.
+The `draytek` inventory contains the known estate, grouped by operational role.
+Do not attach the DrayTek usernames or passwords to the generic discovery job.
+After reviewing its results, authenticated discovery and configuration backup
+must be implemented per model family. Changes must use model-specific command
+fixtures, pre/post connectivity tests, a one-device canary, and manual approval.
+Prefer VigorACS for heterogeneous fleets where it is licensed and deployed.

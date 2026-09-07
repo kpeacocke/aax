@@ -1,0 +1,60 @@
+---
+- name: Collect read-only Synology DSM and storage facts
+  hosts: synology
+  gather_facts: false
+  become: false
+  vars:
+    ansible_port: "{{ synology_ssh_port }}"
+  tasks:
+    - name: Read DSM release metadata
+      ansible.builtin.command:
+        argv: [cat, /etc.defaults/VERSION]
+      register: synology_dsm_release
+      changed_when: false
+
+    - name: Read kernel and platform details
+      ansible.builtin.command:
+        argv: [uname, -a]
+      register: synology_kernel
+      changed_when: false
+
+    - name: Read mounted filesystem capacity
+      ansible.builtin.command:
+        argv: [df, -P]
+      register: synology_filesystems
+      changed_when: false
+
+    - name: Read software RAID state
+      ansible.builtin.command:
+        argv: [cat, /proc/mdstat]
+      register: synology_raid
+      changed_when: false
+
+    - name: List installed DSM packages when supported
+      ansible.builtin.command:
+        argv: [/usr/syno/bin/synopkg, list]
+      register: synology_packages
+      failed_when: false
+      changed_when: false
+
+    - name: Read Docker state when supported
+      ansible.builtin.command:
+        argv: [docker, info, --format, "{{ '{{json .}}' }}"]
+      register: synology_docker
+      failed_when: false
+      changed_when: false
+
+    - name: Report Synology discovery
+      ansible.builtin.debug:
+        msg:
+          name: "{{ inventory_hostname }}"
+          address: "{{ ansible_host }}"
+          model: "{{ device_model }}"
+          expected_dsm_version: "{{ expected_dsm_version }}"
+          kernel: "{{ synology_kernel.stdout }}"
+          dsm_release: "{{ synology_dsm_release.stdout_lines }}"
+          filesystems: "{{ synology_filesystems.stdout_lines }}"
+          raid: "{{ synology_raid.stdout_lines }}"
+          packages: "{{ synology_packages.stdout_lines | default([]) }}"
+          docker: "{{ synology_docker.stdout | default('unavailable') }}"
+

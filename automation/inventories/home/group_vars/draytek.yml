@@ -1,0 +1,10 @@
+---
+# Discovery is deliberately unauthenticated and non-mutating. Add credentials
+# only to model-specific AWX templates after the discovered interfaces have
+# been reviewed.
+discovery_tcp_ports:
+  - 22
+  - 23
+  - 80
+  - 443
+discovery_timeout_seconds: 3

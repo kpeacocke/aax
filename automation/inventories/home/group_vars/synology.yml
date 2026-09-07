@@ -1,0 +1,9 @@
+---
+synology_ssh_port: 22
+synology_https_port: 5001
+synology_expected_reverse_proxy_hosts:
+  - portainer.ambitiouscake.com
+  - plex.ambitiouscake.com
+  - bazarr.ambitiouscake.com
+  - uptime.ambitiouscake.com
+
