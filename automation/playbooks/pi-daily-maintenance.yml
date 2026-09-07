@@ -1,0 +1,17 @@
+---
+# Explicit imports make service order deterministic. A failed wave prevents all
+# later waves from starting.
+- name: Patch first Pi wave
+  ansible.builtin.import_playbook: ../tasks/patch-wave.yml
+  vars:
+    pi_patch_wave: pi_patch_wave_1
+
+- name: Patch second Pi wave
+  ansible.builtin.import_playbook: ../tasks/patch-wave.yml
+  vars:
+    pi_patch_wave: pi_patch_wave_2
+
+- name: Patch shared-infrastructure Pi wave
+  ansible.builtin.import_playbook: ../tasks/patch-wave.yml
+  vars:
+    pi_patch_wave: pi_patch_wave_3

@@ -1,0 +1,20 @@
+---
+pi_apply_dist_upgrade: true
+pi_reboot_when_required: true
+pi_reboot_timeout: 900
+pi_post_reboot_delay: 20
+pi_required_services:
+  - docker
+
+# Portainer requires the agent version to match the server version. Change this
+# in the AWX inventory/group variable when the server is deliberately upgraded.
+portainer_agent_image: portainer/agent:2.45.0
+portainer_agent_container_name: portainer_agent
+portainer_agent_restart_policy: always
+portainer_agent_install_dir: /opt/portainer-agent
+portainer_agent_port: 9001
+portainer_agent_bind_address: 0.0.0.0
+
+# Set to a list of TCP endpoints that must remain reachable before and after
+# each wave, for example [{host: 192.168.3.1, port: 53}].
+pi_guard_endpoints: []

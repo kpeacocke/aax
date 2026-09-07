@@ -1,0 +1,49 @@
+---
+- name: Require the shared Portainer agent secret
+  ansible.builtin.assert:
+    that:
+      - portainer_agent_secret is defined
+      - portainer_agent_secret | length >= 16
+    fail_msg: Configure portainer_agent_secret using an encrypted AWX credential.
+  no_log: true
+
+- name: Create the Portainer agent installation directory
+  ansible.builtin.file:
+    path: "{{ portainer_agent_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Render the Portainer agent compose definition
+  ansible.builtin.template:
+    src: ../templates/portainer-agent-compose.yml.j2
+    dest: "{{ portainer_agent_install_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  register: portainer_agent_compose
+
+- name: Pull and reconcile the Portainer agent
+  community.docker.docker_compose_v2:
+    project_src: "{{ portainer_agent_install_dir }}"
+    files:
+      - compose.yml
+    state: present
+    pull: always
+    remove_orphans: true
+  no_log: true
+
+- name: Inspect the running Portainer agent
+  community.docker.docker_container_info:
+    name: "{{ portainer_agent_container_name }}"
+  register: portainer_agent_info
+
+- name: Assert the Portainer agent is running the selected image
+  ansible.builtin.assert:
+    that:
+      - portainer_agent_info.exists
+      - portainer_agent_info.container.State.Running
+      - portainer_agent_info.container.Config.Image == portainer_agent_image
+    fail_msg: "Portainer agent did not converge on {{ portainer_agent_image }}"

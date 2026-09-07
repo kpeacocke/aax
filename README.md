@@ -182,6 +182,7 @@ Operational notes:
 - Kubernetes deployment: [k8s/K8S.md](k8s/K8S.md)
 - HA guidance: [docs/HA-DEPLOYMENT.md](docs/HA-DEPLOYMENT.md)
 - Testing: [tests/TESTS.md](tests/TESTS.md)
+- Home Pi and network operations: [automation/README.md](automation/README.md)
 
 ## Security
 

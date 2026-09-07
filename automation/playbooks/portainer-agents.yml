@@ -1,0 +1,16 @@
+---
+- name: Reconcile Portainer agents without operating-system patching
+  hosts: raspberry_pi
+  become: true
+  gather_facts: false
+  serial: 1
+  any_errors_fatal: true
+  tasks:
+    - name: Ensure Docker is available
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Install and verify the Portainer agent
+      ansible.builtin.import_tasks: ../tasks/portainer-agent.yml

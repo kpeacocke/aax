@@ -1,0 +1,22 @@
+---
+- name: Audit Raspberry Pi and Portainer agent state without changes
+  hosts: raspberry_pi
+  become: true
+  gather_facts: true
+  strategy: free
+  tasks:
+    - name: Inspect Docker
+      ansible.builtin.service_facts:
+
+    - name: Inspect the Portainer agent
+      community.docker.docker_container_info:
+        name: "{{ portainer_agent_container_name }}"
+      register: agent
+
+    - name: Report compliance
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['docker.service'].state == 'running'
+          - agent.exists
+          - agent.container.State.Running
+          - agent.container.Config.Image == portainer_agent_image
