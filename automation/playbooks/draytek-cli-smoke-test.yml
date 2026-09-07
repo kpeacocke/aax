@@ -11,7 +11,7 @@
     ansible_host: "{{ draytek_managed_switch_addresses[inventory_hostname] }}"
     ansible_connection: ansible.netcommon.network_cli
     ansible_network_os: draytek
-    ansible_network_cli_ssh_type: paramiko
+    ansible_network_cli_ssh_type: auto
     ansible_command_timeout: 20
   tasks:
     - name: Run a read-only CLI command
