@@ -8,7 +8,7 @@
     state: started
   loop: "{{ home_device.tcp_ports }}"
   register: management_port_probes
-  failed_when: false
+  ignore_errors: true
   changed_when: false
 
 - name: "Probe HTTP for {{ home_device.name }}"
