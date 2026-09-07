@@ -1,0 +1,57 @@
+---
+discovery_timeout_seconds: 3
+home_network_devices:
+  - name: HomeOne
+    manufacturer: DrayTek
+    model: Vigor2927Lac
+    address: 192.168.5.1
+    expected_version: 4.5.2.2
+    tcp_ports: [22, 23, 80, 443]
+  - name: MilSwitch
+    manufacturer: DrayTek
+    model: G2100
+    address: 192.168.5.2
+    expected_version: 2.9.11
+    tcp_ports: [22, 23, 80, 443]
+  - name: KPOffice
+    manufacturer: DrayTek
+    model: G2100
+    address: 192.168.5.3
+    expected_version: 2.9.11
+    tcp_ports: [22, 23, 80, 443]
+  - name: KPShelf
+    manufacturer: DrayTek
+    model: G1080
+    address: 192.168.5.5
+    expected_version: 1.05.00
+    tcp_ports: [22, 23, 80, 443]
+  - name: TVRoom
+    manufacturer: DrayTek
+    model: G1080
+    address: 192.168.5.6
+    expected_version: 1.05.00
+    tcp_ports: [22, 23, 80, 443]
+  - name: KidsRoom
+    manufacturer: DrayTek
+    model: G1080
+    address: 192.168.5.7
+    expected_version: 1.05.00
+    tcp_ports: [22, 23, 80, 443]
+  - name: KidsMesh
+    manufacturer: DrayTek
+    model: VigorAP1060C
+    address: 192.168.5.10
+    expected_version: 1.4.12
+    tcp_ports: [22, 23, 80, 443]
+  - name: OfficeMesh
+    manufacturer: DrayTek
+    model: VigorAP918R
+    address: 192.168.5.11
+    expected_version: 1.4.11
+    tcp_ports: [22, 23, 80, 443]
+  - name: alexandria
+    manufacturer: Synology
+    model: DS920+
+    address: 192.168.5.100
+    expected_version: 7.4.1-90080
+    tcp_ports: [22, 80, 443, 5000, 5001]

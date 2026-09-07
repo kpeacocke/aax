@@ -1,0 +1,52 @@
+---
+- name: "Probe TCP management ports for {{ home_device.name }}"
+  ansible.builtin.wait_for:
+    host: "{{ home_device.address }}"
+    port: "{{ item }}"
+    connect_timeout: "{{ discovery_timeout_seconds }}"
+    timeout: "{{ discovery_timeout_seconds }}"
+    state: started
+  loop: "{{ home_device.tcp_ports }}"
+  register: management_port_probes
+  failed_when: false
+  changed_when: false
+
+- name: "Probe HTTP for {{ home_device.name }}"
+  ansible.builtin.uri:
+    url: "http://{{ home_device.address }}/"
+    method: GET
+    follow_redirects: none
+    return_content: false
+    timeout: "{{ discovery_timeout_seconds }}"
+    status_code: [200, 301, 302, 401, 403, 404]
+  register: management_http_probe
+  failed_when: false
+  changed_when: false
+
+- name: "Probe HTTPS for {{ home_device.name }}"
+  ansible.builtin.uri:
+    url: "https://{{ home_device.address }}/"
+    method: GET
+    follow_redirects: none
+    return_content: false
+    timeout: "{{ discovery_timeout_seconds }}"
+    validate_certs: false
+    status_code: [200, 301, 302, 401, 403, 404]
+  register: management_https_probe
+  failed_when: false
+  changed_when: false
+
+- name: "Report management surface for {{ home_device.name }}"
+  ansible.builtin.debug:
+    msg:
+      name: "{{ home_device.name }}"
+      address: "{{ home_device.address }}"
+      manufacturer: "{{ home_device.manufacturer }}"
+      model: "{{ home_device.model }}"
+      expected_version: "{{ home_device.expected_version }}"
+      open_tcp_ports: >-
+        {{ management_port_probes.results
+           | selectattr('failed', 'equalto', false)
+           | map(attribute='item') | list }}
+      http_status: "{{ management_http_probe.status | default('unreachable') }}"
+      https_status: "{{ management_https_probe.status | default('unreachable') }}"

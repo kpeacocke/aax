@@ -37,14 +37,31 @@ def test_home_inventory_contains_declared_infrastructure() -> None:
 
 
 def test_discovery_playbook_has_no_mutating_or_secret_inputs() -> None:
-    content = (REPO_ROOT / "automation/playbooks/network-discovery.yml").read_text(
-        encoding="utf-8"
+    content = "\n".join(
+        (REPO_ROOT / path).read_text(encoding="utf-8")
+        for path in (
+            "automation/playbooks/network-discovery.yml",
+            "automation/tasks/discover-device.yml",
+        )
     )
     assert "connection: local" in content
     assert "ansible.builtin.wait_for" in content
     assert "ansible.builtin.uri" in content
     assert "password" not in content.lower()
     assert "become: true" not in content
+
+
+def test_git_managed_discovery_catalog_matches_network_inventory() -> None:
+    inventory = _yaml("automation/inventories/home/hosts.yml")
+    devices = _yaml("automation/vars/home_devices.yml")["home_network_devices"]
+    children = inventory["all"]["children"]
+    inventory_names = {"alexandria"}
+    inventory_names.update(
+        host
+        for group in children["draytek"]["children"].values()
+        for host in group.get("hosts", {})
+    )
+    assert {device["name"] for device in devices} == inventory_names
 
 
 def test_inventory_does_not_commit_device_usernames_or_passwords() -> None:

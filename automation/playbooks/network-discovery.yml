@@ -1,57 +1,14 @@
 ---
 - name: Discover management interfaces without authenticating or changing devices
-  hosts: draytek:synology
+  hosts: localhost
   gather_facts: false
   connection: local
-  strategy: free
+  vars_files:
+    - ../vars/home_devices.yml
   tasks:
-    - name: Probe expected management TCP ports
-      ansible.builtin.wait_for:
-        host: "{{ ansible_host }}"
-        port: "{{ item }}"
-        connect_timeout: "{{ discovery_timeout_seconds | default(3) }}"
-        timeout: "{{ discovery_timeout_seconds | default(3) }}"
-        state: started
-      loop: "{{ discovery_tcp_ports | default([22, 80, 443, 5000, 5001]) }}"
-      register: management_port_probes
-      failed_when: false
-      changed_when: false
-
-    - name: Probe HTTP management endpoint
-      ansible.builtin.uri:
-        url: "http://{{ ansible_host }}/"
-        method: GET
-        follow_redirects: none
-        return_content: false
-        timeout: "{{ discovery_timeout_seconds | default(3) }}"
-        status_code: [200, 301, 302, 401, 403, 404]
-      register: management_http_probe
-      failed_when: false
-      changed_when: false
-
-    - name: Probe HTTPS management endpoint
-      ansible.builtin.uri:
-        url: "https://{{ ansible_host }}/"
-        method: GET
-        follow_redirects: none
-        return_content: false
-        timeout: "{{ discovery_timeout_seconds | default(3) }}"
-        validate_certs: false
-        status_code: [200, 301, 302, 401, 403, 404]
-      register: management_https_probe
-      failed_when: false
-      changed_when: false
-
-    - name: Report discovered management surface
-      ansible.builtin.debug:
-        msg:
-          name: "{{ inventory_hostname }}"
-          address: "{{ ansible_host }}"
-          model: "{{ device_model }}"
-          expected_version: "{{ expected_firmware | default(expected_dsm_version | default('unknown')) }}"
-          open_tcp_ports: >-
-            {{ management_port_probes.results
-               | selectattr('failed', 'equalto', false)
-               | map(attribute='item') | list }}
-          http_status: "{{ management_http_probe.status | default('unreachable') }}"
-          https_status: "{{ management_https_probe.status | default('unreachable') }}"
+    - name: Probe each declared device
+      ansible.builtin.include_tasks: ../tasks/discover-device.yml
+      loop: "{{ home_network_devices }}"
+      loop_control:
+        loop_var: home_device
+        label: "{{ home_device.name }}"
