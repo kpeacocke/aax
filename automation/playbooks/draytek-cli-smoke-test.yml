@@ -1,0 +1,17 @@
+---
+- name: Verify read-only DrayTek switch CLI access
+  hosts: draytek_managed_switches
+  gather_facts: false
+  serial: 1
+  vars:
+    draytek_read_only_command: show version
+  tasks:
+    - name: Run a read-only CLI command
+      ansible.netcommon.cli_command:
+        command: "{{ draytek_read_only_command }}"
+      register: draytek_cli_result
+      changed_when: false
+
+    - name: Report the device response
+      ansible.builtin.debug:
+        var: draytek_cli_result.stdout
