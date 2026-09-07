@@ -13,7 +13,8 @@ class TerminalModule(TerminalBase):
     """Recognise DrayTek prompts without making configuration changes."""
 
     terminal_stdout_re = [
-        re.compile(rb"[\r\n]?[A-Za-z0-9_.:/()\- ]+[>#]\s?$"),
+        # DrayTek prompts can include model, site and angle-bracket characters.
+        re.compile(rb"(?m)[^\r\n]*[>#]\s?$"),
     ]
     terminal_stderr_re = [
         re.compile(rb"(?:invalid|unknown|unsupported|ambiguous)\s+(?:input|command)", re.I),
