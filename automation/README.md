@@ -24,6 +24,8 @@ from the AWX execution container.
 Create these once in AWX:
 
 1. A source-control project pointed to this repository, branch `main`.
+   Enable collection installation during project updates; AWX reads
+   `collections/requirements.yml` and installs `community.docker`.
 2. An inventory sourced from `automation/inventories/home/hosts.yml`.
 3. A machine credential for the dedicated `ansible` account and its sudo
    password/key.
