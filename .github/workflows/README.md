@@ -67,7 +67,9 @@ This document describes the CI/CD pipeline for the AAX project.
 
 - Push to: develop, feature/*, bugfix/*, hotfix/*, release/*
 - Pull requests to: main, develop
-- Only on changes to: images/, tests/, pyproject.toml
+- All repository changes. Every CI job is a required branch-protection check,
+  so workflow-level path filtering would leave non-image PRs permanently
+  blocked with checks stuck at `Expected`.
 
 **Jobs:**
 
