@@ -19,40 +19,70 @@ Review the order in `inventories/home/hosts.yml` before the first production
 run. Add `ansible_host` per host there only if local DNS names do not resolve
 from the AWX execution container.
 
+## Controller structure
+
+Use repository and lifecycle boundaries, not device boundaries:
+
+| AWX organization | AWX project | Repository | Scope |
+| --- | --- | --- | --- |
+| `Home Lab` | `AAX - Home Infrastructure` | `kpeacocke/aax` | Raspberry Pi fleet, Synology, network discovery and future DrayTek automation |
+| `pi5-openclaw` | `pi-claw` | `kpeacocke/piclaw` | OpenClaw application lifecycle only |
+
+Do not create a project per host or manufacturer. Within AAX, use inventory
+groups and job-template prefixes as the operational boundary:
+
+- `Discovery - *` is read-only and requires no device credential.
+- `Raspberry Pi - *` operates on `raspberry_pi`, with `dns_pair` and `mdns`
+  preserving their different failure and scheduling semantics.
+- `Synology - *` operates on `synology` with a dedicated NAS credential.
+- `DrayTek - <model family> - *` must remain model-specific once authenticated
+  automation is introduced; do not combine heterogeneous CLI mutations.
+
+Split AAX into another repository/project only when it gains a genuinely
+independent release cycle, owner, security boundary, or reusable Ansible
+collection. A new device alone is not a split criterion.
+
 ## AWX objects
 
 Create these once in AWX:
 
-1. A source-control project pointed to this repository, branch `main`.
+1. Organization **Home Lab**. Keep application-specific projects such as
+   `pi-claw` in their own organization.
+2. Project **AAX - Home Infrastructure** pointed to this repository, branch
+   `main`.
    Enable collection installation during project updates; AWX reads
    `collections/requirements.yml` and installs `community.docker`.
-2. An inventory sourced from `automation/inventories/home/hosts.yml`.
-3. A machine credential for the dedicated `ansible` account and its sudo
+3. Inventory **Home Lab**, sourced from
+   `automation/inventories/home/hosts.yml` when project inventory updates are
+   supported by the execution environment. Otherwise mirror the Git groups in
+   AWX and treat Git as the desired-state source.
+4. A machine credential for the dedicated `ansible` account and its sudo
    password/key.
-4. A custom credential that injects the secret as the extra variable
+5. A custom credential that injects the secret as the extra variable
    `portainer_agent_secret`. It must equal the Portainer Server `AGENT_SECRET`.
-5. Job template **Pi - Audit** using `automation/playbooks/pi-audit.yml`.
-6. Job template **Pi - DNS Pair Maintenance** using
+6. Job template **Raspberry Pi - Audit** using
+   `automation/playbooks/pi-audit.yml`.
+7. Job template **Raspberry Pi - DNS Pair Maintenance** using
    `automation/playbooks/dns-pair-daily-maintenance.yml`, with concurrent jobs
    off and privilege escalation on.
-7. Job template **Pi - mDNS Maintenance** using
+8. Job template **Raspberry Pi - mDNS Maintenance** using
    `automation/playbooks/mdns-daily-maintenance.yml`, on a different daily
    schedule from the DNS pair.
-8. Job template **Pi - Portainer Agents** using
+9. Job template **Raspberry Pi - Portainer Agents** using
    `automation/playbooks/portainer-agents.yml` for manual reconciliation.
-9. Attach an AWX notification template to the **Error** event for both scheduled
+10. Attach an AWX notification template to the **Error** event for both scheduled
    job templates. Store the webhook/token in AWX, not this repository. The
    notification includes the failed job URL and the host/task that stopped the
    workflow.
-10. Job template **Home - Network Discovery** using
+11. Job template **Discovery - Network** using
     `automation/playbooks/network-discovery.yml`. It requires no device
     credential and only probes TCP/HTTP(S) from the execution environment.
-11. Job template **Synology - Discovery** using
+12. Job template **Synology - Discovery** using
     `automation/playbooks/synology-discovery.yml`. Attach a dedicated Synology
     machine credential; do not use a personal DSM account. Start without
     privilege escalation. This job is read-only.
-12. Optionally create **Home - Discovery Workflow** with **Home - Network
-    Discovery**, **Pi - Audit**, and **Synology - Discovery** as separate nodes.
+13. Optionally create **Discovery - Home Workflow** with **Discovery - Network**,
+    **Raspberry Pi - Audit**, and **Synology - Discovery** as separate nodes.
     Keeping them separate allows each node to carry only the credential it
     needs and makes failures attributable.
 

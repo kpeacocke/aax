@@ -70,3 +70,29 @@ def test_inventory_does_not_commit_device_usernames_or_passwords() -> None:
     )
     for forbidden in ("bigman", "kpeacocke", "ansible_password", "api_key"):
         assert forbidden not in content
+
+
+def test_controller_object_model_has_clear_repository_boundaries() -> None:
+    model = _yaml("automation/controller/object-model.yml")
+
+    aax_project = model["projects"][0]
+    assert aax_project["organization"] == "Home Lab"
+    assert aax_project["scm_url"] == "https://github.com/kpeacocke/aax.git"
+    assert aax_project["scm_branch"] == "main"
+
+    template_names = [item["name"] for item in model["job_templates"]]
+    assert len(template_names) == len(set(template_names))
+    assert all(
+        item["project"] == "AAX - Home Infrastructure"
+        and item["inventory"] == "Home Lab"
+        for item in model["job_templates"]
+    )
+
+    assert model["external_projects"] == [
+        {
+            "name": "pi-claw",
+            "organization": "pi5-openclaw",
+            "repository": "https://github.com/kpeacocke/piclaw",
+            "rationale": "Separate application repository and release lifecycle",
+        }
+    ]
