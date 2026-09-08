@@ -19,4 +19,9 @@
           - ansible_facts.services['docker.service'].state == 'running'
           - agent.exists
           - agent.container.State.Running
-          - agent.container.Config.Image == portainer_agent_image
+          - agent.container.Config.Labels.git_commit == portainer_agent_git_commit
+        fail_msg: >-
+          Portainer agent is not the approved {{ portainer_server_version }} build
+          (expected commit {{ portainer_agent_git_commit }}, found
+          {{ agent.container.Config.Labels.git_commit | default('unknown') }} from
+          {{ agent.container.Config.Image | default('unknown image') }}).

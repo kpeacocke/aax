@@ -13,7 +13,8 @@ pi_required_containers: []
 # Change this one value immediately after deliberately upgrading Portainer
 # Server. Agents must remain on the same version as the server.
 portainer_server_version: 2.45.0
-portainer_agent_image: "portainer/agent:{{ portainer_server_version }}"
+portainer_agent_image: "portainer/agent:{{ portainer_server_version }}-alpine"
+portainer_agent_git_commit: 0f3812e
 portainer_agent_container_name: portainer_agent
 portainer_agent_restart_policy: always
 portainer_agent_install_dir: /opt/portainer-agent
