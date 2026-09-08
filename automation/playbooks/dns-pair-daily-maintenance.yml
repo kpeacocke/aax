@@ -11,6 +11,8 @@
   become: true
   gather_facts: false
   any_errors_fatal: true
+  vars_files:
+    - ../inventories/home/group_vars/dns_pair.yml
   tasks:
     - name: Verify DNS is accepting TCP queries on the replica
       ansible.builtin.wait_for:
@@ -61,6 +63,8 @@
   hosts: dns_primary
   become: true
   gather_facts: false
+  vars_files:
+    - ../inventories/home/group_vars/dns_pair.yml
   tasks:
     - name: Wait for the next Nebula Sync cycle
       ansible.builtin.command:

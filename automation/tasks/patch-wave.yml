@@ -6,6 +6,8 @@
   serial: 1
   any_errors_fatal: true
   max_fail_percentage: 0
+  vars_files:
+    - ../inventories/home/group_vars/raspberry_pi.yml
   vars:
     maintenance_started_at: "{{ ansible_date_time.iso8601 }}"
   pre_tasks:
@@ -61,6 +63,7 @@
 
     - name: Install the Portainer agent compose definition
       ansible.builtin.import_tasks: portainer-agent.yml
+      when: pi_reconcile_portainer_agent | bool
 
   post_tasks:
     - name: Inspect required application containers

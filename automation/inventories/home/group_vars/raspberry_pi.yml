@@ -9,6 +9,7 @@ pi_post_reboot_delay: 20
 pi_required_services:
   - docker
 pi_required_containers: []
+pi_reconcile_portainer_agent: false
 
 # Change this one value immediately after deliberately upgrading Portainer
 # Server. Agents must remain on the same version as the server.
