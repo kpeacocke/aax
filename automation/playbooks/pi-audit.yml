@@ -4,6 +4,8 @@
   become: true
   gather_facts: true
   strategy: free
+  vars_files:
+    - ../inventories/home/group_vars/raspberry_pi.yml
   tasks:
     - name: Inspect Docker
       ansible.builtin.service_facts:
