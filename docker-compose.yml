@@ -453,6 +453,7 @@ services:
         # Install the GitOps-declared collection majors here so network and
         # Docker modules remain available after every container recreation.
         ansible-galaxy collection install \
+          'ansible.posix:>=2.1.0,<3.0.0' \
           'community.docker:>=5.2.2,<6.0.0'
         mkdir -p /etc/receptor
         cat > /usr/local/bin/ansible-runner-worker << 'WEOF'

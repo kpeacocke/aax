@@ -1,0 +1,34 @@
+---
+- name: Validate the managed AWX public key
+  ansible.builtin.assert:
+    that:
+      - pi_ansible_authorized_key is defined
+      - pi_ansible_authorized_key is match('^ssh-ed25519 ')
+    fail_msg: pi_ansible_authorized_key must contain the AWX fleet public key
+
+- name: Ensure the Ansible automation account exists
+  ansible.builtin.user:
+    name: ansible
+    comment: AWX automation account
+    create_home: true
+    shell: /bin/bash
+    password_lock: true
+    state: present
+
+- name: Install the AWX fleet public key
+  ansible.posix.authorized_key:
+    user: ansible
+    key: "{{ pi_ansible_authorized_key }}"
+    exclusive: true
+    manage_dir: true
+    state: present
+
+- name: Grant passwordless sudo to the automation account
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/90-ansible
+    content: "ansible ALL=(ALL:ALL) NOPASSWD: ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+

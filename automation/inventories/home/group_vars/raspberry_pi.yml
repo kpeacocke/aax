@@ -1,4 +1,7 @@
 ---
+pi_ansible_authorized_key: >-
+  ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFQzyoP3xzirCsCsuJ7gEO1bp0fbekgebkVxb8AcAhtB awx@ambitiouscake-pi-fleet
+
 pi_apply_dist_upgrade: true
 pi_reboot_when_required: true
 pi_reboot_timeout: 900

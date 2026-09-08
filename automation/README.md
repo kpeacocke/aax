@@ -86,6 +86,22 @@ Create these once in AWX:
     Keeping them separate allows each node to carry only the credential it
     needs and makes failures attributable.
 
+## Raspberry Pi account bootstrap
+
+The permanent Pi jobs use the AWX Machine credential **Home Lab - Raspberry Pi
+Fleet** as user `ansible`, with its SSH private key and `sudo` escalation. The
+matching public key is intentionally versioned in
+`inventories/home/group_vars/raspberry_pi.yml`; private keys and passwords must
+never be committed.
+
+For a replacement host, create a temporary job template using
+`playbooks/pi-bootstrap.yml` and a one-time administrative Machine credential.
+Limit the first run to the replacement host. After it succeeds, delete the
+temporary credential and verify the host with **Raspberry Pi - Audit** using the
+permanent fleet credential. The role locks password authentication for the
+`ansible` account, installs only the declared public key, and validates its
+sudoers entry before replacing it.
+
 Run **Pi - Audit** first. Run both maintenance jobs manually before enabling
 their daily schedules. Schedule the agent-only job after a deliberate
 Portainer Server upgrade, not independently: Portainer requires agent and server
