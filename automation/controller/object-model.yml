@@ -43,11 +43,27 @@ job_templates:
     playbook: automation/playbooks/mdns-daily-maintenance.yml
     credential_policy: dedicated_pi_machine_and_portainer_secret
     concurrent_jobs: false
-  - name: Raspberry Pi - Portainer Agents
+  - name: Raspberry Pi - Portainer Agent - pi-harmony
     inventory: Home Lab
     project: AAX - Home Infrastructure
     playbook: automation/playbooks/portainer-agents.yml
     credential_policy: dedicated_pi_machine_and_portainer_secret
+    limit: pi-harmony
+    concurrent_jobs: false
+  - name: Raspberry Pi - Portainer Agent - pi-mdns
+    inventory: Home Lab
+    project: AAX - Home Infrastructure
+    playbook: automation/playbooks/portainer-agents.yml
+    credential_policy: dedicated_pi_machine_and_portainer_secret
+    limit: pi-mdns
+    concurrent_jobs: false
+  - name: Raspberry Pi - Portainer Agent - pi-terror
+    inventory: Home Lab
+    project: AAX - Home Infrastructure
+    playbook: automation/playbooks/portainer-agents.yml
+    credential_policy: dedicated_pi_machine_and_portainer_secret
+    limit: pi-terror
+    concurrent_jobs: false
   - name: Synology - Discovery
     inventory: Home Lab
     project: AAX - Home Infrastructure
