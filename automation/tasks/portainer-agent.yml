@@ -31,6 +31,23 @@
   no_log: true
   register: portainer_agent_compose
 
+- name: Inspect any existing Portainer agent before Compose adoption
+  community.docker.docker_container_info:
+    name: "{{ portainer_agent_container_name }}"
+  register: portainer_agent_pre_info
+
+- name: Remove the pre-GitOps Portainer agent before Compose adoption
+  community.docker.docker_container:
+    name: "{{ portainer_agent_container_name }}"
+    state: absent
+    force_kill: true
+  when:
+    - portainer_agent_pre_info.exists
+    - >-
+      (portainer_agent_pre_info.container.Config.Labels | default({}, true)).get(
+        'com.docker.compose.project.working_dir', ''
+      ) != portainer_agent_install_dir
+
 - name: Pull and reconcile the Portainer agent
   community.docker.docker_compose_v2:
     project_src: "{{ portainer_agent_install_dir }}"
