@@ -27,7 +27,9 @@
     - name: Refuse maintenance when a required service is already down
       ansible.builtin.assert:
         that:
-          - "ansible_facts.services[item + '.service'].state == 'running'"
+          - >-
+            (ansible_facts.services.get(item + '.service', {})).get('state', '')
+            == 'running'
         fail_msg: "Required service {{ item }} is not running on {{ inventory_hostname }}"
       loop: "{{ pi_required_services }}"
 
