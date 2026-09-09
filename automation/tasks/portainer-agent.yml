@@ -1,10 +1,16 @@
 ---
+- name: Resolve the shared Portainer agent secret from the AWX credential
+  ansible.builtin.set_fact:
+    portainer_agent_secret_effective: >-
+      {{ lookup('env', 'PORTAINER_AGENT_SECRET') |
+         default(portainer_agent_secret | default(''), true) }}
+  no_log: true
+
 - name: Require the shared Portainer agent secret
   ansible.builtin.assert:
     that:
-      - portainer_agent_secret is defined
-      - portainer_agent_secret | length >= 16
-    fail_msg: Configure portainer_agent_secret using an encrypted AWX credential.
+      - portainer_agent_secret_effective | length >= 24
+    fail_msg: Attach the encrypted Portainer Agent Secret AWX credential.
   no_log: true
 
 - name: Create the Portainer agent installation directory
