@@ -2,6 +2,13 @@
 name: Deploy controller stack
 
 "on":
+  push:
+    branches: [main]
+    paths:
+      - docker-compose.yml
+      - automation/**
+      - collections/**
+      - .github/workflows/deploy.yml
   workflow_run:
     workflows: ["Publish Images"]
     types: [completed]
@@ -14,6 +21,7 @@ concurrency:
 jobs:
   deploy:
     if: >-
+      github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.head_branch == 'main')
