@@ -307,6 +307,7 @@ class TestDockerCompose:
         # receptor worker instead of remaining under the controller's /tmp.
         assert "only_transmit_kwargs'] = False" in config
         assert config.count("awx_runner_tmp:/tmp") == 3
+        assert config.count('ln -sfn "$private_data_dir/env" /runner/env') == 2
 
 
 @pytest.mark.integration

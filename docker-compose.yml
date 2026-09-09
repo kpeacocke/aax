@@ -322,6 +322,15 @@ services:
         mkdir -p /etc/receptor
         cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
         #!/bin/sh
+        for arg in "$@"; do
+          case "$arg" in
+            --private-data-dir=*)
+              private_data_dir=${arg#--private-data-dir=}
+              mkdir -p /runner
+              ln -sfn "$private_data_dir/env" /runner/env
+              ;;
+          esac
+        done
         exec ansible-runner worker "$@" 2>&1
         WEOF
         chmod +x /usr/local/bin/ansible-runner-worker
@@ -460,6 +469,15 @@ services:
         mkdir -p /etc/receptor
         cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
         #!/bin/sh
+        for arg in "$@"; do
+          case "$arg" in
+            --private-data-dir=*)
+              private_data_dir=${arg#--private-data-dir=}
+              mkdir -p /runner
+              ln -sfn "$private_data_dir/env" /runner/env
+              ;;
+          esac
+        done
         exec ansible-runner worker "$@" 2>&1
         WEOF
         chmod +x /usr/local/bin/ansible-runner-worker
