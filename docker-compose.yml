@@ -250,6 +250,7 @@ services:
       - awx_projects:/var/lib/awx/projects
       - awx_rsyslog:/var/log/tower
       - receptor_data:/var/lib/receptor
+      - awx_runner_tmp:/tmp
     networks:
       - awx-network
       - hub-network
@@ -331,6 +332,7 @@ services:
       - receptor_data:/var/lib/receptor
       - awx_projects:/var/lib/awx/projects
       - awx_rsyslog:/var/log/tower
+      - awx_runner_tmp:/tmp
     networks:
       - awx-network
     healthcheck:
@@ -467,6 +469,7 @@ services:
     volumes:
       - receptor_execution_data:/var/lib/receptor
       - awx_projects:/var/lib/awx/projects
+      - awx_runner_tmp:/tmp
     networks:
       - awx-network
     healthcheck:
@@ -889,6 +892,8 @@ volumes:
     name: receptor_hop_data
   receptor_execution_data:
     name: receptor_execution_data
+  awx_runner_tmp:
+    name: awx_runner_tmp
   hub_postgres_data:
     labels:
       com.aax.description: "PostgreSQL database for Private Automation Hub"
