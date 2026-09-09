@@ -1,0 +1,14 @@
+---
+- name: Discover management interfaces without authenticating or changing devices
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  vars_files:
+    - ../vars/home_devices.yml
+  tasks:
+    - name: Probe each declared device
+      ansible.builtin.include_tasks: ../tasks/discover-device.yml
+      loop: "{{ home_network_devices }}"
+      loop_control:
+        loop_var: home_device
+        label: "{{ home_device.name }}"

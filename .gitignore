@@ -275,6 +275,9 @@ $RECYCLE.BIN/
 
 # Ansible collections and roles downloaded
 collections/
+!collections/
+collections/*
+!collections/requirements.yml
 roles/downloaded/
 
 # ==================== Secrets & Credentials ====================

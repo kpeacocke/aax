@@ -1,0 +1,13 @@
+---
+synology_ssh_port: 22
+synology_https_port: 5001
+# DSM does not provide a working SFTP subsystem in this configuration. Piped
+# transfer avoids noisy SCP/SFTP fallback warnings, while pinning the interpreter
+# prevents discovery from changing if another Python is installed later.
+ansible_ssh_transfer_method: piped
+ansible_python_interpreter: /usr/bin/python3.8
+synology_expected_reverse_proxy_hosts:
+  - portainer.ambitiouscake.com
+  - plex.ambitiouscake.com
+  - bazarr.ambitiouscake.com
+  - uptime.ambitiouscake.com

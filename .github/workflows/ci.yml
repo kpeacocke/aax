@@ -8,28 +8,14 @@ on:
       - "bugfix/**"
       - "hotfix/**"
       - "release/**"
-    paths:
-      - "images/**"
-      - "k8s/**"
-      - "docker-compose.yml"
-      - ".env.example"
-      - "tests/**"
-      - "docs/**"
-      - "pyproject.toml"
-      - ".github/workflows/ci.yml"
   pull_request:
     branches:
       - main
       - develop
-    paths:
-      - "images/**"
-      - "k8s/**"
-      - "docker-compose.yml"
-      - ".env.example"
-      - "tests/**"
-      - "docs/**"
-      - "pyproject.toml"
-      - ".github/workflows/ci.yml"
+
+# Every job below is a required branch-protection check. Do not add workflow
+# path filters: skipped workflows leave required checks in "Expected" forever
+# and make otherwise valid documentation or automation PRs impossible to merge.
 
 # Cancel in-progress runs for same workflow on same PR/branch
 concurrency:

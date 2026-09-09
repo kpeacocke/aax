@@ -1,0 +1,8 @@
+---
+- name: Bootstrap the AWX account on Raspberry Pis
+  hosts: raspberry_pi
+  gather_facts: false
+  become: true
+  serial: 1
+  roles:
+    - role: pi_ansible_account

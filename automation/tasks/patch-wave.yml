@@ -1,0 +1,105 @@
+---
+- name: "Patch {{ pi_patch_wave }} one host at a time"
+  hosts: "{{ pi_patch_wave }}"
+  become: true
+  gather_facts: true
+  serial: 1
+  any_errors_fatal: true
+  max_fail_percentage: 0
+  vars_files:
+    - ../inventories/home/group_vars/raspberry_pi.yml
+  vars:
+    maintenance_started_at: "{{ ansible_date_time.iso8601 }}"
+  pre_tasks:
+    - name: Verify guard endpoints before changing the host
+      ansible.builtin.wait_for:
+        host: "{{ item.host }}"
+        port: "{{ item.port }}"
+        timeout: 10
+        state: started
+      loop: "{{ pi_guard_endpoints }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Verify required services are running before maintenance
+      ansible.builtin.service_facts:
+
+    - name: Refuse maintenance when a required service is already down
+      ansible.builtin.assert:
+        that:
+          - >-
+            (ansible_facts.services.get(item + '.service', {})).get('state', '')
+            == 'running'
+        fail_msg: "Required service {{ item }} is not running on {{ inventory_hostname }}"
+      loop: "{{ pi_required_services }}"
+
+  tasks:
+    - name: Refresh APT metadata and apply available upgrades
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+        upgrade: "{{ 'dist' if pi_apply_dist_upgrade else 'safe' }}"
+        autoremove: true
+        autoclean: true
+      register: apt_upgrade
+
+    - name: Check whether the operating system requests a reboot
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Reboot only when required by the upgraded packages
+      ansible.builtin.reboot:
+        msg: "AWX rolling maintenance started at {{ maintenance_started_at }}"
+        reboot_timeout: "{{ pi_reboot_timeout }}"
+        post_reboot_delay: "{{ pi_post_reboot_delay }}"
+      when:
+        - pi_reboot_when_required
+        - reboot_required.stat.exists
+
+    - name: Wait for Docker after a possible reboot
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Install the Portainer agent compose definition
+      ansible.builtin.import_tasks: portainer-agent.yml
+      when: pi_reconcile_portainer_agent | bool
+
+  post_tasks:
+    - name: Inspect required application containers
+      community.docker.docker_container_info:
+        name: "{{ item }}"
+      loop: "{{ pi_required_containers }}"
+      register: required_container_results
+
+    - name: Require application containers to be running and healthy
+      ansible.builtin.assert:
+        that:
+          - item.exists
+          - item.container.State.Running
+          - item.container.State.Health is not defined or item.container.State.Health.Status == 'healthy'
+        fail_msg: "Required container failed validation on {{ inventory_hostname }}"
+      loop: "{{ required_container_results.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Verify the Portainer agent accepts connections
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host | default(inventory_hostname) }}"
+        port: "{{ portainer_agent_port }}"
+        timeout: 60
+        state: started
+      delegate_to: localhost
+      become: false
+
+    - name: Verify guard endpoints after the host is healthy
+      ansible.builtin.wait_for:
+        host: "{{ item.host }}"
+        port: "{{ item.port }}"
+        timeout: 20
+        state: started
+      loop: "{{ pi_guard_endpoints }}"
+      delegate_to: localhost
+      become: false

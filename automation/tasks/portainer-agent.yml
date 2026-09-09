@@ -1,0 +1,71 @@
+---
+- name: Resolve the shared Portainer agent secret from the AWX credential
+  ansible.builtin.set_fact:
+    portainer_agent_secret_effective: >-
+      {{ lookup('env', 'PORTAINER_AGENT_SECRET') |
+         default(portainer_agent_secret | default(''), true) }}
+  no_log: true
+
+- name: Require the shared Portainer agent secret
+  ansible.builtin.assert:
+    that:
+      - portainer_agent_secret_effective | length >= 16
+    fail_msg: Attach a non-trivial encrypted Portainer Agent Secret AWX credential.
+  no_log: true
+
+- name: Create the Portainer agent installation directory
+  ansible.builtin.file:
+    path: "{{ portainer_agent_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Render the Portainer agent compose definition
+  ansible.builtin.template:
+    src: ../templates/portainer-agent-compose.yml.j2
+    dest: "{{ portainer_agent_install_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Inspect any existing Portainer agent before Compose adoption
+  community.docker.docker_container_info:
+    name: "{{ portainer_agent_container_name }}"
+  register: portainer_agent_pre_info
+
+- name: Remove the pre-GitOps Portainer agent before Compose adoption
+  community.docker.docker_container:
+    name: "{{ portainer_agent_container_name }}"
+    state: absent
+    force_kill: true
+  when:
+    - portainer_agent_pre_info.exists
+    - >-
+      (portainer_agent_pre_info.container.Config.Labels | default({}, true)).get(
+        'com.docker.compose.project.working_dir', ''
+      ) != portainer_agent_install_dir
+
+- name: Pull and reconcile the Portainer agent
+  community.docker.docker_compose_v2:
+    project_src: "{{ portainer_agent_install_dir }}"
+    files:
+      - compose.yml
+    state: present
+    pull: always
+    remove_orphans: true
+  no_log: true
+
+- name: Inspect the running Portainer agent
+  community.docker.docker_container_info:
+    name: "{{ portainer_agent_container_name }}"
+  register: portainer_agent_info
+
+- name: Assert the Portainer agent is running the selected image
+  ansible.builtin.assert:
+    that:
+      - portainer_agent_info.exists
+      - portainer_agent_info.container.State.Running
+      - portainer_agent_info.container.Config.Image == portainer_agent_image
+    fail_msg: "Portainer agent did not converge on {{ portainer_agent_image }}"

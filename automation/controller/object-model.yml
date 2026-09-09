@@ -1,0 +1,77 @@
+---
+# Desired AWX ownership and naming model. Secrets and credential material never
+# belong here. This file is deliberately data-only so it can be consumed by a
+# future controller bootstrap job without making AWX manage itself implicitly.
+organizations:
+  - name: Home Lab
+    description: Home infrastructure automation and operations
+
+projects:
+  - name: AAX - Home Infrastructure
+    organization: Home Lab
+    scm_type: git
+    scm_url: https://github.com/kpeacocke/aax.git
+    scm_branch: main
+    scm_clean: true
+    update_on_launch: true
+
+inventories:
+  - name: Home Lab
+    organization: Home Lab
+    desired_source: automation/inventories/home/hosts.yml
+
+job_templates:
+  - name: Discovery - Network
+    inventory: Home Lab
+    project: AAX - Home Infrastructure
+    playbook: automation/playbooks/network-discovery.yml
+    credentials: []
+  - name: Raspberry Pi - Audit
+    inventory: Home Lab
+    project: AAX - Home Infrastructure
+    playbook: automation/playbooks/pi-audit.yml
+    credential_policy: dedicated_pi_machine_credential
+  - name: Raspberry Pi - DNS Pair Maintenance
+    inventory: Home Lab
+    project: AAX - Home Infrastructure
+    playbook: automation/playbooks/dns-pair-daily-maintenance.yml
+    credential_policy: dedicated_pi_machine_and_portainer_secret
+    concurrent_jobs: false
+  - name: Raspberry Pi - mDNS Maintenance
+    inventory: Home Lab
+    project: AAX - Home Infrastructure
+    playbook: automation/playbooks/mdns-daily-maintenance.yml
+    credential_policy: dedicated_pi_machine_and_portainer_secret
+    concurrent_jobs: false
+  - name: Raspberry Pi - Portainer Agent - pi-harmony
+    inventory: Home Lab
+    project: AAX - Home Infrastructure
+    playbook: automation/playbooks/portainer-agents.yml
+    credential_policy: dedicated_pi_machine_and_portainer_secret
+    limit: pi-harmony
+    concurrent_jobs: false
+  - name: Raspberry Pi - Portainer Agent - pi-mdns
+    inventory: Home Lab
+    project: AAX - Home Infrastructure
+    playbook: automation/playbooks/portainer-agents.yml
+    credential_policy: dedicated_pi_machine_and_portainer_secret
+    limit: pi-mdns
+    concurrent_jobs: false
+  - name: Raspberry Pi - Portainer Agent - pi-terror
+    inventory: Home Lab
+    project: AAX - Home Infrastructure
+    playbook: automation/playbooks/portainer-agents.yml
+    credential_policy: dedicated_pi_machine_and_portainer_secret
+    limit: pi-terror
+    concurrent_jobs: false
+  - name: Synology - Discovery
+    inventory: Home Lab
+    project: AAX - Home Infrastructure
+    playbook: automation/playbooks/synology-discovery.yml
+    credential_policy: dedicated_synology_machine_credential
+
+external_projects:
+  - name: pi-claw
+    organization: pi5-openclaw
+    repository: https://github.com/kpeacocke/piclaw
+    rationale: Separate application repository and release lifecycle
