@@ -320,7 +320,7 @@ services:
       - |
         set -e
         mkdir -p /etc/receptor
-        cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
+        cat > /usr/local/bin/ansible-runner-locked << 'WEOF'
         #!/bin/sh
         for arg in "$$@"; do
           case "$$arg" in
@@ -333,6 +333,14 @@ services:
         done
         exec ansible-runner worker "$$@" 2>&1
         WEOF
+        cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
+        #!/bin/sh
+        # /runner/env is a compatibility path shared by this single-node
+        # Compose deployment. Hold the lock before changing it and throughout
+        # the job so parallel launches cannot cross-wire credential files.
+        exec flock /tmp/aax-ansible-runner.lock /usr/local/bin/ansible-runner-locked "$$@"
+        WEOF
+        chmod +x /usr/local/bin/ansible-runner-locked
         chmod +x /usr/local/bin/ansible-runner-worker
         printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
         printf '%s' "$$AAX_PATCH_SCRIPT" | python3
@@ -467,7 +475,7 @@ services:
           'ansible.posix:>=2.1.0,<3.0.0' \
           'community.docker:>=5.2.2,<6.0.0'
         mkdir -p /etc/receptor
-        cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
+        cat > /usr/local/bin/ansible-runner-locked << 'WEOF'
         #!/bin/sh
         for arg in "$$@"; do
           case "$$arg" in
@@ -480,6 +488,13 @@ services:
         done
         exec ansible-runner worker "$$@" 2>&1
         WEOF
+        cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
+        #!/bin/sh
+        # Serialize the compatibility mapping for /runner/env. The lock file
+        # lives on the shared awx_runner_tmp volume used by both worker paths.
+        exec flock /tmp/aax-ansible-runner.lock /usr/local/bin/ansible-runner-locked "$$@"
+        WEOF
+        chmod +x /usr/local/bin/ansible-runner-locked
         chmod +x /usr/local/bin/ansible-runner-worker
         printf '%s' "$$RECEPTOR_CONFIG" > /etc/receptor/receptor.conf
         printf '%s' "$$AAX_PATCH_SCRIPT" | python3
