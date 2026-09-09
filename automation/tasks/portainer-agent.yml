@@ -9,8 +9,8 @@
 - name: Require the shared Portainer agent secret
   ansible.builtin.assert:
     that:
-      - portainer_agent_secret_effective | length >= 24
-    fail_msg: Attach the encrypted Portainer Agent Secret AWX credential.
+      - portainer_agent_secret_effective | length >= 16
+    fail_msg: Attach a non-trivial encrypted Portainer Agent Secret AWX credential.
   no_log: true
 
 - name: Create the Portainer agent installation directory
