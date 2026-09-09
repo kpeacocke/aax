@@ -6,4 +6,3 @@
   serial: 1
   roles:
     - role: pi_ansible_account
-

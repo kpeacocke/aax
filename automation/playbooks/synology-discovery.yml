@@ -57,4 +57,3 @@
           raid: "{{ synology_raid.stdout_lines }}"
           packages: "{{ synology_packages.stdout_lines | default([]) }}"
           docker: "{{ synology_docker.stdout | default('unavailable') }}"
-
