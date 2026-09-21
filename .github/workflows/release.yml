@@ -347,7 +347,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-${{ matrix.image }}@${{ steps.build-push.outputs.digest }}
 
       - name: Generate SBOM
-        uses: anchore/sbom-action@d94f46e13c6c62f59525ac9a1e147a99dc0b9bf5 # v0.17.0
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         with:
           image: ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-${{ matrix.image }}:${{ needs.release-please.outputs.version }}
           format: spdx-json
