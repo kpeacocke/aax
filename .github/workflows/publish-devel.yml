@@ -137,8 +137,8 @@ jobs:
           for name in "${!images[@]}"; do
             source_image="${images[$name]}"
             if docker manifest inspect "$prefix/aax-$name:$IMAGE_TAG" >/dev/null 2>&1; then
-              echo "Immutable image tag already exists: $prefix/aax-$name:$IMAGE_TAG" >&2
-              exit 1
+              echo "Immutable image tag already exists; leaving it unchanged: $prefix/aax-$name:$IMAGE_TAG"
+              continue
             fi
             docker tag "$source_image" "$prefix/aax-$name:$IMAGE_TAG"
             docker push "$prefix/aax-$name:$IMAGE_TAG"
