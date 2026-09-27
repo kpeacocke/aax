@@ -80,6 +80,8 @@ services:
     volumes:
       - hub_pulp_certs:/etc/pulp/certs
   awx-web:
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import json,urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8052/api/v2/ping/', timeout=5); assert r.status == 200 and json.load(r).get('version')"]
     image: ${DEVEL_AWX_IMAGE:-ghcr.io/kpeacocke/aax-awx}:${DEVEL_IMAGE_TAG:-devel}
     pull_policy: always
     volumes:
