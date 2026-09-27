@@ -18,6 +18,10 @@ export DEVEL_RECEPTOR_IMAGE="${DEVEL_RECEPTOR_IMAGE:-aax/receptor}"
 export DEVEL_GATEWAY_IMAGE="${DEVEL_GATEWAY_IMAGE:-aax/gateway}"
 export DEVEL_PULP_IMAGE="${DEVEL_PULP_IMAGE:-aax-pulp}"
 export DEVEL_GALAXY_IMAGE="${DEVEL_GALAXY_IMAGE:-aax-galaxy-ng}"
+export DEVEL_EDA_IMAGE="${DEVEL_EDA_IMAGE:-aax/eda-controller}"
+if [[ "${DEVEL_IMAGE_TAG:-}" == "devel-<commit-sha>" ]]; then
+  export DEVEL_IMAGE_TAG=devel
+fi
 
 if [[ "$#" -eq 0 ]]; then
   set -- up -d

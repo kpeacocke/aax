@@ -113,6 +113,9 @@ jobs:
       - name: Build AAX gateway devel
         run: docker buildx build --load -t gateway:devel images/gateway
 
+      - name: Build AAX EDA controller devel
+        run: docker buildx build --load -t eda-controller:devel images/eda-controller
+
       - name: Tag and push bundle
         env:
           PUSH_MUTABLE: ${{ github.event_name == 'push' || github.event_name == 'schedule' || inputs.publish_latest_devel }}
@@ -128,6 +131,7 @@ jobs:
             [galaxy-ng]=galaxy-ng:devel
             [pulp]=galaxy-ng:devel
             [gateway]=gateway:devel
+            [eda-controller]=eda-controller:devel
           )
           for name in "${!images[@]}"; do
             source_image="${images[$name]}"

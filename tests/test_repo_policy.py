@@ -218,6 +218,7 @@ def test_devel_publish_workflow_publishes_immutable_bundle() -> None:
         "[galaxy-ng]=galaxy-ng:devel",
         "[pulp]=galaxy-ng:devel",
         "[gateway]=gateway:devel",
+        "[eda-controller]=eda-controller:devel",
         "docker push",
     ]
     missing = [token for token in required if token not in workflow]

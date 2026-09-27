@@ -1,8 +1,10 @@
 services:
   gateway:
     image: ${DEVEL_GATEWAY_IMAGE:-ghcr.io/kpeacocke/aax-gateway}:${DEVEL_IMAGE_TAG:-devel}
+    pull_policy: always
   pulp-api:
     image: ${DEVEL_PULP_IMAGE:-ghcr.io/kpeacocke/aax-pulp}:${DEVEL_IMAGE_TAG:-devel}
+    pull_policy: always
     command: ["run", "api"]
     environment:
       PULP_DB_HOST: hub-postgres
@@ -19,6 +21,7 @@ services:
       - hub_pulp_certs:/etc/pulp/certs
   pulp-content:
     image: ${DEVEL_PULP_IMAGE:-ghcr.io/kpeacocke/aax-pulp}:${DEVEL_IMAGE_TAG:-devel}
+    pull_policy: always
     command: ["run", "content-app"]
     healthcheck:
       test: ["CMD-SHELL", "code=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:24816/pulp/content/); echo $$code | grep -Eq '^(200|404)$$'"]
@@ -36,6 +39,7 @@ services:
       - hub_pulp_certs:/etc/pulp/certs
   pulp-worker:
     image: ${DEVEL_PULP_IMAGE:-ghcr.io/kpeacocke/aax-pulp}:${DEVEL_IMAGE_TAG:-devel}
+    pull_policy: always
     command: ["run", "worker"]
     environment:
       PULP_DB_HOST: hub-postgres
@@ -53,6 +57,7 @@ services:
       test: ["CMD-SHELL", "pgrep -f 'pulpcore.tasking.entrypoint|pulpcore-worker' >/dev/null"]
   galaxy-ng:
     image: ${DEVEL_GALAXY_IMAGE:-ghcr.io/kpeacocke/aax-galaxy-ng}:${DEVEL_IMAGE_TAG:-devel}
+    pull_policy: always
     command: ["run", "api"]
     environment:
       PULP_DB_HOST: hub-postgres
@@ -67,21 +72,30 @@ services:
       - hub_pulp_certs:/etc/pulp/certs
   awx-web:
     image: ${DEVEL_AWX_IMAGE:-ghcr.io/kpeacocke/aax-awx}:${DEVEL_IMAGE_TAG:-devel}
+    pull_policy: always
     volumes:
       - ./compat/awx-cache.py:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
   awx-task:
     image: ${DEVEL_AWX_IMAGE:-ghcr.io/kpeacocke/aax-awx}:${DEVEL_IMAGE_TAG:-devel}
+    pull_policy: always
     volumes:
       - ./compat/awx-cache.py:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
 
   awx-receptor:
     image: ${DEVEL_AWX_EE_IMAGE:-ghcr.io/kpeacocke/aax-awx-ee}:${DEVEL_IMAGE_TAG:-devel}
+    pull_policy: always
 
   receptor-execution:
     image: ${DEVEL_AWX_EE_IMAGE:-ghcr.io/kpeacocke/aax-awx-ee}:${DEVEL_IMAGE_TAG:-devel}
+    pull_policy: always
 
   receptor-hop:
     image: ${DEVEL_RECEPTOR_IMAGE:-ghcr.io/kpeacocke/aax-receptor}:${DEVEL_IMAGE_TAG:-devel}
+    pull_policy: always
+
+  eda-controller:
+    image: ${DEVEL_EDA_IMAGE:-ghcr.io/kpeacocke/aax-eda-controller}:${DEVEL_IMAGE_TAG:-devel}
+    pull_policy: always
 
 volumes:
   hub_pulp_certs:
