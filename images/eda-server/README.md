@@ -12,7 +12,8 @@ unchanged; this runtime is selected by the devel overlay. The dedicated EDA work
 tests migrations, authenticated API boundaries, and restart before publishing.
 
 The API readiness endpoint is `/_healthz`. Background project work uses the
-`eda-worker` service; scheduled work uses `eda-scheduler`. Existing database
+`eda-worker` service, whose dispatcher also handles scheduling. No redundant
+legacy scheduler process is started. Existing database
 credentials are retained. `EDA_SECRET_KEY` defaults to the existing `SECRET_KEY`
 when unset; preserve the chosen value across deployments.
 

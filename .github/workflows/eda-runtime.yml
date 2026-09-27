@@ -38,6 +38,13 @@ jobs:
           curl -fsS http://127.0.0.1:15000/_healthz
           code=$(curl -s -o /tmp/eda-response -w '%{http_code}' http://127.0.0.1:15000/api/eda/v1/projects/)
           test "$code" = 401 -o "$code" = 403
+          docker run -d --name eda-worker --network eda-test \
+            -e EDA_DB_HOST=eda-db -e EDA_DB_NAME=eda -e EDA_DB_USER=eda -e EDA_DB_PASSWORD \
+            -e EDA_SECRET_KEY -e EDA_RESOURCE_SERVER__URL='@none None' \
+            -e EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT=true aax-eda-test worker
+          sleep 10
+          test "$(docker inspect -f '{{.State.Running}}' eda-worker)" = true
+          docker logs eda-worker 2>&1 | grep -q 'Starting DefaultWorker with dispatcherd'
           docker restart eda-api
           for i in $(seq 1 60); do curl -fsS http://127.0.0.1:15000/_healthz && break; sleep 3; done
           curl -fsS http://127.0.0.1:15000/_healthz

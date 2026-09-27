@@ -123,20 +123,6 @@ services:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/_healthz', timeout=5).read()"]
       start_period: 120s
 
-  eda-scheduler:
-    image: ${DEVEL_EDA_IMAGE:-ghcr.io/kpeacocke/aax-eda-controller}:${DEVEL_EDA_IMAGE_TAG:-${DEVEL_IMAGE_TAG:-devel}}
-    pull_policy: always
-    profiles: [eda]
-    restart: unless-stopped
-    command: [scheduler]
-    environment: *eda-runtime-environment
-    networks: [eda-network]
-    depends_on:
-      eda-controller:
-        condition: service_healthy
-    security_opt: [no-new-privileges:true]
-    cap_drop: [ALL]
-
   eda-worker:
     image: ${DEVEL_EDA_IMAGE:-ghcr.io/kpeacocke/aax-eda-controller}:${DEVEL_EDA_IMAGE_TAG:-${DEVEL_IMAGE_TAG:-devel}}
     pull_policy: always
