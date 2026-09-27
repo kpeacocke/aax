@@ -4,8 +4,11 @@ This image wraps the digest-pinned official `ansible/eda-server` image. It runs
 schema migrations, creates upstream initial data, and serves the real controller
 API on port 5000. It does not emulate a controller with a health-only HTTP server.
 
-The devel overlay uses `DEVEL_EDA_IMAGE_TAG=runtime-<commit>` for this image while
-retaining `DEVEL_IMAGE_TAG` for the other bundle images. The dedicated EDA workflow
+The regular devel bundle publisher also builds this image, so its
+`devel-<commit>` tag works with the overlay defaults. For a targeted repair, the
+devel overlay accepts `DEVEL_EDA_IMAGE_TAG=runtime-<commit>` while retaining
+`DEVEL_IMAGE_TAG` for the other bundle images. The stable-image pipeline is
+unchanged; this runtime is selected by the devel overlay. The dedicated EDA workflow
 tests migrations, authenticated API boundaries, and restart before publishing.
 
 The API readiness endpoint is `/_healthz`. Background project work uses the
