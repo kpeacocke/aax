@@ -1,0 +1,68 @@
+services:
+  gateway:
+    image: ${DEVEL_IMAGE_PREFIX:-aax}/aax-gateway:${DEVEL_IMAGE_TAG:-devel}
+  pulp-api:
+    image: ${DEVEL_IMAGE_PREFIX:-aax}/aax-pulp:${DEVEL_IMAGE_TAG:-devel}
+    command: ["run", "api"]
+    environment:
+      PULP_DB_HOST: hub-postgres
+      PULP_DB_PORT: "5432"
+      PULP_DB_NAME: hub
+      PULP_DB_USER: galaxy
+      PULP_DB_PASSWORD: ${HUB_DB_PASSWORD}
+      WITH_MIGRATIONS: "1"
+      GUNICORN_PORT: "24817"
+    volumes:
+      - hub_pulp_certs:/etc/pulp/certs
+  pulp-content:
+    image: ${DEVEL_IMAGE_PREFIX:-aax}/aax-pulp:${DEVEL_IMAGE_TAG:-devel}
+    command: ["run", "content-app"]
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:24816/pulp/content/); echo $$code | grep -Eq '^(200|404)$$'"]
+    environment:
+      PULP_DB_HOST: hub-postgres
+      PULP_DB_PORT: "5432"
+      PULP_DB_NAME: hub
+      PULP_DB_USER: galaxy
+      PULP_DB_PASSWORD: ${HUB_DB_PASSWORD}
+      GUNICORN_PORT: "24816"
+    volumes:
+      - hub_pulp_certs:/etc/pulp/certs
+  pulp-worker:
+    image: ${DEVEL_IMAGE_PREFIX:-aax}/aax-pulp:${DEVEL_IMAGE_TAG:-devel}
+    command: ["run", "worker"]
+    environment:
+      PULP_DB_HOST: hub-postgres
+      PULP_DB_PORT: "5432"
+      PULP_DB_NAME: hub
+      PULP_DB_USER: galaxy
+      PULP_DB_PASSWORD: ${HUB_DB_PASSWORD}
+      GUNICORN_PORT: "24817"
+    volumes:
+      - hub_pulp_certs:/etc/pulp/certs
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'pulpcore.tasking.entrypoint|pulpcore-worker' >/dev/null"]
+  galaxy-ng:
+    image: ${DEVEL_IMAGE_PREFIX:-aax}/aax-galaxy-ng:${DEVEL_IMAGE_TAG:-devel}
+    command: ["run", "api"]
+    environment:
+      PULP_DB_HOST: hub-postgres
+      PULP_DB_PORT: "5432"
+      PULP_DB_NAME: hub
+      PULP_DB_USER: galaxy
+      PULP_DB_PASSWORD: ${HUB_DB_PASSWORD}
+      SECRET_KEY: ${GALAXY_SECRET_KEY}
+      PULP_SECRET_KEY: ${PULP_SECRET_KEY}
+      GUNICORN_PORT: "8000"
+    volumes:
+      - hub_pulp_certs:/etc/pulp/certs
+  awx-web:
+    environment:
+      AWX_CSRF_TRUSTED_ORIGINS: ""
+  awx-task:
+    environment:
+      AWX_CSRF_TRUSTED_ORIGINS: ""
+
+volumes:
+  hub_pulp_certs:
+    name: aax_devel_hub_pulp_certs

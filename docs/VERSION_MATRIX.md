@@ -4,18 +4,28 @@ This document is the canonical tested version matrix for the current AAX baselin
 
 ## Compose and Portainer Component Images
 
-| Component      | Default Tag | Source                          |
-| -------------- | ----------- | ------------------------------- |
-| awx            | `24.6.1`    | `AWX_VERSION`                   |
-| awx-ee         | `24.6.1`    | `AWX_EE_VERSION`                |
-| ee-base        | `latest`    | `AAX_VERSION`                   |
-| ee-builder     | `latest`    | `AAX_VERSION`                   |
-| dev-tools      | `latest`    | `AAX_VERSION`                   |
-| galaxy-ng      | `latest`    | `AAX_VERSION`                   |
-| pulp           | `latest`    | `AAX_VERSION`                   |
-| eda-controller | `latest`    | `AAX_VERSION`                   |
-| gateway        | `latest`    | `AAX_VERSION`                   |
-| receptor       | `v1.6.4`    | `RECEPTOR_VERSION`              |
+The project intentionally targets a recent, compatible AAP-like deployment baseline:
+
+- upstream AWX and AWX EE are pinned to recent tested versions
+- repo-owned compatibility components follow the AAX release channel
+- Portainer remains the deployment gate for the assembled stack
+
+| Component      | Default Tag | Source             |
+| -------------- | ----------- | ------------------ |
+| awx            | `24.6.1`    | `AWX_VERSION`      |
+| awx-ee         | `24.6.1`    | `AWX_EE_VERSION`   |
+| ee-base        | `latest`    | `AAX_VERSION`      |
+| ee-builder     | `latest`    | `AAX_VERSION`      |
+| dev-tools      | `latest`    | `AAX_VERSION`      |
+| galaxy-ng      | `latest`    | `AAX_VERSION`      |
+| pulp           | `latest`    | `AAX_VERSION`      |
+| eda-controller | `latest`    | `AAX_VERSION`      |
+| gateway        | `latest`    | `AAX_VERSION`      |
+| receptor       | `v1.6.4`    | `RECEPTOR_VERSION` |
+
+AWX 24.6.1's checked-in dependency lock requires Django 4.2. The upstream
+build script therefore pins `django-ansible-base` to `2024.6.26` instead of
+resolving its moving `devel` branch, which now requires Django 5 or newer.
 
 ## Kubernetes Component Images
 
@@ -25,10 +35,10 @@ must be advanced deliberately as a separate deployment target.
 
 ## Runtime Base Dependencies
 
-| Dependency            | Default channel                         |
-| --------------------- | --------------------------------------- |
-| PostgreSQL (AWX, EDA) | `15` (floats to the newest `15.x`)      |
-| PostgreSQL (Hub)      | `16-alpine` (newest Alpine `16.x`)      |
+| Dependency            | Default channel                       |
+| --------------------- | ------------------------------------- |
+| PostgreSQL (AWX, EDA) | `15` (floats to the newest `15.x`)    |
+| PostgreSQL (Hub)      | `16-alpine` (newest Alpine `16.x`)    |
 | Redis                 | `7.4` / `7.4-alpine` (newest `7.4.x`) |
 
 ## Update Rules

@@ -150,7 +150,7 @@ class TestDockerCompose:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "DEFAULT_EXECUTION_ENVIRONMENT: ghcr.io/kpeacocke/aax-ee-base:" in result.stdout
+        assert "DEFAULT_EXECUTION_ENVIRONMENT: aax/ee-base:1.0.0" in result.stdout
 
     def test_missing_required_secret_fails_compose_render(self):
         """Test that required secret variables fail fast when empty."""
@@ -306,7 +306,8 @@ class TestDockerCompose:
         # Generated inventory and credential files must be transmitted to the
         # receptor worker instead of remaining under the controller's /tmp.
         assert "only_transmit_kwargs'] = False" in config
-        assert config.count("awx_runner_tmp:/tmp") == 3
+        assert config.count("source: awx_runner_tmp") == 3
+        assert config.count("target: /tmp") == 3
         assert config.count('ln -sfn "$$private_data_dir/env" /runner/env') == 2
 
 

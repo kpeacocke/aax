@@ -4,7 +4,7 @@
 # Includes ansible-navigator, ansible-lint, and development utilities
 # Multi-stage build: separates build dependencies from runtime
 
-ARG BASE_IMAGE=aax/ee-base:1.0.0
+ARG BASE_IMAGE=aax/ee-base:latest
 
 # Stage 1: Builder
 # hadolint ignore=DL3006,DL3007
@@ -23,7 +23,7 @@ ENV PIP_NO_CACHE_DIR=1 \
   PIP_ROOT_USER_ACTION=ignore
 
 # Switch to root for installation
-# hadolint ignore=DL3002
+# hadolint ignore=DL3002,DL3066
 USER root
 
 # Copy Python requirements
@@ -63,6 +63,7 @@ ENV PIP_NO_CACHE_DIR=1 \
   PAGER=""
 
 # Switch to root for cleanup
+# hadolint ignore=DL3066
 USER root
 
 # Copy installed Python packages from builder
@@ -90,9 +91,10 @@ LABEL org.opencontainers.image.title="AAX Development Tools" \
 
 # Health check to verify ansible-navigator is functional
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD ansible-navigator --version || exit 1
+  CMD ["sh", "-c", "ansible-navigator --version"]
 
 # Switch to non-root user
+# hadolint ignore=DL3066
 USER ansible
 WORKDIR /workspace
 

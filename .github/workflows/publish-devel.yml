@@ -1,0 +1,140 @@
+name: Publish upstream devel bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      awx_ref:
+        description: AWX ref to build
+        required: false
+        default: devel
+      publish_latest_devel:
+        description: Also move the mutable devel tag
+        required: true
+        type: boolean
+        default: true
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/publish-devel.yml
+      - docker-compose.devel.yml
+      - images/gateway/**
+      - scripts/build-upstream.sh
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-devel-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: ${{ github.repository_owner }}
+  IMAGE_TAG: devel-${{ github.sha }}
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out AAX
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install upstream build tools
+        run: |
+          python3 -m pip install --disable-pip-version-check \
+            ansible-core ansible-builder build
+
+      - name: Check out upstream sources
+        env:
+          AWX_BRANCH: ${{ inputs.awx_ref || 'devel' }}
+          AWX_EE_BRANCH: devel
+          RECEPTOR_BRANCH: devel
+          RULEBOOK_BRANCH: main
+          GALAXY_NG_BRANCH: main
+        run: ./scripts/build-upstream.sh
+
+      - name: Build AWX devel
+        working-directory: .upstream/awx
+        env:
+          AWX_BUILD_VERSION: 24.6.1.dev1+g${{ github.sha }}
+        run: |
+          ansible-playbook -e ansible_python_interpreter=python3 \
+            tools/ansible/dockerfile.yml \
+            -e dockerfile_name=Dockerfile.devel \
+            -e build_dev=False \
+            -e headless=True
+          grep -q '^ENV SETUPTOOLS_SCM_PRETEND_VERSION=' Dockerfile.devel || \
+            sed -i '/^ARG SETUPTOOLS_SCM_PRETEND_VERSION/a ENV SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION}' Dockerfile.devel
+          docker buildx build --load -f Dockerfile.devel \
+            -t awx:devel \
+            --build-arg VERSION="$AWX_BUILD_VERSION" \
+            --build-arg SETUPTOOLS_SCM_PRETEND_VERSION="$AWX_BUILD_VERSION" .
+
+      - name: Build AWX EE devel
+        working-directory: .upstream/awx-ee
+        run: ansible-builder build -v3 -t awx-ee:devel --container-runtime=docker
+
+      - name: Build Receptor devel
+        working-directory: .upstream/receptor
+        run: |
+          rm -f .container-flag-*
+          PATH="$GITHUB_WORKSPACE/.venv/bin:$PATH" \
+            make VERSION=1.6.9.dev1+g${{ github.sha }} container \
+            REPO=receptor TAG=devel CONTAINERCMD=docker
+
+      - name: Build ansible-rulebook devel
+        working-directory: .upstream/ansible-rulebook
+        run: |
+          grep -q '^ENV SETUPTOOLS_SCM_PRETEND_VERSION=' Dockerfile || \
+            sed -i '/^ARG SETUPTOOLS_SCM_PRETEND_VERSION/a ENV SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION}' Dockerfile
+          docker buildx build --load -t ansible-rulebook:devel \
+            --build-arg SETUPTOOLS_SCM_PRETEND_VERSION=1.0.0.dev1+g${{ github.sha }} .
+
+      - name: Build Galaxy NG and Pulp devel
+        working-directory: .upstream/galaxy-ng
+        run: docker buildx build --load -t galaxy-ng:devel \
+          --build-arg GIT_COMMIT=${{ github.sha }} .
+
+      - name: Build AAX gateway devel
+        run: docker buildx build --load -t gateway:devel images/gateway
+
+      - name: Tag and push bundle
+        env:
+          PUSH_MUTABLE: ${{ github.event_name == 'push' || github.event_name == 'schedule' || inputs.publish_latest_devel }}
+        run: |
+          set -euo pipefail
+          owner=$(printf '%s' "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')
+          prefix="$REGISTRY/$owner"
+          declare -A images=(
+            [awx]=awx:devel
+            [awx-ee]=awx-ee:devel
+            [receptor]=receptor:devel
+            [ansible-rulebook]=ansible-rulebook:devel
+            [galaxy-ng]=galaxy-ng:devel
+            [pulp]=galaxy-ng:devel
+            [gateway]=gateway:devel
+          )
+          for name in "${!images[@]}"; do
+            source_image="${images[$name]}"
+            docker tag "$source_image" "$prefix/aax-$name:$IMAGE_TAG"
+            docker push "$prefix/aax-$name:$IMAGE_TAG"
+            if [[ "$PUSH_MUTABLE" == true ]]; then
+              docker tag "$source_image" "$prefix/aax-$name:devel"
+              docker push "$prefix/aax-$name:devel"
+            fi
+          done
