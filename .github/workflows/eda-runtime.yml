@@ -1,0 +1,57 @@
+name: Test and publish EDA runtime
+on:
+  push:
+    branches: [main, fix/portainer-runtime-health]
+    paths: [images/eda-server/**, .github/workflows/eda-runtime.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build controller
+        run: docker build -t aax-eda-test images/eda-server
+      - name: Verify migrations and real HTTP API
+        run: |
+          set -euo pipefail
+          docker network create eda-test
+          docker run -d --name eda-db --network eda-test -e POSTGRES_DB=eda -e POSTGRES_USER=eda -e POSTGRES_PASSWORD=test-only postgres:15
+          for i in $(seq 1 30); do docker exec eda-db pg_isready -U eda && break; sleep 2; done
+          docker run -d --name eda-api --network eda-test -p 127.0.0.1:15000:5000 \
+            -e EDA_DB_HOST=eda-db -e EDA_DB_NAME=eda -e EDA_DB_USER=eda -e EDA_DB_PASSWORD=test-only \
+            -e EDA_SECRET_KEY=ci-only-not-a-production-secret \
+            -e EDA_ALLOWED_HOSTS='["127.0.0.1","localhost"]' \
+            -e EDA_RESOURCE_SERVER__URL='@none None' \
+            -e EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT=true aax-eda-test
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:15000/_healthz; then break; fi
+            sleep 4
+          done
+          curl -fsS http://127.0.0.1:15000/_healthz
+          code=$(curl -s -o /tmp/eda-response -w '%{http_code}' http://127.0.0.1:15000/api/eda/v1/projects/)
+          test "$code" = 401 -o "$code" = 403
+          docker restart eda-api
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:15000/_healthz && break; sleep 3; done
+          curl -fsS http://127.0.0.1:15000/_healthz
+      - name: Diagnostics
+        if: failure()
+        run: docker logs eda-api
+      - uses: docker/login-action@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish tested image
+        if: github.ref == 'refs/heads/main'
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REVISION: ${{ github.sha }}
+        run: |
+          image="ghcr.io/${OWNER,,}/aax-eda-controller:runtime-${REVISION}"
+          docker tag aax-eda-test "$image"
+          docker push "$image"

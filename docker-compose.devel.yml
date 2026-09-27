@@ -54,7 +54,16 @@ services:
     volumes:
       - hub_pulp_certs:/etc/pulp/certs
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'pulpcore.tasking.entrypoint|pulpcore-worker' >/dev/null"]
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import os,pathlib,sys;
+          paths=pathlib.Path('/proc').glob('[0-9]*/cmdline');
+          sys.exit(not any(p.parent.name != str(os.getpid()) and
+          any(term in p.read_bytes() for term in (b'pulpcore-worker', b'pulpcore.tasking.entrypoint'))
+          for p in paths if p.exists()))
   galaxy-ng:
     image: ${DEVEL_GALAXY_IMAGE:-ghcr.io/kpeacocke/aax-galaxy-ng}:${DEVEL_IMAGE_TAG:-devel}
     pull_policy: always
@@ -74,12 +83,12 @@ services:
     image: ${DEVEL_AWX_IMAGE:-ghcr.io/kpeacocke/aax-awx}:${DEVEL_IMAGE_TAG:-devel}
     pull_policy: always
     volumes:
-      - ./compat/awx-cache.py:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
+      - ${AAX_AWX_CACHE_FILE:-./compat/awx-cache.py}:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
   awx-task:
     image: ${DEVEL_AWX_IMAGE:-ghcr.io/kpeacocke/aax-awx}:${DEVEL_IMAGE_TAG:-devel}
     pull_policy: always
     volumes:
-      - ./compat/awx-cache.py:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
+      - ${AAX_AWX_CACHE_FILE:-./compat/awx-cache.py}:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
 
   awx-receptor:
     image: ${DEVEL_AWX_EE_IMAGE:-ghcr.io/kpeacocke/aax-awx-ee}:${DEVEL_IMAGE_TAG:-devel}
@@ -94,8 +103,51 @@ services:
     pull_policy: always
 
   eda-controller:
-    image: ${DEVEL_EDA_IMAGE:-ghcr.io/kpeacocke/aax-eda-controller}:${DEVEL_IMAGE_TAG:-devel}
+    image: ${DEVEL_EDA_IMAGE:-ghcr.io/kpeacocke/aax-eda-controller}:${DEVEL_EDA_IMAGE_TAG:-${DEVEL_IMAGE_TAG:-devel}}
     pull_policy: always
+    environment: &eda-runtime-environment
+      EDA_DB_HOST: eda-postgres
+      EDA_DB_PORT: "5432"
+      EDA_DB_NAME: ${EDA_DB_NAME:-eda}
+      EDA_DB_USER: ${EDA_DB_USER:-eda}
+      EDA_DB_PASSWORD: ${EDA_DB_PASSWORD}
+      EDA_SECRET_KEY: ${EDA_SECRET_KEY:-${SECRET_KEY}}
+      EDA_ALLOWED_HOSTS: ${EDA_ALLOWED_HOSTS:-'["localhost","127.0.0.1","eda-controller"]'}
+      EDA_RESOURCE_SERVER__URL: "@none None"
+      EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT: "true"
+      EDA_CONTROLLER_URL: ${EDA_CONTROLLER_URL:-http://awx-web:8052}
+      EDA_CONTROLLER_SSL_VERIFY: "true"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/_healthz', timeout=5).read()"]
+      start_period: 120s
+
+  eda-scheduler:
+    image: ${DEVEL_EDA_IMAGE:-ghcr.io/kpeacocke/aax-eda-controller}:${DEVEL_EDA_IMAGE_TAG:-${DEVEL_IMAGE_TAG:-devel}}
+    pull_policy: always
+    profiles: [eda]
+    restart: unless-stopped
+    command: [scheduler]
+    environment: *eda-runtime-environment
+    networks: [eda-network]
+    depends_on:
+      eda-controller:
+        condition: service_healthy
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+  eda-worker:
+    image: ${DEVEL_EDA_IMAGE:-ghcr.io/kpeacocke/aax-eda-controller}:${DEVEL_EDA_IMAGE_TAG:-${DEVEL_IMAGE_TAG:-devel}}
+    pull_policy: always
+    profiles: [eda]
+    restart: unless-stopped
+    command: [worker]
+    environment: *eda-runtime-environment
+    networks: [eda-network, awx-network]
+    depends_on:
+      eda-controller:
+        condition: service_healthy
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
 
 volumes:
   hub_pulp_certs:
