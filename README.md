@@ -56,9 +56,62 @@ Profile note:
 - If `COMPOSE_PROFILES` is set in `.env`, Docker Compose combines it with any CLI `--profile` flags.
 - To run a single stack predictably (for example hub-only), keep `COMPOSE_PROFILES` empty and pass explicit `--profile` flags in the command.
 
+## Local Setup and Validation
+
+For local development and repo validation, use the repo-managed Python environment rather than the system Python. These commands are for developers and CI, not for Portainer itself.
+
+```bash
+make bootstrap
+make test
+```
+
+This creates the local `.venv` environment, installs the repo’s Python tooling, and runs the policy/docs checks used by CI.
+
+## Portainer Deployment Model
+
+This repo is designed to be deployed through Portainer using the Git repository stack workflow.
+
+- Portainer reads the repo as a stack source
+- Portainer uses the Compose file and environment variables
+- GitHub Actions can trigger a Portainer webhook on main-branch changes
+- `make` is local developer tooling only; Portainer does not run `make`
+
+### Modern AAP-like stack strategy
+
+The project intentionally follows a modern, compatible AAP-like model:
+
+- upstream AWX and related components remain the runtime foundation
+- the repo owns the compatibility layer: networking, security defaults, env wiring, and integration glue
+- custom execution environment and gateway images are built here for the stack
+- the repo aims to keep the stack aligned to a recent, tested upstream baseline instead of drifting onto a stale or loosely maintained state
+
+This gives you a recent, practical AAP-like deployment stack without reimplementing the upstream project itself.
+
+See [docs/MODERN_STACK_STRATEGY.md](docs/MODERN_STACK_STRATEGY.md) for the full stack model and release posture.
+See [docs/MODERN_STACK_BUILD_PLAN.md](docs/MODERN_STACK_BUILD_PLAN.md) for the concrete upstream component mapping and build plan.
+See [docs/PORTAINER_DEVEL.md](docs/PORTAINER_DEVEL.md) for deploying the GitHub-built devel bundle from GHCR.
+
+### Portainer workflow
+
+Use the repo in Portainer like this:
+
+1. Add the repository URL in Portainer as a Git stack source.
+2. Set the compose file path to `docker-compose.yml`.
+3. Set the environment variables from `.env.example` into the stack environment.
+4. Keep `COMPOSE_PROFILES` empty unless you intentionally want a specific stack profile.
+5. Use the stack to pull and redeploy after changes.
+6. Optionally trigger a redeploy via the webhook from `.github/workflows/deploy.yml`.
+
+This repo is intentionally a Portainer-first deployment repo. The local `make` targets exist only for developer setup and validation.
+
 ## Common Commands
 
 ```bash
+# Local developer bootstrap and validation
+make bootstrap
+make test
+
+# Local stack operations for a developer workstation
 # Build images
 docker compose --profile controller --profile hub build
 

@@ -1,5 +1,5 @@
 # images/ee-builder/Dockerfile
-ARG BASE_IMAGE=aax/ee-base:1.0.0
+ARG BASE_IMAGE=aax/ee-base:latest
 # hadolint ignore=DL3006,DL3007
 FROM ${BASE_IMAGE}
 
@@ -16,6 +16,7 @@ ENV PIP_NO_CACHE_DIR=1 \
   PIP_ROOT_USER_ACTION=ignore
 
 # Switch to root for installation
+# hadolint ignore=DL3066
 USER root
 
 # Copy Python requirements
@@ -40,9 +41,10 @@ LABEL org.opencontainers.image.title="AAX Execution Environment Builder" \
 
 # Health check to verify ansible-builder is functional
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD ansible-builder --version || exit 1
+  CMD ["sh", "-c", "ansible-builder --version"]
 
 # Switch to non-root user
+# hadolint ignore=DL3066
 USER ansible
 WORKDIR /workspace
 

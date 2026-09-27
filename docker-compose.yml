@@ -367,7 +367,7 @@ services:
 
   receptor-hop:
     <<: *service-defaults
-    image: quay.io/ansible/receptor:${RECEPTOR_VERSION:-v1.6.4}
+    image: ${RECEPTOR_IMAGE_REPOSITORY:-quay.io/ansible/receptor}:${RECEPTOR_VERSION:-v1.6.4}
     container_name: receptor-hop
     profiles:
       - controller
@@ -788,7 +788,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "code=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/galaxy/); echo $$code | grep -Eq '^(200|301|302|307|308|401|403)$$'",
+          "code=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/automation-hub/); echo $$code | grep -Eq '^(200|301|302|307|308|401|403)$$'",
         ]
       interval: 30s
       timeout: 10s
@@ -919,7 +919,7 @@ volumes:
   awx_postgres_data:
     name: awx_postgres_data
   awx_redis_data:
-    name: awx_redis_data
+    name: ${AWX_REDIS_VOLUME:-awx_redis_data}
   awx_projects:
     name: awx_projects
   awx_rsyslog:

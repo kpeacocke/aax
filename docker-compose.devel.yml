@@ -1,0 +1,77 @@
+services:
+  gateway:
+    image: ${DEVEL_IMAGE_PREFIX:-aax}/aax-gateway:${DEVEL_IMAGE_TAG:-devel}
+  pulp-api:
+    image: ${DEVEL_IMAGE_PREFIX:-aax}/aax-pulp:${DEVEL_IMAGE_TAG:-devel}
+    command: ["run", "api"]
+    environment:
+      PULP_DB_HOST: hub-postgres
+      PULP_DB_PORT: "5432"
+      PULP_DB_NAME: hub
+      PULP_DB_USER: galaxy
+      PULP_DB_PASSWORD: ${HUB_DB_PASSWORD}
+      PULP_REDIS_HOST: hub-redis
+      PULP_REDIS_PORT: "6379"
+      PULP_SECRET_KEY: ${PULP_SECRET_KEY}
+      WITH_MIGRATIONS: "1"
+      GUNICORN_PORT: "24817"
+    volumes:
+      - hub_pulp_certs:/etc/pulp/certs
+  pulp-content:
+    image: ${DEVEL_IMAGE_PREFIX:-aax}/aax-pulp:${DEVEL_IMAGE_TAG:-devel}
+    command: ["run", "content-app"]
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:24816/pulp/content/); echo $$code | grep -Eq '^(200|404)$$'"]
+    environment:
+      PULP_DB_HOST: hub-postgres
+      PULP_DB_PORT: "5432"
+      PULP_DB_NAME: hub
+      PULP_DB_USER: galaxy
+      PULP_DB_PASSWORD: ${HUB_DB_PASSWORD}
+      PULP_REDIS_HOST: hub-redis
+      PULP_REDIS_PORT: "6379"
+      PULP_SECRET_KEY: ${PULP_SECRET_KEY}
+      GUNICORN_PORT: "24816"
+    volumes:
+      - hub_pulp_certs:/etc/pulp/certs
+  pulp-worker:
+    image: ${DEVEL_IMAGE_PREFIX:-aax}/aax-pulp:${DEVEL_IMAGE_TAG:-devel}
+    command: ["run", "worker"]
+    environment:
+      PULP_DB_HOST: hub-postgres
+      PULP_DB_PORT: "5432"
+      PULP_DB_NAME: hub
+      PULP_DB_USER: galaxy
+      PULP_DB_PASSWORD: ${HUB_DB_PASSWORD}
+      PULP_REDIS_HOST: hub-redis
+      PULP_REDIS_PORT: "6379"
+      PULP_SECRET_KEY: ${PULP_SECRET_KEY}
+      GUNICORN_PORT: "24817"
+    volumes:
+      - hub_pulp_certs:/etc/pulp/certs
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'pulpcore.tasking.entrypoint|pulpcore-worker' >/dev/null"]
+  galaxy-ng:
+    image: ${DEVEL_IMAGE_PREFIX:-aax}/aax-galaxy-ng:${DEVEL_IMAGE_TAG:-devel}
+    command: ["run", "api"]
+    environment:
+      PULP_DB_HOST: hub-postgres
+      PULP_DB_PORT: "5432"
+      PULP_DB_NAME: hub
+      PULP_DB_USER: galaxy
+      PULP_DB_PASSWORD: ${HUB_DB_PASSWORD}
+      SECRET_KEY: ${GALAXY_SECRET_KEY}
+      PULP_SECRET_KEY: ${PULP_SECRET_KEY}
+      GUNICORN_PORT: "8000"
+    volumes:
+      - hub_pulp_certs:/etc/pulp/certs
+  awx-web:
+    volumes:
+      - ./compat/awx-cache.py:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
+  awx-task:
+    volumes:
+      - ./compat/awx-cache.py:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
+
+volumes:
+  hub_pulp_certs:
+    name: aax_devel_hub_pulp_certs

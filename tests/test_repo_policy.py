@@ -189,6 +189,49 @@ def test_compose_published_ports_use_localhost_host_bind_default() -> None:
         assert binding in content
 
 
+def test_devel_overlay_supports_registry_tagged_images() -> None:
+    """Portainer can select immutable GHCR devel images through environment variables."""
+    overlay = _read("docker-compose.devel.yml")
+    script = _read("scripts/deploy-devel.sh")
+    expected_images = [
+        "aax-gateway:${DEVEL_IMAGE_TAG:-devel}",
+        "aax-pulp:${DEVEL_IMAGE_TAG:-devel}",
+        "aax-galaxy-ng:${DEVEL_IMAGE_TAG:-devel}",
+    ]
+    for image in expected_images:
+        assert image in overlay
+    assert "DEVEL_IMAGE_PREFIX" in script
+    assert "DEVEL_IMAGE_TAG" in script
+
+
+def test_devel_publish_workflow_publishes_immutable_bundle() -> None:
+    """The devel workflow must publish every image needed by the overlay."""
+    workflow = _read(".github/workflows/publish-devel.yml")
+    required = [
+        "packages: write",
+        "docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
+        "devel-${{ github.sha }}",
+        "SETUPTOOLS_SCM_PRETEND_VERSION=",
+        "[awx]=awx:devel",
+        "[awx-ee]=awx-ee:devel",
+        "[receptor]=receptor:devel",
+        "[ansible-rulebook]=ansible-rulebook:devel",
+        "[galaxy-ng]=galaxy-ng:devel",
+        "[pulp]=galaxy-ng:devel",
+        "[gateway]=gateway:devel",
+        "docker push",
+    ]
+    missing = [token for token in required if token not in workflow]
+    assert missing == [], "Devel publish workflow is missing: " + ", ".join(missing)
+
+
+def test_upstream_checkout_does_not_apply_release_django_pin_to_devel() -> None:
+    """AWX devel must retain its Django-compatible moving dependency set."""
+    script = _read("scripts/build-upstream.sh")
+    assert 'if [[ -z "$AWX_DAB_REF" ]]' in script
+    assert 'preserving django-ansible-base ref from AWX $AWX_BRANCH' in script
+
+
 def _compose_service_port_mappings(compose_text: str) -> dict[str, list[str]]:
     """Extract published port mappings per service from docker-compose YAML text."""
     mappings: dict[str, list[str]] = {}
@@ -433,7 +476,9 @@ def test_release_workflow_records_digest_and_signing_provenance() -> None:
 
 def test_env_example_matches_compose_variable_surface() -> None:
     """Env template and compose interpolation surface should stay synchronized."""
-    compose_vars = _compose_env_var_names(_read("docker-compose.yml"))
+    compose_vars = _compose_env_var_names(
+        _read("docker-compose.yml") + _read("docker-compose.devel.yml")
+    )
     env_example_vars = _env_example_var_names(_read(".env.example"))
     compose_cli_only_vars = {"COMPOSE_PROFILES", "COMPOSE_PROJECT_NAME"}
 
