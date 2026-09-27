@@ -10,6 +10,9 @@ services:
       PULP_DB_NAME: hub
       PULP_DB_USER: galaxy
       PULP_DB_PASSWORD: ${HUB_DB_PASSWORD}
+      PULP_REDIS_HOST: hub-redis
+      PULP_REDIS_PORT: "6379"
+      PULP_SECRET_KEY: ${PULP_SECRET_KEY}
       WITH_MIGRATIONS: "1"
       GUNICORN_PORT: "24817"
     volumes:
@@ -25,6 +28,9 @@ services:
       PULP_DB_NAME: hub
       PULP_DB_USER: galaxy
       PULP_DB_PASSWORD: ${HUB_DB_PASSWORD}
+      PULP_REDIS_HOST: hub-redis
+      PULP_REDIS_PORT: "6379"
+      PULP_SECRET_KEY: ${PULP_SECRET_KEY}
       GUNICORN_PORT: "24816"
     volumes:
       - hub_pulp_certs:/etc/pulp/certs
@@ -37,6 +43,9 @@ services:
       PULP_DB_NAME: hub
       PULP_DB_USER: galaxy
       PULP_DB_PASSWORD: ${HUB_DB_PASSWORD}
+      PULP_REDIS_HOST: hub-redis
+      PULP_REDIS_PORT: "6379"
+      PULP_SECRET_KEY: ${PULP_SECRET_KEY}
       GUNICORN_PORT: "24817"
     volumes:
       - hub_pulp_certs:/etc/pulp/certs
@@ -57,11 +66,11 @@ services:
     volumes:
       - hub_pulp_certs:/etc/pulp/certs
   awx-web:
-    environment:
-      AWX_CSRF_TRUSTED_ORIGINS: ""
+    volumes:
+      - ./compat/awx-cache.py:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
   awx-task:
-    environment:
-      AWX_CSRF_TRUSTED_ORIGINS: ""
+    volumes:
+      - ./compat/awx-cache.py:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
 
 volumes:
   hub_pulp_certs:

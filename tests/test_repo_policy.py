@@ -209,7 +209,7 @@ def test_devel_publish_workflow_publishes_immutable_bundle() -> None:
     workflow = _read(".github/workflows/publish-devel.yml")
     required = [
         "packages: write",
-        "docker/login-action@v3",
+        "docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
         "devel-${{ github.sha }}",
         "SETUPTOOLS_SCM_PRETEND_VERSION=",
         "[awx]=awx:devel",
