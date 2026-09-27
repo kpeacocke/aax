@@ -211,6 +211,8 @@ def test_devel_publish_workflow_publishes_immutable_bundle() -> None:
         "docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
         "devel-${{ github.sha }}",
         "SETUPTOOLS_SCM_PRETEND_VERSION=",
+        "leaving it unchanged",
+        "continue",
         "[awx]=awx:devel",
         "[awx-ee]=awx-ee:devel",
         "[receptor]=receptor:devel",
