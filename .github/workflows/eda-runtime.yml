@@ -19,7 +19,7 @@ jobs:
         run: |
           set -euo pipefail
           docker network create eda-test
-          docker run -d --name eda-db --network eda-test -e POSTGRES_DB=eda -e POSTGRES_USER=eda -e POSTGRES_PASSWORD=test-only postgres:15
+          docker run -d --name eda-db --network eda-test -e POSTGRES_DB=eda -e POSTGRES_USER=eda -e POSTGRES_PASSWORD=test-only postgres:15 # pragma: allowlist secret
           for i in $(seq 1 30); do docker exec eda-db pg_isready -U eda && break; sleep 2; done
           docker run -d --name eda-api --network eda-test -p 127.0.0.1:15000:5000 \
             -e EDA_DB_HOST=eda-db -e EDA_DB_NAME=eda -e EDA_DB_USER=eda -e EDA_DB_PASSWORD=test-only \
@@ -29,6 +29,7 @@ jobs:
             -e EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT=true aax-eda-test
           for i in $(seq 1 90); do
             if curl -fsS http://127.0.0.1:15000/_healthz; then break; fi
+            test "$(docker inspect -f '{{.State.Running}}' eda-api)" = true || { docker logs eda-api; exit 1; }
             sleep 4
           done
           curl -fsS http://127.0.0.1:15000/_healthz
