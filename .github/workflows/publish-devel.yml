@@ -107,11 +107,15 @@ jobs:
 
       - name: Build Galaxy NG and Pulp devel
         working-directory: .upstream/galaxy-ng
-        run: docker buildx build --load -t galaxy-ng:devel \
-          --build-arg GIT_COMMIT=${{ github.sha }} .
+        run: |
+          docker buildx build --load -t galaxy-ng:devel \
+            --build-arg GIT_COMMIT=${{ github.sha }} .
 
       - name: Build AAX gateway devel
         run: docker buildx build --load -t gateway:devel images/gateway
+
+      - name: Build AAX EDA controller devel
+        run: docker buildx build --load -t eda-controller:devel images/eda-controller
 
       - name: Tag and push bundle
         env:
@@ -128,6 +132,7 @@ jobs:
             [galaxy-ng]=galaxy-ng:devel
             [pulp]=galaxy-ng:devel
             [gateway]=gateway:devel
+            [eda-controller]=eda-controller:devel
           )
           for name in "${!images[@]}"; do
             source_image="${images[$name]}"

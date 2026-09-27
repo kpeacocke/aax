@@ -15,6 +15,7 @@ these images under `ghcr.io/<owner>`:
 - `aax-galaxy-ng`
 - `aax-pulp`
 - `aax-gateway`
+- `aax-eda-controller`
 
 The immutable tag is `devel-<full-commit-sha>`. The mutable `devel` tag is also
 published when the workflow input allows it.
@@ -43,7 +44,7 @@ AWX_EE_IMAGE_REPOSITORY=ghcr.io/<owner>/aax-awx-ee
 AWX_EE_VERSION=devel-<full-commit-sha>
 RECEPTOR_IMAGE_REPOSITORY=ghcr.io/<owner>/aax-receptor
 RECEPTOR_VERSION=devel-<full-commit-sha>
-COMPOSE_PROFILES=controller,hub
+COMPOSE_PROFILES=controller,hub,eda
 ```
 
 Keep the required database passwords, AWX/Galaxy secrets, hostnames, and trusted

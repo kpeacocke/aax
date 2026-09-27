@@ -194,13 +194,12 @@ def test_devel_overlay_supports_registry_tagged_images() -> None:
     overlay = _read("docker-compose.devel.yml")
     script = _read("scripts/deploy-devel.sh")
     expected_images = [
-        "aax-gateway:${DEVEL_IMAGE_TAG:-devel}",
-        "aax-pulp:${DEVEL_IMAGE_TAG:-devel}",
-        "aax-galaxy-ng:${DEVEL_IMAGE_TAG:-devel}",
+        "${DEVEL_GATEWAY_IMAGE:-ghcr.io/kpeacocke/aax-gateway}:${DEVEL_IMAGE_TAG:-devel}",
+        "${DEVEL_PULP_IMAGE:-ghcr.io/kpeacocke/aax-pulp}:${DEVEL_IMAGE_TAG:-devel}",
+        "${DEVEL_GALAXY_IMAGE:-ghcr.io/kpeacocke/aax-galaxy-ng}:${DEVEL_IMAGE_TAG:-devel}",
     ]
     for image in expected_images:
         assert image in overlay
-    assert "DEVEL_IMAGE_PREFIX" in script
     assert "DEVEL_IMAGE_TAG" in script
 
 
@@ -219,6 +218,7 @@ def test_devel_publish_workflow_publishes_immutable_bundle() -> None:
         "[galaxy-ng]=galaxy-ng:devel",
         "[pulp]=galaxy-ng:devel",
         "[gateway]=gateway:devel",
+        "[eda-controller]=eda-controller:devel",
         "docker push",
     ]
     missing = [token for token in required if token not in workflow]

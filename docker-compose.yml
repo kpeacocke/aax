@@ -180,6 +180,7 @@ services:
     volumes:
       - awx_projects:/var/lib/awx/projects
       - awx_rsyslog:/var/log/tower
+      - ./compat/awx-cache.py:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
     networks:
       - awx-network
       - hub-network
@@ -251,6 +252,7 @@ services:
       - awx_rsyslog:/var/log/tower
       - receptor_data:/var/lib/receptor
       - awx_runner_tmp:/tmp
+      - ./compat/awx-cache.py:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
     networks:
       - awx-network
       - hub-network
