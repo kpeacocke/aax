@@ -107,8 +107,9 @@ jobs:
 
       - name: Build Galaxy NG and Pulp devel
         working-directory: .upstream/galaxy-ng
-        run: docker buildx build --load -t galaxy-ng:devel \
-          --build-arg GIT_COMMIT=${{ github.sha }} .
+        run: |
+          docker buildx build --load -t galaxy-ng:devel \
+            --build-arg GIT_COMMIT=${{ github.sha }} .
 
       - name: Build AAX gateway devel
         run: docker buildx build --load -t gateway:devel images/gateway
