@@ -35,6 +35,7 @@ with the Portainer API or deploy a generated combined Compose file from CI.
 Set these variables in the Portainer stack:
 
 ```text
+DEVEL_IMAGE_PREFIX=ghcr.io/<owner>
 DEVEL_IMAGE_TAG=devel-<full-commit-sha>
 AWX_IMAGE_REPOSITORY=ghcr.io/<owner>/aax-awx
 AWX_VERSION=devel-<full-commit-sha>

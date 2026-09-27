@@ -60,8 +60,6 @@ services:
       PULP_DB_NAME: hub
       PULP_DB_USER: galaxy
       PULP_DB_PASSWORD: ${HUB_DB_PASSWORD}
-      PULP_REDIS_HOST: hub-redis
-      PULP_REDIS_PORT: "6379"
       SECRET_KEY: ${GALAXY_SECRET_KEY}
       PULP_SECRET_KEY: ${PULP_SECRET_KEY}
       GUNICORN_PORT: "8000"
@@ -75,10 +73,13 @@ services:
     image: ${DEVEL_AWX_IMAGE:-ghcr.io/kpeacocke/aax-awx}:${DEVEL_IMAGE_TAG:-devel}
     volumes:
       - ./compat/awx-cache.py:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
+
   awx-receptor:
     image: ${DEVEL_AWX_EE_IMAGE:-ghcr.io/kpeacocke/aax-awx-ee}:${DEVEL_IMAGE_TAG:-devel}
+
   receptor-execution:
     image: ${DEVEL_AWX_EE_IMAGE:-ghcr.io/kpeacocke/aax-awx-ee}:${DEVEL_IMAGE_TAG:-devel}
+
   receptor-hop:
     image: ${DEVEL_RECEPTOR_IMAGE:-ghcr.io/kpeacocke/aax-receptor}:${DEVEL_IMAGE_TAG:-devel}
 
