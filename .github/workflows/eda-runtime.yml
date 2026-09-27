@@ -18,12 +18,15 @@ jobs:
       - name: Verify migrations and real HTTP API
         run: |
           set -euo pipefail
+          export POSTGRES_PASSWORD=$(openssl rand -hex 24)
+          export EDA_DB_PASSWORD="$POSTGRES_PASSWORD"
+          export EDA_SECRET_KEY=$(openssl rand -hex 32)
           docker network create eda-test
-          docker run -d --name eda-db --network eda-test -e POSTGRES_DB=eda -e POSTGRES_USER=eda -e POSTGRES_PASSWORD=test-only postgres:15 # pragma: allowlist secret
+          docker run -d --name eda-db --network eda-test -e POSTGRES_DB=eda -e POSTGRES_USER=eda -e POSTGRES_PASSWORD postgres:15
           for i in $(seq 1 30); do docker exec eda-db pg_isready -U eda && break; sleep 2; done
           docker run -d --name eda-api --network eda-test -p 127.0.0.1:15000:5000 \
-            -e EDA_DB_HOST=eda-db -e EDA_DB_NAME=eda -e EDA_DB_USER=eda -e EDA_DB_PASSWORD=test-only \
-            -e EDA_SECRET_KEY=ci-only-not-a-production-secret \
+            -e EDA_DB_HOST=eda-db -e EDA_DB_NAME=eda -e EDA_DB_USER=eda -e EDA_DB_PASSWORD \
+            -e EDA_SECRET_KEY \
             -e EDA_ALLOWED_HOSTS='["127.0.0.1","localhost"]' \
             -e EDA_RESOURCE_SERVER__URL='@none None' \
             -e EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT=true aax-eda-test
