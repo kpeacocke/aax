@@ -90,4 +90,5 @@ def test_runner_orphan_cannot_retain_supervisor_lock(tmp_path, service):
             try:
                 os.kill(orphan_pid, signal.SIGTERM)
             except ProcessLookupError:
+                # Cleanup is complete if the test child has already exited.
                 pass
