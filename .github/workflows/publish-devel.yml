@@ -19,6 +19,7 @@ on:
       - .github/workflows/publish-devel.yml
       - docker-compose.devel.yml
       - images/gateway/**
+      - images/eda-server/**
       - scripts/build-upstream.sh
   schedule:
     - cron: "17 3 * * *"
@@ -115,7 +116,7 @@ jobs:
         run: docker buildx build --load -t gateway:devel images/gateway
 
       - name: Build AAX EDA controller devel
-        run: docker buildx build --load -t eda-controller:devel images/eda-controller
+        run: docker buildx build --load -t eda-controller:devel images/eda-server
 
       - name: Tag and push bundle
         env:
