@@ -32,16 +32,19 @@ jobs:
           PORTAINER_WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
         run: curl --fail --show-error --silent --request POST "$PORTAINER_WEBHOOK_URL"
 
-      - name: Verify public AWX API health
+      # This endpoint proves availability only. Portainer stack revision and
+      # container health must be verified separately before declaring rollout success.
+      - name: Check public AWX API availability (not rollout completion)
         run: |
           for attempt in $(seq 1 30); do
             if curl --fail --show-error --silent \
               --max-time 10 \
               https://awx.ambitiouscake.com/api/v2/ping/ \
               | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data.get("version")'; then
+              echo "AWX API is available; Portainer rollout completion is not verified by this check." >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             sleep 10
           done
-          echo "AWX public API did not become healthy after deployment" >&2
+          echo "AWX public API did not become available after the webhook request" >&2
           exit 1

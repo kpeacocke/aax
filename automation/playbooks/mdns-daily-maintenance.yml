@@ -4,7 +4,7 @@
   vars:
     pi_patch_wave: mdns
     pi_guard_endpoints:
-      - host: 192.168.5.101
+      - host: "{{ ansible_host | default(inventory_hostname) }}"
         port: 9105
     pi_required_containers:
       - avahi-reflector
@@ -14,7 +14,7 @@
   gather_facts: false
   become: false
   vars:
-    mdns_metrics_url: http://192.168.5.101:9105/metrics
+    mdns_metrics_url: "http://{{ ansible_host | default(inventory_hostname) }}:9105/metrics"
     mdns_expected_interfaces:
       - interface: eth0.1
         vlan: "1"
@@ -30,6 +30,20 @@
         role: iot
 
   tasks:
+    - name: Wait for the reflector Docker health check to pass
+      community.docker.docker_container_info:
+        name: avahi-reflector
+      become: true
+      register: mdns_container
+      until:
+        - mdns_container.exists
+        - (mdns_container.container | default({}, true)).get('State', {}).get('Running', false)
+        - >-
+          (mdns_container.container | default({}, true)).get('State', {}).get('Health', {}).get('Status', '')
+          == 'healthy'
+      retries: 12
+      delay: 10
+
     - name: Read pi-mdns Prometheus metrics
       ansible.builtin.uri:
         url: "{{ mdns_metrics_url }}"
@@ -43,8 +57,8 @@
     - name: Require exporter and Avahi browsing to be healthy
       ansible.builtin.assert:
         that:
-          - "'mdns_exporter_up 1' in mdns_metrics.content"
-          - "'mdns_browse_success 1' in mdns_metrics.content"
+          - "'mdns_exporter_up 1' in mdns_metrics.content.splitlines()"
+          - "'mdns_browse_success 1' in mdns_metrics.content.splitlines()"
         fail_msg: pi-mdns exporter or Avahi browse validation failed
 
     - name: Require each reflected VLAN interface to be up
@@ -53,7 +67,7 @@
           - >-
             ('mdns_interface_up{interface="' ~ item.interface ~
              '",vlan="' ~ item.vlan ~
-             '",role="' ~ item.role ~ '"} 1') in mdns_metrics.content
+             '",role="' ~ item.role ~ '"} 1') in mdns_metrics.content.splitlines()
         fail_msg: >-
           mDNS interface {{ item.interface }} (VLAN {{ item.vlan }},
           {{ item.role }}) is not reported up
@@ -67,10 +81,10 @@
           - >-
             mdns_metrics.content |
             regex_search(
-              'mdns_services_total\\{interface="' ~ item.interface ~
+              '(?m)^mdns_services_total\\{interface="' ~ item.interface ~
               '",vlan="' ~ item.vlan ~
-              '",role="' ~ item.role ~ '"\\} [1-9][0-9]*'
-            )
+              '",role="' ~ item.role ~ '"\\} [1-9][0-9]*$'
+            ) is not none
         fail_msg: >-
           {{ item.interface }} (VLAN {{ item.vlan }}, {{ item.role }})
           is not seeing any mDNS services

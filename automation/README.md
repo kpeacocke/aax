@@ -12,6 +12,8 @@ read-only discovery of the DrayTek network estate.
   the DNS-pair workflow. Its maintenance job also validates the production
   mDNS metrics endpoint, Avahi browse status, VLAN interfaces 1-4 and non-zero
   service visibility on each reflected VLAN.
+  The endpoint follows the inventory address, and validation waits for an explicit
+  Docker `healthy` state; a running container without a health check does not pass.
 - A failure stops the workflow before the paired DNS host is touched.
 - Reboots occur only when `/var/run/reboot-required` exists.
 - Docker and the Portainer agent are reconciled and verified after each host.
