@@ -342,7 +342,8 @@ services:
         # /runner paths are compatibility mappings shared by this single-node
         # Compose deployment. Hold the lock before changing it and throughout
         # the job so parallel launches cannot cross-wire credential files.
-        exec flock /tmp/aax-ansible-runner.lock /usr/local/bin/ansible-runner-locked "$$@"
+        # Keep lock ownership in the supervisor, not orphanable runner children.
+        exec flock --close /tmp/aax-ansible-runner.lock /usr/local/bin/ansible-runner-locked "$$@"
         WEOF
         chmod +x /usr/local/bin/ansible-runner-locked
         chmod +x /usr/local/bin/ansible-runner-worker
@@ -503,7 +504,8 @@ services:
         #!/bin/sh
         # Serialize the compatibility mappings under /runner. The lock file
         # lives on the shared awx_runner_tmp volume used by both worker paths.
-        exec flock /tmp/aax-ansible-runner.lock /usr/local/bin/ansible-runner-locked "$$@"
+        # Keep lock ownership in the supervisor, not orphanable runner children.
+        exec flock --close /tmp/aax-ansible-runner.lock /usr/local/bin/ansible-runner-locked "$$@"
         WEOF
         chmod +x /usr/local/bin/ansible-runner-locked
         chmod +x /usr/local/bin/ansible-runner-worker
