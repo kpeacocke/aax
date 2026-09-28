@@ -5,6 +5,8 @@ WORKDIR /src
 # Last standalone AWX webpack configuration before the upstream platform redesign.
 ARG UI_REVISION=b512f07205f2be38d29dc245e955e66e64248ae3
 RUN git init && git remote add origin https://github.com/ansible/ansible-ui.git && git fetch --depth 1 origin "$UI_REVISION" && git checkout --detach FETCH_HEAD
+COPY patch-ui.cjs patch-ui.test.cjs /tmp/
+RUN node --test /tmp/patch-ui.test.cjs && node /tmp/patch-ui.cjs /src
 RUN npm ci --ignore-scripts
 RUN PRODUCT=AWX PUBLIC_PATH=/static/awx/ ROUTE_PREFIX=/ NODE_OPTIONS=--max-old-space-size=4096 npm run build:awx && mv build/awx/index.html build/awx/index_awx.html
 

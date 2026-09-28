@@ -113,7 +113,7 @@ jobs:
       - name: Run repository policy tests
         run: |
           pip install PyYAML Jinja2
-          pytest -q tests/test_repo_policy.py tests/test_docs_contract.py tests/test_home_automation.py tests/test_mdns_validation.py
+          pytest -q tests/test_repo_policy.py tests/test_docs_contract.py tests/test_home_automation.py tests/test_mdns_validation.py tests/test_runner_paths.py
 
   test-images:
     name: Test Docker Images
