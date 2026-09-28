@@ -31,11 +31,19 @@ job_templates:
     project: AAX - Home Infrastructure
     playbook: automation/playbooks/pi-audit.yml
     credential_policy: dedicated_pi_machine_credential
-  - name: Raspberry Pi - DNS Pair Maintenance
+  - name: Raspberry Pi - DNS Replica Maintenance
     inventory: Home Lab
     project: AAX - Home Infrastructure
     playbook: automation/playbooks/dns-pair-daily-maintenance.yml
-    credential_policy: dedicated_pi_machine_and_portainer_secret
+    credential: Home Lab - pi-harmony SSH
+    limit: pi-harmony
+    concurrent_jobs: false
+  - name: Raspberry Pi - DNS Primary Maintenance
+    inventory: Home Lab
+    project: AAX - Home Infrastructure
+    playbook: automation/playbooks/dns-pair-daily-maintenance.yml
+    credential: Home Lab - pi-terror SSH
+    limit: pi-terror
     concurrent_jobs: false
   - name: Raspberry Pi - mDNS Maintenance
     inventory: Home Lab
@@ -75,3 +83,25 @@ external_projects:
     organization: pi5-openclaw
     repository: https://github.com/kpeacocke/piclaw
     rationale: Separate application repository and release lifecycle
+
+workflow_job_templates:
+  - name: Raspberry Pi - DNS Pair Maintenance
+    organization: Home Lab
+    inventory: Home Lab
+    concurrent_jobs: false
+    nodes:
+      - identifier: dns-replica
+        job_template: Raspberry Pi - DNS Replica Maintenance
+        success_nodes: [dns-primary]
+        failure_nodes: []
+        always_nodes: []
+      - identifier: dns-primary
+        job_template: Raspberry Pi - DNS Primary Maintenance
+        success_nodes: []
+        failure_nodes: []
+        always_nodes: []
+    schedule:
+      name: Daily DNS Pair Maintenance
+      timezone: Australia/Sydney
+      time: "03:00"
+      frequency: daily
