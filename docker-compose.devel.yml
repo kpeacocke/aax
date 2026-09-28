@@ -82,12 +82,12 @@ services:
   awx-web:
     healthcheck:
       test: ["CMD", "python3", "-c", "import json,urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8052/api/v2/ping/', timeout=5); assert r.status == 200 and json.load(r).get('version')"]
-    image: ${DEVEL_AWX_IMAGE:-ghcr.io/kpeacocke/aax-awx}:${DEVEL_IMAGE_TAG:-devel}
+    image: ${DEVEL_AWX_IMAGE:-ghcr.io/kpeacocke/aax-awx}:${DEVEL_AWX_IMAGE_TAG:-${DEVEL_IMAGE_TAG:-devel}}
     pull_policy: always
     volumes:
       - ${AAX_AWX_CACHE_FILE:-./compat/awx-cache.py}:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro
   awx-task:
-    image: ${DEVEL_AWX_IMAGE:-ghcr.io/kpeacocke/aax-awx}:${DEVEL_IMAGE_TAG:-devel}
+    image: ${DEVEL_AWX_IMAGE:-ghcr.io/kpeacocke/aax-awx}:${DEVEL_AWX_IMAGE_TAG:-${DEVEL_IMAGE_TAG:-devel}}
     pull_policy: always
     volumes:
       - ${AAX_AWX_CACHE_FILE:-./compat/awx-cache.py}:/var/lib/awx/venv/awx/lib64/python3.12/site-packages/awx/main/cache.py:ro

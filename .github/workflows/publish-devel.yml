@@ -20,6 +20,7 @@ on:
       - docker-compose.devel.yml
       - images/gateway/**
       - images/eda-server/**
+      - images/awx-ui-runtime/**
       - scripts/build-upstream.sh
   schedule:
     - cron: "17 3 * * *"
@@ -85,6 +86,11 @@ jobs:
             -t awx:devel \
             --build-arg VERSION="$AWX_BUILD_VERSION" \
             --build-arg SETUPTOOLS_SCM_PRETEND_VERSION="$AWX_BUILD_VERSION" .
+
+      - name: Add compiled AWX UI
+        run: |
+          docker build --build-arg AWX_BASE_IMAGE=awx:devel -t awx:with-ui images/awx-ui-runtime
+          docker tag awx:with-ui awx:devel
 
       - name: Build AWX EE devel
         working-directory: .upstream/awx-ee
