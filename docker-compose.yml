@@ -330,6 +330,8 @@ services:
               private_data_dir=$${arg#--private-data-dir=}
               mkdir -p /runner
               ln -sfn "$$private_data_dir/env" /runner/env
+              ln -sfn "$$private_data_dir/project" /runner/project
+              ln -sfn "$$private_data_dir/artifacts" /runner/artifacts
               ;;
           esac
         done
@@ -337,7 +339,7 @@ services:
         WEOF
         cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
         #!/bin/sh
-        # /runner/env is a compatibility path shared by this single-node
+        # /runner paths are compatibility mappings shared by this single-node
         # Compose deployment. Hold the lock before changing it and throughout
         # the job so parallel launches cannot cross-wire credential files.
         exec flock /tmp/aax-ansible-runner.lock /usr/local/bin/ansible-runner-locked "$$@"
@@ -490,6 +492,8 @@ services:
               private_data_dir=$${arg#--private-data-dir=}
               mkdir -p /runner
               ln -sfn "$$private_data_dir/env" /runner/env
+              ln -sfn "$$private_data_dir/project" /runner/project
+              ln -sfn "$$private_data_dir/artifacts" /runner/artifacts
               ;;
           esac
         done
@@ -497,7 +501,7 @@ services:
         WEOF
         cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
         #!/bin/sh
-        # Serialize the compatibility mapping for /runner/env. The lock file
+        # Serialize the compatibility mappings under /runner. The lock file
         # lives on the shared awx_runner_tmp volume used by both worker paths.
         exec flock /tmp/aax-ansible-runner.lock /usr/local/bin/ansible-runner-locked "$$@"
         WEOF

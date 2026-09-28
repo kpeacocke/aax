@@ -15,3 +15,11 @@ tag to repair web and task containers without changing the rest of the bundle.
 Database migrations, credentials, and application settings are unchanged by
 this image layer. Browser login and application behavior still require live
 verification; asset presence is not proof of complete UI/API compatibility.
+
+The devel API rejects the pinned UI's `notification_admin_role` organization
+filter. The build applies a narrow compatibility patch: only that exact HTTP 400
+response becomes an empty result for the optional notification-tab probe. Other
+validation errors, authentication failures, authorization failures, and server
+errors still propagate. This hides the unsupported notification capability and
+does not grant permissions or bypass the API's access checks. Node regression
+tests cover those boundaries, and pull requests build the complete UI image.

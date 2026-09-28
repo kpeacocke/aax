@@ -4,6 +4,9 @@ on:
     branches: [main, fix/awx-devel-ui]
     paths: [images/awx-ui-runtime/**, .github/workflows/awx-ui-runtime.yml]
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths: [images/awx-ui-runtime/**, .github/workflows/awx-ui-runtime.yml]
 permissions:
   contents: read
   packages: write
@@ -14,6 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: github.event_name != 'pull_request'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
