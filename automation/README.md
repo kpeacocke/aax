@@ -74,7 +74,11 @@ Create these once in AWX:
    schedule from the DNS pair. The job guards TCP/9105 before and after
    maintenance, requires the `avahi-reflector` container to remain healthy,
    then validates the exporter, Avahi browsing, VLAN interfaces 1-4 and
-   non-zero discovery on each reflected VLAN.
+   non-zero advertisements on the service-producing VLANs (1, 3 and 4).
+   VLAN 2 is a consumer network: zero local advertisements is valid, but its
+   interface must remain up. Advertisement counts do not prove consumption.
+   Verify discovery and connection to a known service from an actual VLAN 2
+   client separately; the reflector's own browse is not a client-side test.
 9. Job template **Raspberry Pi - Portainer Agents** using
    `automation/playbooks/portainer-agents.yml` for manual reconciliation.
 10. Attach an AWX notification template to the **Error** event for both scheduled
