@@ -11,7 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Validate the mDNS exporter, Avahi, reflected VLANs and explicit container health
   after maintenance, using the inventory address for network checks.
-- Distinguish public AWX API availability from Portainer rollout completion.
 
 ### Added
 

@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLAY = yaml.safe_load(
     (ROOT / "automation/playbooks/mdns-daily-maintenance.yml").read_text()
 )[1]
-ENV = Environment(undefined=StrictUndefined)
+ENV = Environment(undefined=StrictUndefined, autoescape=True)
 ENV.filters["regex_search"] = lambda value, pattern: re.search(pattern, value)
 
 
