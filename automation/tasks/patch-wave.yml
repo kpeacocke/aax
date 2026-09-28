@@ -6,8 +6,8 @@
   serial: 1
   any_errors_fatal: true
   max_fail_percentage: 0
-  vars_files:
-    - ../inventories/home/group_vars/raspberry_pi.yml
+  # Inventory group_vars supply defaults. Loading them as vars_files would
+  # override the mDNS play's guards and the DNS child group's containers.
   vars:
     maintenance_started_at: "{{ ansible_date_time.iso8601 }}"
   pre_tasks:
