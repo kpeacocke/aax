@@ -17,7 +17,7 @@ def test_home_inventory_contains_declared_infrastructure() -> None:
     children = inventory["all"]["children"]
 
     alexandria = children["synology"]["hosts"]["alexandria"]
-    assert alexandria["ansible_host"] == "192.168.48.1"
+    assert alexandria["ansible_host"] == "host.docker.internal"
     assert alexandria["management_address"] == "192.168.5.100"
 
     draytek_children = children["draytek"]["children"]
