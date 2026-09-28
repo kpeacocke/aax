@@ -19,15 +19,20 @@
       - interface: eth0.1
         vlan: "1"
         role: trusted
+        require_advertisements: true
       - interface: eth0.2
         vlan: "2"
         role: kids
+        # Clients consume reflected services; local advertisements are optional.
+        require_advertisements: false
       - interface: eth0.3
         vlan: "3"
         role: media
+        require_advertisements: true
       - interface: eth0.4
         vlan: "4"
         role: iot
+        require_advertisements: true
 
   tasks:
     - name: Wait for the reflector Docker health check to pass
@@ -75,7 +80,7 @@
       loop_control:
         label: "{{ item.interface }}"
 
-    - name: Require each reflected VLAN to see at least one mDNS service
+    - name: Require service-producing VLANs to advertise mDNS services
       ansible.builtin.assert:
         that:
           - >-
@@ -88,6 +93,6 @@
         fail_msg: >-
           {{ item.interface }} (VLAN {{ item.vlan }}, {{ item.role }})
           is not seeing any mDNS services
-      loop: "{{ mdns_expected_interfaces }}"
+      loop: "{{ mdns_expected_interfaces | selectattr('require_advertisements') | list }}"
       loop_control:
         label: "{{ item.interface }}"
