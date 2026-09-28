@@ -86,8 +86,8 @@ Create these once in AWX:
    client separately; the reflector's own browse is not a client-side test.
 9. Job template **Raspberry Pi - Portainer Agents** using
    `automation/playbooks/portainer-agents.yml` for manual reconciliation.
-10. Attach an AWX notification template to the **Error** event for both scheduled
-   job templates. Store the webhook/token in AWX, not this repository. The
+10. Attach an AWX notification template to the **Error** event for the DNS
+   workflow and the mDNS job template. Store the webhook/token in AWX, not this repository. The
    notification includes the failed job URL and the host/task that stopped the
    workflow.
 11. Job template **Discovery - Network** using
@@ -104,8 +104,11 @@ Create these once in AWX:
 
 ## Raspberry Pi account bootstrap
 
-The permanent Pi jobs use the AWX Machine credential **Home Lab - Raspberry Pi
-Fleet** as user `ansible`, with its SSH private key and `sudo` escalation. The
+The fleet audit and newly bootstrapped hosts use the AWX Machine credential
+**Home Lab - Raspberry Pi Fleet** as user `ansible`, with its SSH private key
+and `sudo` escalation. DNS workflow stages use the dedicated host credentials
+listed above; mDNS uses **Home Lab - pi-mdns SSH**. Do not replace these with
+the fleet credential until its key has been installed and verified on each host. The
 matching public key is intentionally versioned in
 `inventories/home/group_vars/raspberry_pi.yml`; private keys and passwords must
 never be committed.
@@ -118,8 +121,9 @@ permanent fleet credential. The role locks password authentication for the
 `ansible` account, installs only the declared public key, and validates its
 sudoers entry before replacing it.
 
-Run **Pi - Audit** first. Run both maintenance jobs manually before enabling
-their daily schedules. Schedule the agent-only job after a deliberate
+Run **Pi - Audit** first. Run the DNS workflow and mDNS maintenance job manually
+before enabling their daily schedules. Enable only the workflow schedule for
+DNS; keep the superseded combined DNS job schedule disabled. Schedule the agent-only job after a deliberate
 Portainer Server upgrade, not independently: Portainer requires agent and server
 versions to match.
 

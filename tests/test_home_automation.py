@@ -106,6 +106,12 @@ def test_dns_workflow_uses_host_credentials_and_success_only_sequence() -> None:
     workflow = model["workflow_job_templates"][0]
     replica, primary = workflow["nodes"]
     assert workflow["concurrent_jobs"] is False
+    assert workflow["schedule"] == {
+        "name": "Daily DNS Pair Maintenance",
+        "timezone": "Australia/Sydney",
+        "time": "03:00",
+        "frequency": "daily",
+    }
     assert replica["success_nodes"] == [primary["identifier"]]
     assert replica["failure_nodes"] == replica["always_nodes"] == []
     assert primary["success_nodes"] == primary["failure_nodes"] == primary["always_nodes"] == []
