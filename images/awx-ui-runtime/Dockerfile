@@ -1,6 +1,6 @@
-ARG AWX_BASE_IMAGE=ghcr.io/kpeacocke/aax-awx:devel-cb8ba124a551f58b5499752bbad33dc4d9a66f48
-FROM node:22-bookworm-slim AS ui
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+ARG AWX_BASE_IMAGE=ghcr.io/kpeacocke/aax-awx
+ARG AWX_BASE_TAG=devel-cb8ba124a551f58b5499752bbad33dc4d9a66f48
+FROM node:22-bookworm AS ui
 WORKDIR /src
 # Last standalone AWX webpack configuration before the upstream platform redesign.
 ARG UI_REVISION=b512f07205f2be38d29dc245e955e66e64248ae3
@@ -8,7 +8,7 @@ RUN git init && git remote add origin https://github.com/ansible/ansible-ui.git 
 RUN npm ci --ignore-scripts
 RUN PRODUCT=AWX PUBLIC_PATH=/static/awx/ ROUTE_PREFIX=/ NODE_OPTIONS=--max-old-space-size=4096 npm run build:awx && mv build/awx/index.html build/awx/index_awx.html
 
-FROM ${AWX_BASE_IMAGE}
+FROM ${AWX_BASE_IMAGE}:${AWX_BASE_TAG}
 USER root
 COPY --from=ui /src/build/awx /tmp/aax-ui
 RUN set -eu; \

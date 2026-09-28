@@ -89,7 +89,7 @@ jobs:
 
       - name: Add compiled AWX UI
         run: |
-          docker build --build-arg AWX_BASE_IMAGE=awx:devel -t awx:with-ui images/awx-ui-runtime
+          docker build --build-arg AWX_BASE_IMAGE=awx --build-arg AWX_BASE_TAG=devel -t awx:with-ui images/awx-ui-runtime
           docker tag awx:with-ui awx:devel
 
       - name: Build AWX EE devel
