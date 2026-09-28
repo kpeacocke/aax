@@ -39,5 +39,9 @@ jobs:
           REVISION: ${{ github.sha }}
         run: |
           image="ghcr.io/${OWNER,,}/aax-awx:ui-${REVISION}"
+          if docker manifest inspect "$image" >/dev/null 2>&1; then
+            echo "Image tag already exists; leaving it unchanged"
+            exit 0
+          fi
           docker tag aax-awx-ui-test "$image"
           docker push "$image"

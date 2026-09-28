@@ -5,6 +5,9 @@ The original devel bundle was built with `headless=True`, so its API runs but
 that exact backend and adds the official standalone Ansible UI, pinned to the
 upstream webpack upgrade commit `b512f07205f2be38d29dc245e955e66e64248ae3`.
 The current UI main branch uses a different platform build layout.
+This devel backend resolves templates under `awx/ui/build/awx`; the repository's
+separate stable 24.6.1 Dockerfile uses `ui_next`, which is not this base image.
+The workflow loads the actual derivative image's Django template to verify this.
 
 The workflow verifies Django can load the template and compiled JavaScript is
 present before publishing `aax-awx:ui-<commit>`. Set `DEVEL_AWX_IMAGE_TAG` to that
