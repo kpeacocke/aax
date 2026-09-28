@@ -98,3 +98,20 @@ def test_controller_object_model_has_clear_repository_boundaries() -> None:
             "rationale": "Separate application repository and release lifecycle",
         }
     ]
+
+
+def test_dns_workflow_uses_host_credentials_and_success_only_sequence() -> None:
+    model = _yaml("automation/controller/object-model.yml")
+    templates = {item["name"]: item for item in model["job_templates"]}
+    workflow = model["workflow_job_templates"][0]
+    replica, primary = workflow["nodes"]
+    assert workflow["concurrent_jobs"] is False
+    assert replica["success_nodes"] == [primary["identifier"]]
+    assert replica["failure_nodes"] == replica["always_nodes"] == []
+    assert primary["success_nodes"] == primary["failure_nodes"] == primary["always_nodes"] == []
+    for node, host in ((replica, "pi-harmony"), (primary, "pi-terror")):
+        template = templates[node["job_template"]]
+        assert template["limit"] == host
+        assert template["credential"] == f"Home Lab - {host} SSH"
+        assert template["concurrent_jobs"] is False
+        assert template["playbook"] == "automation/playbooks/dns-pair-daily-maintenance.yml"

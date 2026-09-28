@@ -66,9 +66,14 @@ Create these once in AWX:
    `portainer_agent_secret`. It must equal the Portainer Server `AGENT_SECRET`.
 6. Job template **Raspberry Pi - Audit** using
    `automation/playbooks/pi-audit.yml`.
-7. Job template **Raspberry Pi - DNS Pair Maintenance** using
-   `automation/playbooks/dns-pair-daily-maintenance.yml`, with concurrent jobs
-   off and privilege escalation on.
+7. Workflow **Raspberry Pi - DNS Pair Maintenance**, with concurrent jobs off:
+   **DNS Replica Maintenance** uses the dedicated pi-harmony SSH credential and
+   limit `pi-harmony`; its success edge starts **DNS Primary Maintenance**, using
+   the dedicated pi-terror SSH credential and limit `pi-terror`. Both stages use
+   `automation/playbooks/dns-pair-daily-maintenance.yml`, privilege escalation
+   on, and concurrent jobs off. The primary stage retains the replica DNS and
+   Nebula Sync gates. Schedule only the workflow at 03:00 Australia/Sydney;
+   disable the superseded combined job's schedule before enabling this one.
 8. Job template **Raspberry Pi - mDNS Maintenance** using
    `automation/playbooks/mdns-daily-maintenance.yml`, on a different daily
    schedule from the DNS pair. The job guards TCP/9105 before and after
