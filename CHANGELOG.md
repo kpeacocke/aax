@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Validate the mDNS exporter, Avahi, reflected VLANs and explicit container health
+  after maintenance, using the inventory address for network checks.
+
 ### Added
 
 - Initial release of AAX

@@ -3,3 +3,91 @@
   ansible.builtin.import_playbook: ../tasks/patch-wave.yml
   vars:
     pi_patch_wave: mdns
+    pi_guard_endpoints:
+      - host: "{{ ansible_host | default(inventory_hostname) }}"
+        port: 9105
+    pi_required_containers:
+      - avahi-reflector
+
+- name: Validate mDNS discovery after maintenance
+  hosts: mdns
+  gather_facts: false
+  become: false
+  vars:
+    mdns_metrics_url: "http://{{ ansible_host | default(inventory_hostname) }}:9105/metrics"
+    mdns_expected_interfaces:
+      - interface: eth0.1
+        vlan: "1"
+        role: trusted
+      - interface: eth0.2
+        vlan: "2"
+        role: kids
+      - interface: eth0.3
+        vlan: "3"
+        role: media
+      - interface: eth0.4
+        vlan: "4"
+        role: iot
+
+  tasks:
+    - name: Wait for the reflector Docker health check to pass
+      community.docker.docker_container_info:
+        name: avahi-reflector
+      become: true
+      register: mdns_container
+      until:
+        - mdns_container.exists
+        - (mdns_container.container | default({}, true)).get('State', {}).get('Running', false)
+        - >-
+          (mdns_container.container | default({}, true)).get('State', {}).get('Health', {}).get('Status', '')
+          == 'healthy'
+      retries: 12
+      delay: 10
+
+    - name: Read pi-mdns Prometheus metrics
+      ansible.builtin.uri:
+        url: "{{ mdns_metrics_url }}"
+        method: GET
+        return_content: true
+        status_code: 200
+        timeout: 15
+      register: mdns_metrics
+      delegate_to: localhost
+
+    - name: Require exporter and Avahi browsing to be healthy
+      ansible.builtin.assert:
+        that:
+          - "'mdns_exporter_up 1' in mdns_metrics.content.splitlines()"
+          - "'mdns_browse_success 1' in mdns_metrics.content.splitlines()"
+        fail_msg: pi-mdns exporter or Avahi browse validation failed
+
+    - name: Require each reflected VLAN interface to be up
+      ansible.builtin.assert:
+        that:
+          - >-
+            ('mdns_interface_up{interface="' ~ item.interface ~
+             '",vlan="' ~ item.vlan ~
+             '",role="' ~ item.role ~ '"} 1') in mdns_metrics.content.splitlines()
+        fail_msg: >-
+          mDNS interface {{ item.interface }} (VLAN {{ item.vlan }},
+          {{ item.role }}) is not reported up
+      loop: "{{ mdns_expected_interfaces }}"
+      loop_control:
+        label: "{{ item.interface }}"
+
+    - name: Require each reflected VLAN to see at least one mDNS service
+      ansible.builtin.assert:
+        that:
+          - >-
+            mdns_metrics.content |
+            regex_search(
+              '(?m)^mdns_services_total\\{interface="' ~ item.interface ~
+              '",vlan="' ~ item.vlan ~
+              '",role="' ~ item.role ~ '"\\} [1-9][0-9]*$'
+            ) is not none
+        fail_msg: >-
+          {{ item.interface }} (VLAN {{ item.vlan }}, {{ item.role }})
+          is not seeing any mDNS services
+      loop: "{{ mdns_expected_interfaces }}"
+      loop_control:
+        label: "{{ item.interface }}"
