@@ -9,7 +9,9 @@ read-only discovery of the DrayTek network estate.
 - The Pi-hole primary (`pi-terror`) is touched only after the replica's Pi-hole,
   Unbound, DNS port and recent Nebula Sync cycle all pass validation.
 - `pi-mdns` has a separate playbook and schedule; it does not participate in
-  the DNS-pair workflow.
+  the DNS-pair workflow. Its maintenance job also validates the production
+  mDNS metrics endpoint, Avahi browse status, VLAN interfaces 1-4 and non-zero
+  service visibility on each reflected VLAN.
 - A failure stops the workflow before the paired DNS host is touched.
 - Reboots occur only when `/var/run/reboot-required` exists.
 - Docker and the Portainer agent are reconciled and verified after each host.
@@ -67,7 +69,10 @@ Create these once in AWX:
    off and privilege escalation on.
 8. Job template **Raspberry Pi - mDNS Maintenance** using
    `automation/playbooks/mdns-daily-maintenance.yml`, on a different daily
-   schedule from the DNS pair.
+   schedule from the DNS pair. The job guards TCP/9105 before and after
+   maintenance, requires the `avahi-reflector` container to remain healthy,
+   then validates the exporter, Avahi browsing, VLAN interfaces 1-4 and
+   non-zero discovery on each reflected VLAN.
 9. Job template **Raspberry Pi - Portainer Agents** using
    `automation/playbooks/portainer-agents.yml` for manual reconciliation.
 10. Attach an AWX notification template to the **Error** event for both scheduled
