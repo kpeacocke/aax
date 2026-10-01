@@ -319,6 +319,12 @@ class TestDockerCompose:
         assert config.count("source: awx_runner_tmp") == 3
         assert config.count("target: /tmp") == 3
         assert config.count('ln -sfn "$$private_data_dir/env" /runner/env') == 2
+        assert config.count(
+            'ln -sfn "$$private_data_dir/requirements_collections" /runner/requirements_collections'
+        ) == 2
+        assert config.count(
+            'ln -sfn "$$private_data_dir/requirements_roles" /runner/requirements_roles'
+        ) == 2
 
 
 @pytest.mark.integration

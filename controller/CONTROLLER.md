@@ -339,6 +339,15 @@ docker compose --profile controller exec awx-receptor receptorctl --socket /var/
 
 1. Ensure Docker socket is mounted and accessible
 
+### Synced Collections Missing in Jobs
+
+When runner process isolation is disabled, AWX still places
+`/runner/requirements_collections` and `/runner/requirements_roles` in the
+Ansible search paths. The Compose Receptor worker wrappers map those paths to
+each job's private data directory. Deploy changes to both `awx-receptor` and
+`receptor-execution` before retrying a job; a successful project sync alone
+does not update the running wrappers.
+
 ### Database Connection Errors
 
 Verify PostgreSQL is running and healthy:

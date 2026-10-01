@@ -345,6 +345,8 @@ services:
               ln -sfn "$$private_data_dir/env" /runner/env
               ln -sfn "$$private_data_dir/project" /runner/project
               ln -sfn "$$private_data_dir/artifacts" /runner/artifacts
+              ln -sfn "$$private_data_dir/requirements_collections" /runner/requirements_collections
+              ln -sfn "$$private_data_dir/requirements_roles" /runner/requirements_roles
               ;;
           esac
         done
@@ -508,6 +510,8 @@ services:
               ln -sfn "$$private_data_dir/env" /runner/env
               ln -sfn "$$private_data_dir/project" /runner/project
               ln -sfn "$$private_data_dir/artifacts" /runner/artifacts
+              ln -sfn "$$private_data_dir/requirements_collections" /runner/requirements_collections
+              ln -sfn "$$private_data_dir/requirements_roles" /runner/requirements_roles
               ;;
           esac
         done
