@@ -1,5 +1,6 @@
 ---
-synology_ssh_port: 22
+synology_ssh_port: 2222
+ansible_port: "{{ synology_ssh_port }}"
 synology_https_port: 5001
 # DSM does not provide a working SFTP subsystem in this configuration. Piped
 # transfer avoids noisy SCP/SFTP fallback warnings, while pinning the interpreter
