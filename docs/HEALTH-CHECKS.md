@@ -93,7 +93,7 @@ GET /api/v2/ping/
   "license_info": {
     "license_type": "community"
   },
-  "version": "devel"
+  "version": "<resolved-devel-version>"
 }
 ```
 
