@@ -473,5 +473,5 @@ async def main(
 ---
 
 **Last Updated:** February 27, 2026  
-**EDA Version:** 1.1.3  
+**EDA Version:** 1.3.2
 **Status:** Production-ready

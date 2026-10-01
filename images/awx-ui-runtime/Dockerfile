@@ -11,6 +11,7 @@ RUN npm ci --ignore-scripts
 RUN PRODUCT=AWX PUBLIC_PATH=/static/awx/ ROUTE_PREFIX=/ NODE_OPTIONS=--max-old-space-size=4096 npm run build:awx && mv build/awx/index.html build/awx/index_awx.html
 
 FROM ${AWX_BASE_IMAGE}:${AWX_BASE_TAG}
+# hadolint ignore=DL3066
 USER root
 COPY --from=ui /src/build/awx /tmp/aax-ui
 RUN set -eu; \
@@ -21,4 +22,5 @@ RUN set -eu; \
     test -s "$awx_dir/ui/build/awx/index_awx.html"; \
     test -d /var/lib/awx/public/static/awx; \
     rm -rf /tmp/aax-ui
+# hadolint ignore=DL3066
 USER 1000

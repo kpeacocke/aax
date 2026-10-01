@@ -64,10 +64,10 @@ This is a good fit for a self-hosted deployment model because it separates:
 
 ## Current baseline
 
-The repo currently targets a recent tested baseline with explicit version pins, including:
+The repo currently targets the upstream development line, including:
 
-- AWX `24.6.1`
-- AWX EE `24.6.1`
-- Receptor `v1.6.4`
+- AWX `devel`
+- AWX EE `devel`
+- Receptor `devel`
 
-The goal is to keep this baseline current and compatible, while making the repo-owned compatibility layer deliberate and supportable.
+The goal is to keep the moving upstream components compatible and buildable, while making the repo-owned compatibility layer deliberate and supportable.

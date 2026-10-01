@@ -51,9 +51,10 @@ LABEL org.opencontainers.image.title="AAX Ansible Execution Environment" \
 
 # Health check to verify Ansible installation
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD python3 -c "import ansible; import ansible_runner" || exit 1
+  CMD ["python3", "-c", "import ansible; import ansible_runner"]
 
 # Switch to non-root user
+# hadolint ignore=DL3066
 USER ansible
 WORKDIR /home/ansible
 

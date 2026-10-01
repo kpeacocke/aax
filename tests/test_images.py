@@ -69,7 +69,7 @@ class TestEEBaseImage:
             text=True
         )
         assert result.returncode == 0, f"Ansible not found: {result.stderr}"
-        assert "ansible [core 2.20.0]" in result.stdout
+        assert "ansible [core 2.21.4]" in result.stdout
 
     def test_ansible_runner_installed(self):
         """Test that ansible-runner is installed."""
@@ -173,7 +173,7 @@ class TestEEBuilderImage:
             text=True
         )
         assert result.returncode == 0, f"ansible-builder not found: {result.stderr}"
-        assert "3.1.0" in result.stdout
+        assert "3.1.1" in result.stdout
 
     def test_inherits_from_base(self):
         """Test that ee-builder inherits ansible from ee-base."""
@@ -183,7 +183,7 @@ class TestEEBuilderImage:
             text=True
         )
         assert result.returncode == 0
-        assert "ansible [core 2.20.0]" in result.stdout
+        assert "ansible [core 2.21.4]" in result.stdout
 
     def test_python_version(self):
         """Test that the correct Python version is installed."""
@@ -254,7 +254,7 @@ class TestDevToolsImage:
             text=True
         )
         assert result.returncode == 0, f"ansible-navigator not found: {result.stderr}"
-        assert "24.2.0" in result.stdout
+        assert "26.9.0" in result.stdout
 
     def test_ansible_lint_installed(self):
         """Test that ansible-lint is installed and accessible."""
@@ -264,7 +264,7 @@ class TestDevToolsImage:
             text=True
         )
         assert result.returncode == 0, f"ansible-lint not found: {result.stderr}"
-        assert "25.12.1" in result.stdout
+        assert "26.9.0" in result.stdout
 
     def test_inherits_from_base(self):
         """Test that dev-tools inherits ansible from ee-base."""
@@ -376,7 +376,7 @@ class TestAWXImage:
             self.IMAGE_NAME,
             "images/awx/Dockerfile",
             "images/awx",
-            build_args={"AWX_VERSION": "24.6.1"},
+            build_args={"AWX_VERSION": "devel"},
         )
         assert result.returncode == 0, f"Build failed: {result.stderr}"
 

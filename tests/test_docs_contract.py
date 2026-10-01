@@ -114,7 +114,7 @@ def test_version_matrix_doc_exists_with_controlled_defaults() -> None:
         "gateway",
         "latest",
         "1.0.0",
-        "v1.6.4",
+        "devel",
     ]
     for token in required_tokens:
         assert token in content

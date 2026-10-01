@@ -127,13 +127,13 @@ docker compose down
 
 Controller note:
 
-- `awx-web` and `awx-task` default to the official `quay.io/ansible/awx:24.6.1` image.
+- `awx-web` and `awx-task` default to the official `quay.io/ansible/awx:devel` image.
 - If you switch from an older custom AWX image, redeploy so the controller services pull the official image.
 - Public AWX traffic should terminate at the gateway on `GATEWAY_PORT`; `AWX_WEB_PORT` remains useful for local direct validation.
 
 Receptor mesh note:
 
-- The Docker Compose receptor mesh connects `awx-receptor` directly to `receptor-execution`, bypassing the `receptor-hop` service. The awx-ee image bundles receptor 1.4.8, while the standalone receptor image ships 1.6.4; relaying work through the version-mismatched hop caused jobs to fail silently. On a single-host Compose deployment the hop adds no value since all containers share the same Docker network.
+- The Docker Compose receptor mesh connects `awx-receptor` directly to `receptor-execution`, bypassing the `receptor-hop` service. This avoids an unnecessary version-sensitive hop on a single-host deployment where all containers share the same Docker network.
 - The Kubernetes manifests retain the three-node mesh (controller → hop → execution) for multi-zone deployments where network segmentation matters.
 
 ## Portainer Deployment (Synology/NAS)
@@ -150,9 +150,9 @@ Use Portainer Git repository stack mode with the single compose file.
 - COMPOSE_PROFILES=controller,hub
 - HOST_BIND=127.0.0.1
 - AAX_VERSION=latest
-- AWX_VERSION=24.6.1
-- AWX_EE_VERSION=24.6.1
-- RECEPTOR_VERSION=v1.6.4
+- AWX_VERSION=devel
+- AWX_EE_VERSION=devel
+- RECEPTOR_VERSION=devel
 - AWX_POSTGRES_VERSION=15
 - HUB_POSTGRES_VERSION=16-alpine
 - EDA_POSTGRES_VERSION=15

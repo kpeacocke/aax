@@ -16,7 +16,7 @@ The stack consists of:
 
 ### Design Decision: Building AWX from Source
 
-This controller stack builds AWX from the official Ansible AWX source repository (`github.com/ansible/awx`) at version 24.6.1. This aligns with AAX's philosophy of building all components from source.
+This controller stack builds AWX from the official Ansible AWX source repository (`github.com/ansible/awx`) at the rolling `devel` branch. This aligns with AAX's philosophy of building all components from source.
 
 **Why Build from Source:**
 

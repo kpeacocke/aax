@@ -11,7 +11,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
 #### 3.2. Automation Controller
 
 - **Official Description:** Enterprise framework enabling users to define, operate, scale, and delegate Ansible automation across their enterprise.
-- **AAX Implementation:** [AWX](https://github.com/ansible/awx) v24.6.1
+- **AAX Implementation:** [AWX](https://github.com/ansible/awx) `devel`
 - **Services:** awx-web, awx-task, awx-postgres, awx-redis
 - **Features:**
   - Web UI and REST API for automation management
@@ -28,7 +28,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
 #### 3.3. Private Automation Hub
 
 - **Official Description:** Provides both disconnected and on-premise solutions for synchronizing content. You can synchronize collections and execution environment images from Red Hat cloud automation hub, storing and serving your own custom automation collections and execution images.
-- **AAX Implementation:** [Galaxy NG](https://github.com/ansible/galaxy_ng) v4.9.2 + [Pulp](https://github.com/pulpproject/pulp)
+- **AAX Implementation:** [Galaxy NG](https://github.com/ansible/galaxy_ng) v4.10.6 + [Pulp](https://github.com/pulpproject/pulp) 3.49.40
 - **Services:** galaxy-ng, pulp-api, pulp-content, pulp-worker, hub-postgres, hub-redis
 - **Features:**
   - Custom Ansible Collection hosting and distribution
@@ -60,9 +60,9 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
 #### 3.7. Automation Execution Environments
 
 - **Official Description:** Container images on which all automation in Red Hat Ansible Automation Platform is run. They provide a solution that includes the Ansible execution engine and hundreds of modules.
-- **AAX Implementation:** [Ansible](https://github.com/ansible/ansible) + [ansible-builder](https://github.com/ansible/ansible-builder) v3.1.0
+- **AAX Implementation:** [Ansible](https://github.com/ansible/ansible) + [ansible-builder](https://github.com/ansible/ansible-builder) v3.1.1
 - **Execution Environments:**
-  - **ee-base:** Base EE with Ansible Core 2.20.0, Python 3.14, standard modules
+  - **ee-base:** Base EE with Ansible Core 2.21.4, Python 3.14, standard modules
   - **ee-builder:** Extends ee-base with ansible-builder for building custom EEs
   - **dev-tools:** Extends ee-base with development and testing tools (ansible-navigator, ansible-lint)
 - **Features:**
@@ -89,7 +89,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
 #### 3.9. Automation Content Navigator
 
 - **Official Description:** A textual user interface (TUI) that becomes the primary command line interface into the automation platform, covering use cases from content building, running automation locally in an execution environment, running automation in Ansible Automation Platform.
-- **AAX Implementation:** [Ansible Navigator](https://github.com/ansible/ansible-navigator) v24.2.0 + [ansible-lint](https://github.com/ansible/ansible-lint) v25.12.1
+- **AAX Implementation:** [Ansible Navigator](https://github.com/ansible/ansible-navigator) v26.9.0 + [ansible-lint](https://github.com/ansible/ansible-lint) v26.9.0
 - **Included in:** `dev-tools` execution environment
 - **Features:**
   - TUI for exploring execution environment contents
@@ -139,7 +139,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
 #### 3.5. Event-Driven Ansible Controller
 
 - **Official Description:** The interface for event-driven automation and introduces automated resolution of IT requests. Helps you connect to sources of events and act on those events by using rulebooks.
-- **AAX Implementation:** [ansible-rulebook](https://github.com/ansible/ansible-rulebook) v1.1.3
+- **AAX Implementation:** [ansible-rulebook](https://github.com/ansible/ansible-rulebook) v1.3.2
 - **Services:** eda-controller, eda-postgres, eda-redis
 - **Features:**
   - Event source integration (webhooks, monitoring systems, message queues)

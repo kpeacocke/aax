@@ -12,6 +12,10 @@ when SAML is unconfigured, so no SAML functionality is silently lost.
 import pathlib
 
 p = pathlib.Path('/awx/awx/sso/backends.py')
+if not p.exists():
+    print(f"Skipping SAML patch; {p} is not present in this AWX version")
+    raise SystemExit(0)
+
 text = p.read_text()
 
 # All three top-level saml imports trigger the xmlsec import chain.

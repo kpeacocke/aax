@@ -7,12 +7,12 @@
 ARG VERSION=dev
 ARG BUILD_DATE
 ARG VCS_REF
-ARG GALAXY_NG_VERSION=4.9.2
+ARG GALAXY_NG_REF=4.10.6
 
 # Stage 1: Builder
 FROM python:3.11-slim-bookworm AS builder
 
-ARG GALAXY_NG_VERSION
+ARG GALAXY_NG_REF
 
 # Install build dependencies only
 # hadolint ignore=DL3008
@@ -30,9 +30,10 @@ RUN apt-get update && \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-RUN pip install --no-cache-dir --upgrade pip==24.0 setuptools==69.1.1 wheel==0.42.0 && \
+RUN pip install --no-cache-dir --upgrade pip==26.2.1 setuptools==81.0.0 wheel==0.48.0 && \
   pip install --no-cache-dir \
-  galaxy-ng==${GALAXY_NG_VERSION} \
+  "galaxy-ng @ git+https://github.com/ansible/galaxy_ng.git@${GALAXY_NG_REF}" \
+  boto3==1.43.106 \
   gunicorn==22.0.0 \
   psycopg2-binary==2.9.9 \
   django-environ==0.11.2
@@ -75,7 +76,7 @@ RUN echo "Skipping in-place rewrite of galaxy_ng settings to avoid corruption of
 
 # Patch ruamel.yaml metadata to remove clib dependency (same as in Pulp)
 # hadolint ignore=DL3059
-RUN find /opt/venv/lib/python3.11/site-packages/ruamel.yaml-*.dist-info -name METADATA -exec \
+RUN find /opt/venv/lib/python3.11/site-packages -maxdepth 2 -type f -path '*/ruamel*yaml*.dist-info/METADATA' -exec \
   sed -i 's/Requires-Dist: ruamel\.yaml\.clib.*//' {} \;
 
 # Copy entrypoint script
@@ -98,6 +99,7 @@ LABEL org.opencontainers.image.title="AAX Galaxy NG" \
 
 # Set working directory and user
 WORKDIR /app
+# hadolint ignore=DL3066
 USER galaxy
 
 # Expose port

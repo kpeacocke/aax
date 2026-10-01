@@ -48,13 +48,13 @@ This is the part that should be built and published by the repo.
 
 ## 3. Current baseline target
 
-The repo currently demonstrates a recent tested baseline for the upstream stack:
+The repo currently demonstrates a rolling upstream development baseline:
 
-- AWX `24.6.1`
-- AWX EE `24.6.1`
-- Receptor `v1.6.4`
+- AWX `devel`
+- AWX EE `devel`
+- Receptor `devel`
 
-This should remain the starting point for the modern build plan while the repo moves to stricter release discipline.
+This is the starting point for the modern build plan; image builds should be validated together because these upstream branches move independently.
 
 ## 4. Release policy
 
