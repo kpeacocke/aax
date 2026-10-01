@@ -93,7 +93,7 @@ GET /api/v2/ping/
   "license_info": {
     "license_type": "community"
   },
-  "version": "24.6.1"
+  "version": "<resolved-devel-version>"
 }
 ```
 
@@ -142,9 +142,9 @@ GET /api/galaxy/v3/status/
 
 ```json
 {
-  "pulp_version": "3.28.43",
+  "pulp_version": "3.49.40",
   "component_versions": {
-    "galaxy_ng": "4.9.2"
+    "galaxy_ng": "4.10.6"
   }
 }
 ```
@@ -200,9 +200,9 @@ GET /pulp/api/v3/status/
   "redis_connection": {
     "connected": true
   },
-  "pulp_version": "3.28.43",
+  "pulp_version": "3.49.40",
   "components": {
-    "pulp_ansible": "0.20.12"
+    "pulp_ansible": "0.25.1"
   }
 }
 ```
@@ -235,7 +235,7 @@ GET /health
 ```json
 {
   "status": "running",
-  "version": "1.1.3"
+  "version": "1.3.2"
 }
 ```
 

@@ -38,7 +38,17 @@ def compose_up():
     """Start docker-compose services before tests and tear down after."""
     # Start services
     result = subprocess.run(
-        ["docker", "compose", "up", "-d", "ee-base", "ee-builder", "dev-tools"],
+        [
+            "docker",
+            "compose",
+            "up",
+            "-d",
+            "--build",
+            "--force-recreate",
+            "ee-base",
+            "ee-builder",
+            "dev-tools",
+        ],
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
@@ -138,7 +148,7 @@ class TestDockerCompose:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "image: quay.io/ansible/awx:24.6.1" in result.stdout
+        assert "image: quay.io/ansible/awx:devel" in result.stdout
 
     def test_default_execution_environment_uses_local_image(self):
         """Test that the controller default EE points at the local ee-base image."""
@@ -409,7 +419,7 @@ class TestServiceFunctionality:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "ansible [core 2.20.0]" in result.stdout
+        assert "ansible [core 2.21.4]" in result.stdout
 
     def test_ee_builder_ansible_builder_works(self, compose_up: Any) -> None:
         """Test that ansible-builder command works in ee-builder service."""
@@ -433,7 +443,7 @@ class TestServiceFunctionality:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "24.2.0" in result.stdout
+        assert "26.9.0" in result.stdout
 
     def test_dev_tools_ansible_lint_works(self, compose_up: Any) -> None:
         """Test that ansible-lint command works in dev-tools service."""
@@ -445,7 +455,7 @@ class TestServiceFunctionality:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "25.12.1" in result.stdout
+        assert "26.9.0" in result.stdout
 
     def test_services_share_network(self, compose_up: Any) -> None:
         """Test that services can communicate on the ansible network."""

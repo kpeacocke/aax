@@ -437,11 +437,11 @@ For production deployments, AAX supports:
 
 | Component  | Version | Source                     |
 | ---------- | ------- | -------------------------- |
-| AWX        | 24.6.1  | ansible/awx                |
-| Galaxy NG  | 4.9.2   | ansible/galaxy_ng          |
-| Pulp       | 3.28.43 | pulp/pulpcore              |
-| EDA        | 1.1.3   | ansible/eda-server         |
-| Python     | 3.11    | python (slim-bookworm)     |
+| AWX        | devel   | ansible/awx                |
+| Galaxy NG  | 4.10.6  | ansible/galaxy_ng          |
+| Pulp       | 3.49.40 | pulp/pulpcore              |
+| EDA        | 1.3.2   | ansible/ansible-rulebook   |
+| Python     | Mixed   | AWX 3.12, ee-base 3.14, Galaxy/Pulp/EDA 3.11 |
 | PostgreSQL | 15      | postgres (docker-official) |
 | Redis      | 7       | redis (docker-official)    |
 

@@ -91,6 +91,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
 RUN groupadd -f docker && usermod -aG docker vscode
 
 # Switch to non-root user for security
+# hadolint ignore=DL3066
 USER vscode
 WORKDIR /workspace
 

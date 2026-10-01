@@ -136,6 +136,9 @@ def test_runtime_files_do_not_contain_weak_secret_fallbacks() -> None:
             "os.getenv('SECRET_KEY', 'awxsecret')",
             "BROADCAST_WEBSOCKET_SECRET = os.getenv('SECRET_KEY', 'awxsecret')",
         ],
+        "images/pulp/settings.py": [
+            "change-me-to-a-long-random-string",
+        ],
         "k8s/awx-settings-configmap.yaml": [
             "awxsecret_change_me",
             "awxpass",
@@ -232,6 +235,21 @@ def test_upstream_checkout_does_not_apply_release_django_pin_to_devel() -> None:
     script = _read("scripts/build-upstream.sh")
     assert 'if [[ -z "$AWX_DAB_REF" ]]' in script
     assert 'preserving django-ansible-base ref from AWX $AWX_BRANCH' in script
+
+
+def test_awx_dockerfile_pins_known_good_devel_ui_revision() -> None:
+    """The AWX devel image should not float against ansible-ui main."""
+    dockerfile = _read("images/awx/Dockerfile")
+    assert "ARG UI_DEVEL_REVISION=b512f07205f2be38d29dc245e955e66e64248ae3" in dockerfile
+    assert "make -C /awx/awx/ui UI_LOCAL=/ansible-ui ui" in dockerfile
+    assert "UI_GIT_REPO=https://github.com/ansible/ansible-ui.git make -C /awx/awx/ui ui" not in dockerfile
+
+
+def test_awx_dockerfile_preserves_24_6_1_ui_next_compatibility_path() -> None:
+    """The AWX image should keep the legacy ui_next build path for 24.6.1."""
+    dockerfile = _read("images/awx/Dockerfile")
+    assert 'if [ "$AWX_VERSION" = "24.6.1" ]; then' in dockerfile
+    assert "make -C /awx/awx/ui_next ui-next" in dockerfile
 
 
 def _compose_service_port_mappings(compose_text: str) -> dict[str, list[str]]:

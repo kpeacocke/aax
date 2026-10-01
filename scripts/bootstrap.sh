@@ -21,7 +21,7 @@ echo "Creating local virtual environment at $VENV_DIR"
 VENV_PYTHON="$VENV_DIR/bin/python"
 
 "$VENV_PYTHON" -m pip install --upgrade pip
-"$VENV_PYTHON" -m pip install pytest pytest-cov pre-commit
+"$VENV_PYTHON" -m pip install -r .devcontainer/requirements.txt
 "$VENV_PYTHON" -m pre_commit install
 
 cat <<'EOF'

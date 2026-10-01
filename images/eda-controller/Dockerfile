@@ -7,7 +7,7 @@
 ARG VERSION=dev
 ARG BUILD_DATE
 ARG VCS_REF
-ARG EDA_VERSION=1.1.3
+ARG EDA_VERSION=1.3.2
 
 # Stage 1: Builder
 FROM python:3.11-slim-bookworm AS builder
@@ -84,9 +84,10 @@ LABEL org.opencontainers.image.title="AAX Event-Driven Ansible Controller" \
 
 # Health check: verify entrypoint process (PID 1) is still running
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD kill -0 1 2>/dev/null || exit 1
+    CMD ["kill", "-0", "1"]
 
 # Switch to eda user
+# hadolint ignore=DL3066
 USER eda
 
 # Set working directory

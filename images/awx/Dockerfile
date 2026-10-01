@@ -1,8 +1,20 @@
 # syntax=docker/dockerfile:1
-FROM python:3.11-slim as builder
+FROM node:18-bookworm AS node-builder
+
+ARG UI_DEVEL_REVISION=b512f07205f2be38d29dc245e955e66e64248ae3
+
+RUN git init /ansible-ui && \
+  git -C /ansible-ui remote add origin https://github.com/ansible/ansible-ui.git && \
+  git -C /ansible-ui fetch --depth 1 origin ${UI_DEVEL_REVISION} && \
+  git -C /ansible-ui checkout --detach FETCH_HEAD
+
+FROM python:3.12-slim AS builder
+
+COPY --from=node-builder /usr/local/ /usr/local/
 
 # Build arguments
-ARG AWX_VERSION=24.6.1
+ARG AWX_VERSION=devel
+ARG AWX_DAB_REF
 ARG VERSION=dev
 ARG BUILD_DATE
 ARG VCS_REF
@@ -19,6 +31,7 @@ RUN apt-get update && \
   apt-get install -y --no-install-recommends \
   git \
   gcc \
+  make \
   pkg-config \
   python3-dev \
   libpq-dev \
@@ -32,12 +45,15 @@ RUN apt-get update && \
   libxslt1-dev \
   curl \
   xmlsec1 \
-  nodejs \
-  npm \
   && rm -rf /var/lib/apt/lists/*
 
 # Clone AWX at specific version
 RUN git clone --depth 1 --branch ${AWX_VERSION} https://github.com/ansible/awx.git /awx
+
+# Keep the AWX 24.6.1 DAB dependency aligned with its Django 4.2 lock.
+COPY patch-dab-requirement.py /tmp/patch-dab-requirement.py
+# hadolint ignore=DL3059
+RUN python3 /tmp/patch-dab-requirement.py "$AWX_VERSION" "$AWX_DAB_REF"
 
 # Keep Django in sync with django-ansible-base dependency constraints
 RUN sed -i 's/^Django==4.2.10/Django==4.2.26/' /awx/requirements/requirements.txt && \
@@ -60,20 +76,23 @@ RUN python3 -m pip install --no-cache-dir --prefix=/install \
 # load_backends() happy; SAMLAuth.authenticate() already returns None when
 # SAML credentials are unconfigured, so no SAML functionality is lost.
 COPY patch-saml-import.py /tmp/patch-saml-import.py
+# hadolint ignore=DL3059
 RUN python3 /tmp/patch-saml-import.py
 
-# Build and stage frontend assets so Django serves compiled UI instead of raw templates.
-RUN mkdir -p /awx/awx/ui/build/static /awx/awx/ui_next/build/awx && \
-  npm --prefix /awx/awx/ui --loglevel warn ci --legacy-peer-deps && \
-  npm --prefix /awx/awx/ui --loglevel warn run compile-strings && \
-  NODE_OPTIONS=--max-old-space-size=4096 npm --prefix /awx/awx/ui --loglevel warn run build && \
-  cp /awx/awx/ui_next/placeholder_index_awx.html /awx/awx/ui_next/build/awx/index_awx.html
+# Build the separately maintained AWX UI from a known-good devel revision,
+# while preserving the legacy ui_next path for the 24.6.1 compatibility pin.
+# hadolint ignore=DL3059
+RUN if [ "$AWX_VERSION" = "24.6.1" ]; then \
+    make -C /awx/awx/ui_next ui-next; \
+  else \
+    make -C /awx/awx/ui UI_LOCAL=/ansible-ui ui; \
+  fi
 
 # Final stage
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Build arguments
-ARG AWX_VERSION=24.6.1
+ARG AWX_VERSION=devel
 ARG VERSION=dev
 ARG BUILD_DATE
 ARG VCS_REF
@@ -136,9 +155,10 @@ EXPOSE 8052
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8052/api/v2/ping/ || exit 1
+  CMD ["curl", "-f", "http://localhost:8052/api/v2/ping/"]
 
 # Switch to non-root user
+# hadolint ignore=DL3066
 USER awx
 
 # Default to web entrypoint

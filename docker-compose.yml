@@ -16,6 +16,9 @@ x-watchtower-monitor: &watchtower-monitor
 services:
   ee-base:
     <<: *service-defaults
+    build:
+      context: images/ee-base
+      dockerfile: Dockerfile
     image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-base:${AAX_VERSION:-latest}
     pull_policy: missing
     restart: "no"
@@ -41,6 +44,11 @@ services:
 
   ee-builder:
     <<: *service-defaults
+    build:
+      context: images/ee-builder
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-base:${AAX_VERSION:-latest}
     image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-builder:${AAX_VERSION:-latest}
     pull_policy: missing
     restart: "no"
@@ -71,6 +79,11 @@ services:
 
   dev-tools:
     <<: *service-defaults
+    build:
+      context: images/dev-tools
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-ee-base:${AAX_VERSION:-latest}
     image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-dev-tools:${AAX_VERSION:-latest}
     pull_policy: missing
     restart: "no"
@@ -144,7 +157,7 @@ services:
     <<: *service-defaults
     profiles:
       - controller
-    image: ${AWX_IMAGE_REPOSITORY:-quay.io/ansible/awx}:${AWX_VERSION:-24.6.1}
+    image: ${AWX_IMAGE_REPOSITORY:-quay.io/ansible/awx}:${AWX_VERSION:-devel}
     pull_policy: missing
     container_name: awx-web
     hostname: awx
@@ -174,7 +187,7 @@ services:
       DJANGO_SETTINGS_MODULE: awx.settings.production
       AAX_ALLOW_PLACEHOLDER_SECRETS: ${AAX_ALLOW_PLACEHOLDER_SECRETS:-false}
       RECEPTOR_RELEASE_WORK: ${RECEPTOR_RELEASE_WORK:-false}
-      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-ghcr.io/kpeacocke/aax-ee-base:latest}
+      DEFAULT_EXECUTION_ENVIRONMENT: ${DEFAULT_EXECUTION_ENVIRONMENT:-aax/ee-base:1.0.0}
     ports:
       - "${HOST_BIND:-127.0.0.1}:${AWX_WEB_PORT:-18080}:8052"
     volumes:
@@ -200,7 +213,7 @@ services:
     <<: *service-defaults
     profiles:
       - controller
-    image: ${AWX_IMAGE_REPOSITORY:-quay.io/ansible/awx}:${AWX_VERSION:-24.6.1}
+    image: ${AWX_IMAGE_REPOSITORY:-quay.io/ansible/awx}:${AWX_VERSION:-devel}
     pull_policy: missing
     container_name: awx-task
     hostname: awx
@@ -273,7 +286,7 @@ services:
 
   awx-receptor:
     <<: *service-defaults
-    image: ${AWX_EE_IMAGE_REPOSITORY:-quay.io/ansible/awx-ee}:${AWX_EE_VERSION:-24.6.1}
+    image: ${AWX_EE_IMAGE_REPOSITORY:-quay.io/ansible/awx-ee}:${AWX_EE_VERSION:-devel}
     container_name: awx-receptor
     profiles:
       - controller
@@ -372,7 +385,7 @@ services:
 
   receptor-hop:
     <<: *service-defaults
-    image: ${RECEPTOR_IMAGE_REPOSITORY:-quay.io/ansible/receptor}:${RECEPTOR_VERSION:-v1.6.4}
+    image: ${RECEPTOR_IMAGE_REPOSITORY:-quay.io/ansible/receptor}:${RECEPTOR_VERSION:-devel}
     container_name: receptor-hop
     profiles:
       - controller
@@ -420,7 +433,7 @@ services:
 
   receptor-execution:
     <<: *service-defaults
-    image: ${AWX_EE_IMAGE_REPOSITORY:-quay.io/ansible/awx-ee}:${AWX_EE_VERSION:-24.6.1}
+    image: ${AWX_EE_IMAGE_REPOSITORY:-quay.io/ansible/awx-ee}:${AWX_EE_VERSION:-devel}
     container_name: receptor-execution
     profiles:
       - controller

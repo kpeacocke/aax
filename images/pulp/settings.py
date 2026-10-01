@@ -2,6 +2,7 @@
 Pulp Settings for AAX Private Automation Hub
 """
 import os
+from django.core.exceptions import ImproperlyConfigured
 from pathlib import Path
 
 # Build paths
@@ -54,7 +55,9 @@ API_ROOT = '/pulp/'
 DB_ENCRYPTION_KEY = os.getenv('DB_ENCRYPTION_KEY', '/var/lib/pulp/db-encryption.key')
 
 # Security settings
-SECRET_KEY = os.environ['PULP_SECRET_KEY']
+SECRET_KEY = os.getenv('PULP_SECRET_KEY') or os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    raise ImproperlyConfigured('PULP_SECRET_KEY or SECRET_KEY must be set')
 DEFAULT_ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
 # Parse ALLOWED_HOSTS from environment, defaulting to localhost-only for safety.
 _allowed_hosts_env = os.getenv('PULP_ALLOWED_HOSTS', os.getenv('ALLOWED_HOSTS', '')).strip()

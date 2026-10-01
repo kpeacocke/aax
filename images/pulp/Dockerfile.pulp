@@ -7,12 +7,12 @@
 ARG VERSION=dev
 ARG BUILD_DATE
 ARG VCS_REF
-ARG GALAXY_NG_VERSION=4.9.2
+ARG GALAXY_NG_REF=4.10.6
 
 # Stage 1: Builder
 FROM python:3.11-slim-bookworm AS builder
 
-ARG GALAXY_NG_VERSION
+ARG GALAXY_NG_REF
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -33,12 +33,13 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # hadolint ignore=DL3013
-RUN pip install --no-cache-dir --upgrade pip==24.0 setuptools==69.1.1 wheel==0.42.0 && \
+RUN pip install --no-cache-dir --upgrade pip==26.2.1 setuptools==81.0.0 wheel==0.48.0 && \
   pip install --no-cache-dir \
-  pulpcore==3.28.43 \
-  pulp-ansible==0.20.12 \
-  pulp-container==2.15.7 \
-  galaxy-ng==${GALAXY_NG_VERSION} \
+  pulpcore==3.49.40 \
+  pulp-ansible==0.25.1 \
+  pulp-container==2.19.2 \
+  "galaxy-ng @ git+https://github.com/ansible/galaxy_ng.git@${GALAXY_NG_REF}" \
+  boto3==1.43.106 \
   gunicorn==22.0.0 \
   psycopg2-binary==2.9.9 \
   "redis>=4.3,<5.0.7" \
@@ -48,6 +49,7 @@ RUN pip install --no-cache-dir --upgrade pip==24.0 setuptools==69.1.1 wheel==0.4
   "aiohttp>=3.8.0"
 
 # Patch ruamel metadata and ensure alias metadata exists for pkg_resources lookups.
+# hadolint ignore=SC3060
 RUN shopt -s nullglob && \
   for dist_info in /opt/venv/lib/python3.11/site-packages/ruamel*yaml*.dist-info; do \
   metadata_path="$dist_info/METADATA"; \
@@ -99,6 +101,7 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Ensure ruamel.yaml alias metadata exists in runtime venv for pkg_resources.
+# hadolint ignore=SC3060
 RUN set -e; \
   for dist_info in /opt/venv/lib/python3.11/site-packages/ruamel*yaml*.dist-info; do \
   [ -e "$dist_info" ] || continue; \
@@ -128,6 +131,7 @@ LABEL org.opencontainers.image.title="AAX Pulp" \
 
 # Set working directory and user
 WORKDIR /var/lib/pulp
+# hadolint ignore=DL3066
 USER pulp
 
 # Expose ports

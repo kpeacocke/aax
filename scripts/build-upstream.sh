@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 UPSTREAM_DIR="$ROOT_DIR/.upstream"
 REPO_BASE="https://github.com/ansible"
 
-AWX_BRANCH="${AWX_BRANCH:-24.6.1}"
+AWX_BRANCH="${AWX_BRANCH:-devel}"
 AWX_DAB_REF="${AWX_DAB_REF:-}"
 AWX_EE_BRANCH="${AWX_EE_BRANCH:-devel}"
 RECEPTOR_BRANCH="${RECEPTOR_BRANCH:-devel}"

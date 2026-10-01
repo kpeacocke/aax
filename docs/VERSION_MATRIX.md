@@ -12,8 +12,8 @@ The project intentionally targets a recent, compatible AAP-like deployment basel
 
 | Component      | Default Tag | Source             |
 | -------------- | ----------- | ------------------ |
-| awx            | `24.6.1`    | `AWX_VERSION`      |
-| awx-ee         | `24.6.1`    | `AWX_EE_VERSION`   |
+| awx            | `devel`     | `AWX_VERSION`      |
+| awx-ee         | `devel`     | `AWX_EE_VERSION`   |
 | ee-base        | `latest`    | `AAX_VERSION`      |
 | ee-builder     | `latest`    | `AAX_VERSION`      |
 | dev-tools      | `latest`    | `AAX_VERSION`      |
@@ -21,11 +21,16 @@ The project intentionally targets a recent, compatible AAP-like deployment basel
 | pulp           | `latest`    | `AAX_VERSION`      |
 | eda-controller | `latest`    | `AAX_VERSION`      |
 | gateway        | `latest`    | `AAX_VERSION`      |
-| receptor       | `v1.6.4`    | `RECEPTOR_VERSION` |
+| receptor       | `devel`     | `RECEPTOR_VERSION` |
 
-AWX 24.6.1's checked-in dependency lock requires Django 4.2. The upstream
-build script therefore pins `django-ansible-base` to `2024.6.26` instead of
-resolving its moving `devel` branch, which now requires Django 5 or newer.
+The upstream development stack uses Python 3.12, Django 5.2, and the matching
+`django-ansible-base` development branch. The AWX image retains an explicit
+compatibility pin for callers who build the older `24.6.1` stable tag.
+
+The execution environment uses `ansible-core` 2.21.4 and Python 3.14. EDA uses
+`ansible-rulebook` 1.3.2. Galaxy NG uses its latest tagged release, 4.10.6,
+with Pulp 3.49.40, `pulp-ansible` 0.25.1, and `pulp-container` 2.19.2, matching
+that release's dependency constraints.
 
 ## Kubernetes Component Images
 
