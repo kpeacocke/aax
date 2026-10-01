@@ -66,19 +66,28 @@ Create these once in AWX:
    `portainer_agent_secret`. It must equal the Portainer Server `AGENT_SECRET`.
 6. Job template **Raspberry Pi - Audit** using
    `automation/playbooks/pi-audit.yml`.
-7. Job template **Raspberry Pi - DNS Pair Maintenance** using
-   `automation/playbooks/dns-pair-daily-maintenance.yml`, with concurrent jobs
-   off and privilege escalation on.
+7. Workflow **Raspberry Pi - DNS Pair Maintenance**, with concurrent jobs off:
+   **DNS Replica Maintenance** uses the dedicated pi-harmony SSH credential and
+   limit `pi-harmony`; its success edge starts **DNS Primary Maintenance**, using
+   the dedicated pi-terror SSH credential and limit `pi-terror`. Both stages use
+   `automation/playbooks/dns-pair-daily-maintenance.yml`, privilege escalation
+   on, and concurrent jobs off. The primary stage retains the replica DNS and
+   Nebula Sync gates. Schedule only the workflow at 03:00 Australia/Sydney;
+   disable the superseded combined job's schedule before enabling this one.
 8. Job template **Raspberry Pi - mDNS Maintenance** using
    `automation/playbooks/mdns-daily-maintenance.yml`, on a different daily
    schedule from the DNS pair. The job guards TCP/9105 before and after
    maintenance, requires the `avahi-reflector` container to remain healthy,
    then validates the exporter, Avahi browsing, VLAN interfaces 1-4 and
-   non-zero discovery on each reflected VLAN.
+   non-zero advertisements on the service-producing VLANs (1, 3 and 4).
+   VLAN 2 is a consumer network: zero local advertisements is valid, but its
+   interface must remain up. Advertisement counts do not prove consumption.
+   Verify discovery and connection to a known service from an actual VLAN 2
+   client separately; the reflector's own browse is not a client-side test.
 9. Job template **Raspberry Pi - Portainer Agents** using
    `automation/playbooks/portainer-agents.yml` for manual reconciliation.
-10. Attach an AWX notification template to the **Error** event for both scheduled
-   job templates. Store the webhook/token in AWX, not this repository. The
+10. Attach an AWX notification template to the **Error** event for the DNS
+   workflow and the mDNS job template. Store the webhook/token in AWX, not this repository. The
    notification includes the failed job URL and the host/task that stopped the
    workflow.
 11. Job template **Discovery - Network** using
@@ -95,8 +104,11 @@ Create these once in AWX:
 
 ## Raspberry Pi account bootstrap
 
-The permanent Pi jobs use the AWX Machine credential **Home Lab - Raspberry Pi
-Fleet** as user `ansible`, with its SSH private key and `sudo` escalation. The
+The fleet audit and newly bootstrapped hosts use the AWX Machine credential
+**Home Lab - Raspberry Pi Fleet** as user `ansible`, with its SSH private key
+and `sudo` escalation. DNS workflow stages use the dedicated host credentials
+listed above; mDNS uses **Home Lab - pi-mdns SSH**. Do not replace these with
+the fleet credential until its key has been installed and verified on each host. The
 matching public key is intentionally versioned in
 `inventories/home/group_vars/raspberry_pi.yml`; private keys and passwords must
 never be committed.
@@ -109,8 +121,9 @@ permanent fleet credential. The role locks password authentication for the
 `ansible` account, installs only the declared public key, and validates its
 sudoers entry before replacing it.
 
-Run **Pi - Audit** first. Run both maintenance jobs manually before enabling
-their daily schedules. Schedule the agent-only job after a deliberate
+Run **Pi - Audit** first. Run the DNS workflow and mDNS maintenance job manually
+before enabling their daily schedules. Enable only the workflow schedule for
+DNS; keep the superseded combined DNS job schedule disabled. Schedule the agent-only job after a deliberate
 Portainer Server upgrade, not independently: Portainer requires agent and server
 versions to match.
 

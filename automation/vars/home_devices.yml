@@ -54,4 +54,4 @@ home_network_devices:
     model: DS920+
     address: 192.168.5.100
     expected_version: 7.4.1-90080
-    tcp_ports: [22, 80, 443, 5000, 5001]
+    tcp_ports: [2222, 80, 443, 5000, 5001]

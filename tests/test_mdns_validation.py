@@ -36,7 +36,7 @@ def test_container_requires_explicit_healthy_state():
 
 def test_metrics_reject_zero_missing_and_malformed_values():
     tasks = {task["name"]: task for task in PLAY["tasks"]}
-    service = tasks["Require each reflected VLAN to see at least one mDNS service"]
+    service = tasks["Require service-producing VLANs to advertise mDNS services"]
     interface = tasks["Require each reflected VLAN interface to be up"]
     for item in PLAY["vars"]["mdns_expected_interfaces"]:
         labels = ','.join(f'{key}="{item[key]}"' for key in ("interface", "vlan", "role"))
@@ -57,6 +57,29 @@ def test_exporter_and_browse_require_exact_success_samples():
     for metric, condition in zip(("mdns_exporter_up", "mdns_browse_success"), task["ansible.builtin.assert"]["that"]):
         for value, expected in (("1", True), ("0", False), ("10", False)):
             assert evaluate(condition, mdns_metrics={"content": f"{metric} {value}\n"}) == expected
+
+
+def test_consumer_vlan_can_be_empty_but_must_remain_up():
+    tasks = {task["name"]: task for task in PLAY["tasks"]}
+    service = tasks["Require service-producing VLANs to advertise mDNS services"]
+    interface = tasks["Require each reflected VLAN interface to be up"]
+    variables = PLAY["vars"]
+    service_items = evaluate(service["loop"][3:-3], **variables)
+    interface_items = evaluate(interface["loop"][3:-3], **variables)
+    assert {item["vlan"] for item in service_items} == {"1", "3", "4"}
+    assert {item["vlan"] for item in interface_items} == {"1", "2", "3", "4"}
+    metrics = "\n".join(
+        f'mdns_services_total{{interface="{item["interface"]}",vlan="{item["vlan"]}",role="{item["role"]}"}} '
+        + ("0" if item["vlan"] == "2" else "1")
+        for item in interface_items
+    )
+    condition = service["ansible.builtin.assert"]["that"][0]
+    assert all(evaluate(condition, mdns_metrics={"content": metrics}, item=item)
+               for item in service_items)
+    kids = next(item for item in interface_items if item["vlan"] == "2")
+    assert not evaluate(interface["ansible.builtin.assert"]["that"][0],
+                        mdns_metrics={"content": 'mdns_interface_up{interface="eth0.2",vlan="2",role="kids"} 0'},
+                        item=kids)
 
 
 if __name__ == "__main__":
