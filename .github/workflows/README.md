@@ -108,7 +108,7 @@ This document describes the CI/CD pipeline for the AAX project.
 1. **Security Scan** (fail-fast: false)
 
 - Trivy reporting for image vulnerabilities
-- **Blocks releases on critical vulnerabilities and CI on remediable critical vulnerabilities**
+- **Blocks publication on remediable HIGH/CRITICAL vulnerabilities and required PR checks on remediable CRITICAL vulnerabilities; reports all severities**
 - Uploads results to GitHub Security tab
 
 1. **Create Release** (depends on: tests + security)

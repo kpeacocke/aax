@@ -5,7 +5,18 @@ version: 2
 updates:
   # Docker images in docker-compose files
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/"
+      - "/images/ee-base"
+      - "/images/ee-builder"
+      - "/images/dev-tools"
+      - "/images/gateway"
+      - "/images/awx"
+      - "/images/awx-ui-runtime"
+      - "/images/galaxy-ng"
+      - "/images/pulp"
+      - "/images/eda-controller"
+      - "/images/eda-server"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -26,9 +37,27 @@ updates:
       day: "monday"
       time: "09:00"
     open-pull-requests-limit: 3
+    groups:
+      codeql:
+        patterns:
+          - "github/codeql-action/*"
     labels:
       - "dependencies"
       - "github-actions"
     commit-message:
       prefix: "chore(ci)"
       include: "scope"
+
+  - package-ecosystem: "pip"
+    directories:
+      - "/images/ee-base"
+      - "/images/ee-builder"
+      - "/images/dev-tools"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"

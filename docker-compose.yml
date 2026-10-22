@@ -60,7 +60,6 @@ services:
     volumes:
       - ee_definitions:/workspace:rw
       - ee_builds:/builds:rw
-      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       ANSIBLE_NOCOWS: "1"
     security_opt:

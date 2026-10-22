@@ -9,11 +9,13 @@ ARG VCS_REF
 ENV PIP_NO_CACHE_DIR=1 \
   ANSIBLE_NOCOWS=1 \
   PYTHONUNBUFFERED=1 \
+  PIP_CONSTRAINT=/etc/pip/constraints.txt \
   DEBIAN_FRONTEND=noninteractive \
   PIP_ROOT_USER_ACTION=ignore
 
 # Copy configuration and requirements
 COPY requirements.txt /tmp/requirements.txt
+COPY constraints.txt /etc/pip/constraints.txt
 COPY ansible.cfg /etc/ansible/ansible.cfg
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 
@@ -22,6 +24,7 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN mkdir -p /etc/ansible && \
   useradd -m -u 1000 -s /bin/bash ansible && \
   apt-get update && \
+  apt-get upgrade -y && \
   apt-get install -y --no-install-recommends \
   openssh-client \
   git \

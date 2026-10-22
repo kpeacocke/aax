@@ -22,12 +22,14 @@ on:
       - images/eda-server/**
       - images/awx-ui-runtime/**
       - scripts/build-upstream.sh
+      - scripts/check-vulnerability-reports.sh
   schedule:
     - cron: "17 3 * * *"
 
 permissions:
   contents: read
   packages: write
+  security-events: write
 
 concurrency:
   group: publish-devel-${{ github.ref }}
@@ -36,7 +38,7 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_OWNER: ${{ github.repository_owner }}
-  IMAGE_TAG: devel-${{ github.sha }}
+  IMAGE_TAG: devel-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   build-and-publish:
@@ -124,6 +126,53 @@ jobs:
       - name: Build AAX EDA controller devel
         run: docker buildx build --load -t eda-controller:devel images/eda-server
 
+      - name: Record exact build sources
+        run: |
+          set -euo pipefail
+          mkdir -p bundle-reports
+          for name in awx awx-ee receptor ansible-rulebook galaxy-ng; do
+            jq -n --arg name "$name" \
+              --arg repository "$(git -C ".upstream/$name" remote get-url origin)" \
+              --arg revision "$(git -C ".upstream/$name" rev-parse HEAD)" \
+              '{name: $name, repository: $repository, revision: $revision}'
+          done | jq -s --arg aax "$GITHUB_SHA" --arg tag "$IMAGE_TAG" \
+            '{aax_revision: $aax, image_tag: $tag, sources: .}' > bundle-reports/sources.json
+          cp images/eda-server/Dockerfile bundle-reports/eda-runtime.Dockerfile
+          cp images/awx-ui-runtime/Dockerfile bundle-reports/awx-ui.Dockerfile
+
+      - name: Install bundle scanner
+        uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514 # v0.2.6
+        with:
+          version: v0.70.0
+
+      - name: Scan exact bundle images
+        run: |
+          set -euo pipefail
+          for name in awx awx-ee receptor ansible-rulebook galaxy-ng gateway eda-controller; do
+            trivy image --scanners vuln --timeout 15m --format json \
+              --output "bundle-reports/$name.json" "$name:devel"
+            trivy convert --format sarif --output "bundle-reports/$name.sarif" \
+              "bundle-reports/$name.json"
+            trivy image --format cyclonedx --timeout 15m \
+              --output "bundle-reports/$name.cdx.json" "$name:devel"
+          done
+
+      - name: Gate on fixable high and critical bundle vulnerabilities
+        run: |
+          set -euo pipefail
+          bash scripts/check-vulnerability-reports.sh \
+            bundle-reports/awx.json bundle-reports/awx-ee.json \
+            bundle-reports/receptor.json bundle-reports/ansible-rulebook.json \
+            bundle-reports/galaxy-ng.json bundle-reports/gateway.json \
+            bundle-reports/eda-controller.json
+
+      - name: Upload bundle security findings
+        if: always()
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: bundle-reports
+          category: devel-bundle
+
       - name: Tag and push bundle
         env:
           PUSH_MUTABLE: ${{ github.event_name == 'push' || github.event_name == 'schedule' || inputs.publish_latest_devel }}
@@ -143,14 +192,24 @@ jobs:
           )
           for name in "${!images[@]}"; do
             source_image="${images[$name]}"
-            if docker manifest inspect "$prefix/aax-$name:$IMAGE_TAG" >/dev/null 2>&1; then
-              echo "Immutable image tag already exists; leaving it unchanged: $prefix/aax-$name:$IMAGE_TAG"
-              continue
-            fi
             docker tag "$source_image" "$prefix/aax-$name:$IMAGE_TAG"
             docker push "$prefix/aax-$name:$IMAGE_TAG"
+            docker buildx imagetools inspect "$prefix/aax-$name:$IMAGE_TAG" \
+              --format '{{json .Manifest}}' > "bundle-reports/$name-manifest.json"
+          done
+          for name in "${!images[@]}"; do
             if [[ "$PUSH_MUTABLE" == true ]]; then
-              docker tag "$source_image" "$prefix/aax-$name:devel"
+              docker tag "$prefix/aax-$name:$IMAGE_TAG" "$prefix/aax-$name:devel"
               docker push "$prefix/aax-$name:devel"
             fi
           done
+          echo "Published bundle: \`$IMAGE_TAG\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve bundle provenance and security reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bundle-${{ github.run_id }}-${{ github.run_attempt }}
+          path: bundle-reports/
+          if-no-files-found: error
+          retention-days: 90

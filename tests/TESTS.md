@@ -38,6 +38,9 @@ pytest --cov=tests/ tests/
 - `test_images.py` - Tests for all Docker images
   - `TestEEBaseImage` - Tests for the Ansible EE base image
   - Additional test classes for other images can be added here
+- `test_bundle_publication.py` - Executes publication scripts with a fake registry
+  client and checks unique run tags, fail-closed vulnerability thresholds, and
+  digest-scoped promotion. Requires `jq`, `bash`, and PyYAML; no registry writes.
 
 ## Writing New Tests
 

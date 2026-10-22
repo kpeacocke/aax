@@ -62,7 +62,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
 - **Official Description:** Container images on which all automation in Red Hat Ansible Automation Platform is run. They provide a solution that includes the Ansible execution engine and hundreds of modules.
 - **AAX Implementation:** [Ansible](https://github.com/ansible/ansible) + [ansible-builder](https://github.com/ansible/ansible-builder) v3.1.1
 - **Execution Environments:**
-  - **ee-base:** Base EE with Ansible Core 2.21.4, Python 3.14, standard modules
+  - **ee-base:** Base EE with Ansible Core 2.21.5, Python 3.14, standard modules
   - **ee-builder:** Extends ee-base with ansible-builder for building custom EEs
   - **dev-tools:** Extends ee-base with development and testing tools (ansible-navigator, ansible-lint)
 - **Features:**
@@ -89,7 +89,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
 #### 3.9. Automation Content Navigator
 
 - **Official Description:** A textual user interface (TUI) that becomes the primary command line interface into the automation platform, covering use cases from content building, running automation locally in an execution environment, running automation in Ansible Automation Platform.
-- **AAX Implementation:** [Ansible Navigator](https://github.com/ansible/ansible-navigator) v26.9.0 + [ansible-lint](https://github.com/ansible/ansible-lint) v26.9.0
+- **AAX Implementation:** [Ansible Navigator](https://github.com/ansible/ansible-navigator) v26.10.0 + [ansible-lint](https://github.com/ansible/ansible-lint) v26.10.1
 - **Included in:** `dev-tools` execution environment
 - **Features:**
   - TUI for exploring execution environment contents

@@ -23,7 +23,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.14"
           cache: "pip"
 
       - name: Install dependencies
@@ -32,10 +32,19 @@ jobs:
 
       - name: Audit Python dependencies
         id: audit
-        continue-on-error: true
         run: |
-          pip-audit -r images/ee-base/requirements.txt --format json > audit-results.json || true
-          if [ -s audit-results.json ]; then
+          set -euo pipefail
+          status=0
+          PIP_CONSTRAINT="$PWD/images/ee-base/constraints.txt" \
+            pip-audit -r images/ee-base/requirements.txt \
+              -r images/ee-builder/requirements.txt \
+              -r images/dev-tools/requirements.txt \
+              --format json --output audit-results.json || status=$?
+          if [ "$status" -gt 1 ]; then
+            echo "::error::Dependency audit failed (exit $status)"
+            exit "$status"
+          fi
+          if jq -e '[.dependencies[].vulns[]] | length > 0' audit-results.json >/dev/null; then
             echo "vulnerabilities=true" >> $GITHUB_OUTPUT
           fi
 
@@ -57,31 +66,39 @@ jobs:
 
             Please review and update affected packages.`;
 
-            await github.rest.issues.create({
+            const title = '🔒 Security: Vulnerable dependencies detected';
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: '🔒 Security: Vulnerable dependencies detected',
+              state: 'open',
+              labels: 'security,dependencies',
+              per_page: 100
+            });
+            const existing = issues.find(issue => !issue.pull_request && issue.title === title);
+            const params = {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
               body: body,
               labels: ['security', 'dependencies']
-            });
+            };
+            if (existing) {
+              await github.rest.issues.update({...params, issue_number: existing.number});
+            } else {
+              await github.rest.issues.create(params);
+            }
 
-  update-base-images:
-    name: Check Base Image Updates
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Preserve dependency audit
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dependency-audit
+          path: audit-results.json
+          if-no-files-found: error
 
-      - name: Check for base image updates
-        run: |
-          # Check if python:3.12-slim has updates
-          echo "Checking for Python base image updates..."
-          CURRENT_DIGEST=$(docker pull python:3.12-slim --quiet)
-          echo "Current digest: $CURRENT_DIGEST"
-
-          # This would create a PR if digest changed
-          # Implementation depends on your base image tracking strategy
+      - name: Fail on vulnerable dependencies
+        if: steps.audit.outputs.vulnerabilities == 'true'
+        run: exit 1
 
   stale-management:
     name: Manage Stale Issues and PRs

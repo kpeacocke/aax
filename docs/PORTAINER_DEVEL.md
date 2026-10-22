@@ -17,8 +17,18 @@ these images under `ghcr.io/<owner>`:
 - `aax-gateway`
 - `aax-eda-controller`
 
-The immutable tag is `devel-<full-commit-sha>`. The mutable `devel` tag is also
-published when the workflow input allows it.
+New immutable tags are `devel-<full-commit-sha>-<run-id>-<attempt>`. Each daily
+build gets a distinct tag even when only upstream sources have changed. Older
+`devel-<full-commit-sha>` tags remain usable. The mutable `devel` tag is also
+published when the workflow input allows it, after all immutable images push.
+
+Publication is blocked by fixable HIGH/CRITICAL vulnerabilities in the exact
+built images. All severities, including vulnerabilities without patches, remain
+in the reports; passing this gate does not mean vulnerability-free. The workflow
+artifact contains upstream Git revisions, pinned EDA/UI build inputs, SBOMs,
+security reports, and registry manifests with image digests. Use the tag printed
+in the successful workflow summary rather than constructing one from a commit.
+This scan gate does not replace full-stack runtime/compatibility validation.
 
 ## 2. Configure Portainer registry access
 
@@ -37,13 +47,13 @@ Set these variables in the Portainer stack:
 
 ```text
 DEVEL_IMAGE_PREFIX=ghcr.io/<owner>
-DEVEL_IMAGE_TAG=devel-<full-commit-sha>
+DEVEL_IMAGE_TAG=devel-<full-commit-sha>-<run-id>-<attempt>
 AWX_IMAGE_REPOSITORY=ghcr.io/<owner>/aax-awx
-AWX_VERSION=devel-<full-commit-sha>
+AWX_VERSION=devel-<full-commit-sha>-<run-id>-<attempt>
 AWX_EE_IMAGE_REPOSITORY=ghcr.io/<owner>/aax-awx-ee
-AWX_EE_VERSION=devel-<full-commit-sha>
+AWX_EE_VERSION=devel-<full-commit-sha>-<run-id>-<attempt>
 RECEPTOR_IMAGE_REPOSITORY=ghcr.io/<owner>/aax-receptor
-RECEPTOR_VERSION=devel-<full-commit-sha>
+RECEPTOR_VERSION=devel-<full-commit-sha>-<run-id>-<attempt>
 COMPOSE_PROFILES=controller,hub,eda
 ```
 

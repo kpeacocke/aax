@@ -425,7 +425,7 @@ class TestServiceFunctionality:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "ansible [core 2.21.4]" in result.stdout
+        assert "ansible [core 2.21.5]" in result.stdout
 
     def test_ee_builder_ansible_builder_works(self, compose_up: Any) -> None:
         """Test that ansible-builder command works in ee-builder service."""
@@ -449,7 +449,7 @@ class TestServiceFunctionality:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "26.9.0" in result.stdout
+        assert "26.10.0" in result.stdout
 
     def test_dev_tools_ansible_lint_works(self, compose_up: Any) -> None:
         """Test that ansible-lint command works in dev-tools service."""
@@ -461,7 +461,7 @@ class TestServiceFunctionality:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "26.9.0" in result.stdout
+        assert "26.10.1" in result.stdout
 
     def test_services_share_network(self, compose_up: Any) -> None:
         """Test that services can communicate on the ansible network."""
