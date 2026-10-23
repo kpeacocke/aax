@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "detect-secrets stores one-way finding fingerprints, not plaintext secrets"
+condition = "AND"
+paths = ['''^\.secrets\.baseline$''']
+regexTarget = "line"
+regexes = ['''^\s*"hashed_secret": "[0-9a-f]{40}",?\s*$''']

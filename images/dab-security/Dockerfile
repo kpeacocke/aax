@@ -15,6 +15,8 @@ COPY oauth-organization.patch /tmp/oauth-organization.patch
 COPY requirements-test.txt /tmp/requirements-test.txt
 RUN git apply /tmp/oauth-organization.patch
 ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_DJANGO_ANSIBLE_BASE=${DAB_VERSION}
+# BuildKit retains the download cache outside the resulting image.
+# hadolint ignore=DL3042
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -m pip install '.[all]' djangorestframework==3.17.2 \
       -r /tmp/requirements-test.txt && python -m pip check

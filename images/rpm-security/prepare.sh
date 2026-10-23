@@ -28,6 +28,9 @@ if [[ "$package" == python3.12-setuptools ]]; then
 fi
 case "$package" in
     git-lfs|podman|skopeo)
+        # Go's trimmed source paths do not populate RPM's debugsource file list.
+        # Keep debuginfo and the corresponding SRPM, but omit the empty subpackage.
+        sed -i '/^Name:/i %undefine _debugsource_packages' "$spec"
         cp /aax/go-vendor.sh /build/rpmbuild/SOURCES/aax-go-vendor.sh
         cp /aax/go-dependencies.json /build/rpmbuild/SOURCES/aax-go-dependencies.json
         touch /build/rpmbuild/SOURCES/aax-go-vendor.tar.gz
