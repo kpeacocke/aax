@@ -6,10 +6,13 @@ FROM python:3.12-slim-bookworm AS builder
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends patch && \
     rm -rf /var/lib/apt/lists/*
-ADD --checksum=sha256:85bb81ccb88db4b0ef09b4a97f06a7e0c1f087d597b011c905c0911476243622 https://files.pythonhosted.org/packages/93/f4/6a252fd14335d06498c0d8cb5643259b60568bb12cc833d228143a93ff95/pulpcore-3.105.23.tar.gz /tmp/pulpcore.tar.gz
-ADD --checksum=sha256:2230cb966170180b0a0ab224d8c79c19099816a494e1ba7acd3c4de08c98a233 https://files.pythonhosted.org/packages/21/db/24b4be78d98242004ccb439118d771b72875e360e717537a964e7e29c015/pulp_glue-0.39.5.tar.gz /tmp/pulp-glue.tar.gz
+ADD https://files.pythonhosted.org/packages/93/f4/6a252fd14335d06498c0d8cb5643259b60568bb12cc833d228143a93ff95/pulpcore-3.105.23.tar.gz /tmp/pulpcore.tar.gz
+ADD https://files.pythonhosted.org/packages/21/db/24b4be78d98242004ccb439118d771b72875e360e717537a964e7e29c015/pulp_glue-0.39.5.tar.gz /tmp/pulp-glue.tar.gz
 COPY pulpcore.patch pulp-glue.patch /patches/
-RUN mkdir -p /source/pulpcore /source/pulp-glue && \
+RUN echo '85bb81ccb88db4b0ef09b4a97f06a7e0c1f087d597b011c905c0911476243622  /tmp/pulpcore.tar.gz' > /tmp/source-checksums && \
+    echo '2230cb966170180b0a0ab224d8c79c19099816a494e1ba7acd3c4de08c98a233  /tmp/pulp-glue.tar.gz' >> /tmp/source-checksums && \
+    sha256sum --check /tmp/source-checksums && \
+    mkdir -p /source/pulpcore /source/pulp-glue && \
     tar -xzf /tmp/pulpcore.tar.gz --strip-components=1 -C /source/pulpcore && \
     tar -xzf /tmp/pulp-glue.tar.gz --strip-components=1 -C /source/pulp-glue && \
     patch -d /source/pulpcore -p1 < /patches/pulpcore.patch && \

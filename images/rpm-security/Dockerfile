@@ -17,8 +17,10 @@ COPY go-toolchain.spec /tmp/go-toolchain.spec
 RUN rpmbuild -bb --define '_topdir /tmp/go-rpm' /tmp/go-toolchain.spec && \
     dnf -y install /tmp/go-rpm/RPMS/*/aax-go-toolchain-*.rpm && dnf clean all
 ENV PATH="/opt/aax-go/bin:${PATH}" GOTOOLCHAIN=local GOROOT=/opt/aax-go
-ADD --checksum=sha256:387a8be6b70ecff4949d28778bf8abd06231654283b6e9515afc9305a1391458 https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux-9 /tmp/alma-signing-key
-RUN rpm --import /tmp/alma-signing-key /etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+ADD https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux-9 /tmp/alma-signing-key
+RUN echo '387a8be6b70ecff4949d28778bf8abd06231654283b6e9515afc9305a1391458  /tmp/alma-signing-key' > /tmp/key-checksum && \
+    sha256sum --check /tmp/key-checksum && \
+    rpm --import /tmp/alma-signing-key /etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
 # hadolint ignore=DL3041
 RUN dnf -y --enablerepo=crb install go-rpm-macros python3.12-rpm-macros && dnf clean all
 FROM builder-base AS builder
