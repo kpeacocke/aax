@@ -365,6 +365,13 @@ def test_native_go_vendoring_preserves_sources_and_rejects_downgrades(
 
 
 def test_downstream_dependency_manifests_are_discoverable() -> None:
+    toolchain_spec = ROOT / "images/rpm-security/go-toolchain.spec"
+    assert toolchain_spec.is_file()
+    tracked = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", str(toolchain_spec)],
+        cwd=ROOT, capture_output=True, text=True, timeout=10,
+    )
+    assert tracked.returncode == 0, "The Go RPM recipe must be tracked for CI builds"
     updates = yaml.safe_load((ROOT / ".github/dependabot.yml").read_text())["updates"]
     for ecosystem, paths in (
         ("docker", [ROOT / "images" / name for name in (
