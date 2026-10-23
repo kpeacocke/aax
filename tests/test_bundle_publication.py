@@ -19,6 +19,15 @@ def script(name: str) -> str:
     return next(step["run"] for step in STEPS if step["name"] == name)
 
 
+def grype_report(image_id: str = "sha256:test", matches: tuple[dict, ...] = ()) -> dict:
+    return {
+        "descriptor": {"name": "grype", "db": {"status": {"valid": True}}},
+        "source": {"type": "image", "target": {"imageID": image_id}},
+        "distro": {"name": "centos"},
+        "matches": list(matches),
+    }
+
+
 def test_scheduled_builds_and_retries_have_distinct_tags() -> None:
     template = WORKFLOW["env"]["IMAGE_TAG"]
 
@@ -91,6 +100,7 @@ def test_gate_measures_fixed_version_and_severity(
     (tmp_path / "scripts").symlink_to(ROOT / "scripts", target_is_directory=True)
     for image in IMAGES:
         (reports / f"{image}.json").write_text(json.dumps({"SchemaVersion": 2, "Results": []}))
+    (reports / "awx-grype.json").write_text(json.dumps(grype_report()))
     finding = {"VulnerabilityID": "TEST-CVE", "Severity": severity, "FixedVersion": fixed}
     (reports / "awx.json").write_text(
         json.dumps({"SchemaVersion": 2, "Results": [{"Vulnerabilities": [finding]}]})
@@ -111,6 +121,269 @@ def test_bundle_scan_precedes_publication() -> None:
     for image in IMAGES:
         assert image in scan
     assert "set -euo pipefail" in scan
+    assert '"$RUNNER_TEMP/grype"' in scan
+    assert 'json=bundle-reports/$name-grype.json' in scan
+    assert 'sarif=bundle-reports/$name-grype.sarif' in scan
+    assert "sha256sum --check -" in script("Install supplemental OS scanner")
+
+
+@pytest.mark.parametrize(
+    ("severity", "state", "blocked"),
+    [("Critical", "fixed", True), ("High", "fixed", True),
+     ("Medium", "fixed", False), ("High", "not-fixed", False)],
+)
+def test_supplemental_gate_measures_real_fix_state(
+    tmp_path: Path, severity: str, state: str, blocked: bool
+) -> None:
+    report = tmp_path / "grype.json"
+    report.write_text(json.dumps(grype_report(matches=({
+        "vulnerability": {
+            "id": "TEST-CVE", "severity": severity,
+            "fix": {"state": state, "versions": ["2.0"] if state == "fixed" else []},
+        },
+    },))))
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/check-vulnerability-reports.sh"), str(report)],
+        capture_output=True, text=True, timeout=10,
+    )
+    assert (result.returncode != 0) == blocked, result.stderr
+
+
+@pytest.mark.parametrize("matching_image", [True, False])
+def test_missing_os_coverage_needs_exact_image_supplement(
+    tmp_path: Path, matching_image: bool
+) -> None:
+    trivy = tmp_path / "trivy.json"
+    trivy.write_text(json.dumps({
+        "SchemaVersion": 2, "Results": [],
+        "Metadata": {"ImageID": "sha256:exact", "OS": {"Family": "centos-stream"}},
+    }))
+    grype = tmp_path / "grype.json"
+    grype.write_text(json.dumps(grype_report("sha256:exact" if matching_image else "sha256:other")))
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/check-vulnerability-reports.sh"), str(trivy), str(grype)],
+        capture_output=True, text=True, timeout=10,
+    )
+    assert (result.returncode == 0) == matching_image, result.stderr
+
+
+def test_invalid_supplemental_database_is_not_a_clean_scan(tmp_path: Path) -> None:
+    report = grype_report()
+    report["descriptor"]["db"]["status"]["valid"] = False
+    path = tmp_path / "grype.json"
+    path.write_text(json.dumps(report))
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/check-vulnerability-reports.sh"), str(path)],
+        capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode != 0
+
+
+def test_runtime_security_updates_precede_exact_image_scans(tmp_path: Path) -> None:
+    names = [step.get("name", "") for step in STEPS]
+    assert names.index("Apply maintained runtime security patches") < names.index(
+        "Scan exact bundle images"
+    )
+    docker = tmp_path / "docker"
+    docker.write_text(
+        '#!/bin/bash\nprintf "%s\\n" "$*" >> "$DOCKER_LOG"\n'
+        'if [[ "$1" == run ]]; then printf "%040d 2026.10.21.1.dev2+aax.1\\n" 1; fi\n'
+    )
+    docker.chmod(0o755)
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "build-rpm-security.sh").write_text(
+        '#!/bin/bash\nprintf "build-source-rpms %s\\n" "$*" >> "$DOCKER_LOG"\n'
+    )
+    log = tmp_path / "docker.log"
+    result = subprocess.run(
+        ["bash", "-c", script("Apply maintained runtime security patches").replace(
+            "${{ github.sha }}", "test-sha"
+        )],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "PATH": f"{tmp_path}:{os.environ['PATH']}",
+            "DOCKER_LOG": str(log),
+        },
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    commands = log.read_text().splitlines()
+    assert "build-source-rpms bundle-reports/rpm-security" in commands
+    for name in ("awx", "awx-ee", "galaxy-ng", "eda-controller", "ansible-rulebook", "receptor"):
+        rpm_build = next(
+            command for command in commands if f"-t {name}:rpm-patched " in command
+        )
+        assert "images/rpm-security/Runtime.Dockerfile" in rpm_build
+        assert commands.index(rpm_build) > commands.index(
+            "build-source-rpms bundle-reports/rpm-security"
+        )
+    for name in ("awx", "awx-ee", "galaxy-ng", "eda-controller"):
+        build = next(command for command in commands if f"-t {name}:python-patched " in command)
+        assert f"BASE_IMAGE={name}:devel" in build
+        assert "RUNTIME_USER=" in build and "PYTHON=" in build
+    assert any("RECEPTOR_IMAGE=receptor:devel" in command for command in commands)
+    assert any("images/runtime-security/EDA.Dockerfile" in command for command in commands)
+    for name in ("awx", "galaxy-ng", "eda-controller"):
+        source_build = next(
+            command for command in commands if f"-t aax/dab-security:{name} " in command
+        )
+        assert "DAB_REVISION=" + "0" * 39 + "1" in source_build
+        assert "DAB_VERSION=2026.10.21.1.dev2+aax.1" in source_build
+        assert any(f"DAB_IMAGE=aax/dab-security:{name}" in command for command in commands)
+        evidence = json.loads((tmp_path / f"bundle-reports/{name}-dab-source.json").read_text())
+        assert evidence["revision"] == "0" * 39 + "1"
+    dockerfile = (ROOT / "images/runtime-security/Dockerfile").read_text()
+    assert '"${PYTHON}" -m pip check' in dockerfile
+
+
+def test_java_database_has_independent_public_registry_fallback() -> None:
+    scan = next(step for step in STEPS if step.get("name") == "Scan exact bundle images")
+    assert "public.ecr.aws/aquasecurity/trivy-java-db:1" in scan["env"]["TRIVY_JAVA_DB_REPOSITORY"]
+
+
+@pytest.mark.parametrize(
+    ("installed", "version", "fail_upgrade", "success"),
+    [(True, "0:2-1.x86_64", False, True),
+     (False, "0:2-1.x86_64", False, False),
+     (True, "0:3-1.x86_64", False, False),
+     (True, "0:2-1.x86_64", True, False)],
+)
+def test_rpm_installer_only_upgrades_existing_packages_and_checks_result(
+    tmp_path: Path, installed: bool, version: str, fail_upgrade: bool, success: bool
+) -> None:
+    directory = tmp_path / "rpms"
+    directory.mkdir()
+    for name in ("runtime", "unused-server"):
+        (directory / f"{name}.rpm").touch()
+    binary = tmp_path / "bin"
+    binary.mkdir()
+    (binary / "rpm").write_text(
+        '#!/bin/bash\n'
+        'if [[ "$1" == --upgrade || "$1" == --verify ]]; then\n'
+        '  printf "%s\\n" "$*" >> "$PACKAGE_LOG"\n'
+        '  if [[ "$1" == --upgrade && "$FAIL_UPGRADE" == true ]]; then\n'
+        '    echo "upgrade failed" >&2; exit 1\n'
+        '  fi\n'
+        '  exit 0\n'
+        'fi\n'
+        'if [[ "$1" == -qp ]]; then\n'
+        '  if [[ "$3" == "%{NAME}" ]]; then\n'
+        '    name="${4##*/}"; printf "%s" "${name%.rpm}"\n'
+        '  else printf "0:2-1.x86_64"; fi\n'
+        'elif [[ "${*: -1}" != runtime || "$INSTALLED" != true ]]; then exit 1\n'
+        'elif [[ "$2" == --queryformat ]]; then printf "%s" "$VERSION"\n'
+        'fi\n'
+    )
+    for executable in binary.iterdir():
+        executable.chmod(0o755)
+    log = tmp_path / "rpm.log"
+    result = subprocess.run(
+        ["bash", str(ROOT / "images/rpm-security/install.sh"), str(directory)],
+        env={
+            **os.environ, "PATH": f"{binary}:{os.environ['PATH']}",
+            "PACKAGE_LOG": str(log), "INSTALLED": str(installed).lower(),
+            "VERSION": version, "FAIL_UPGRADE": str(fail_upgrade).lower(),
+        },
+        capture_output=True, text=True, timeout=10,
+    )
+    assert (result.returncode == 0) == success, result.stderr
+    commands = log.read_text().splitlines() if log.exists() else []
+    assert all("unused-server" not in command for command in commands)
+    if success:
+        assert commands == [
+            f"--upgrade {directory}/runtime.rpm", "--verify --all --nofiles --noscripts"
+        ]
+    elif not installed:
+        assert commands == []
+        assert "No applicable AAX security RPMs" in result.stderr
+    elif fail_upgrade:
+        assert "upgrade failed" in result.stderr
+    else:
+        assert "expected 0:2-1.x86_64, found 0:3-1.x86_64" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("current", "list_failure", "success"),
+    [("v0.59.0", False, True), ("v0.61.0", False, False),
+     ("", False, True), ("v0.59.0", True, False)],
+)
+def test_native_go_vendoring_preserves_sources_and_rejects_downgrades(
+    tmp_path: Path, current: str, list_failure: bool, success: bool
+) -> None:
+    binary = tmp_path / "bin"
+    binary.mkdir()
+    go = binary / "go"
+    go.write_text(
+        '#!/bin/bash\n'
+        'printf "%s\\n" "$*" >> "$GO_LOG"\n'
+        'if [[ "$1" == list ]]; then\n'
+        '  if [[ "$LIST_FAILURE" == true ]]; then exit 1; fi\n'
+        '  printf "%s\\n" "$MODULES"\n'
+        'elif [[ "$1 $2" == "mod vendor" ]]; then\n'
+        '  mkdir -p vendor; printf "retained source\\n" > vendor/module.go\n'
+        'fi\n'
+    )
+    go.chmod(0o755)
+    (tmp_path / "go.mod").write_text("module example.test/application\n")
+    (tmp_path / "go.sum").touch()
+    pins = tmp_path / "pins.json"
+    pins.write_text(json.dumps({"golang.org/x/net": "v0.60.0"}))
+    archive = tmp_path / "corresponding-source.tar.gz"
+    archive.touch()
+    log = tmp_path / "go.log"
+    modules = {"Path": "golang.org/x/net", "Version": current} if current else {}
+    env = {
+        **os.environ, "PATH": f"{binary}:{os.environ['PATH']}", "GO_LOG": str(log),
+        "MODULES": json.dumps(modules), "LIST_FAILURE": str(list_failure).lower(),
+    }
+    command = ["bash", str(ROOT / "images/rpm-security/go-vendor.sh"),
+               str(pins), str(archive)]
+    result = subprocess.run(
+        command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30,
+    )
+    assert (result.returncode == 0) == success, result.stderr
+    commands = log.read_text().splitlines()
+    if not success:
+        assert archive.stat().st_size == 0
+        assert not any(command.startswith("get ") for command in commands)
+        if not list_failure:
+            assert "Refusing to downgrade" in result.stderr
+        return
+    assert ("get golang.org/x/net@v0.60.0" in commands) == bool(current)
+    assert "mod vendor" in commands
+    assert archive.stat().st_size > 0
+    (tmp_path / "vendor/obsolete.go").touch()
+    restored = subprocess.run(
+        command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30,
+    )
+    assert restored.returncode == 0, restored.stderr
+    assert log.read_text().splitlines() == commands
+    assert not (tmp_path / "vendor/obsolete.go").exists()
+    assert (tmp_path / "vendor/module.go").read_text() == "retained source\n"
+
+
+def test_downstream_dependency_manifests_are_discoverable() -> None:
+    updates = yaml.safe_load((ROOT / ".github/dependabot.yml").read_text())["updates"]
+    for ecosystem, paths in (
+        ("docker", [ROOT / "images" / name for name in (
+            "awx-ee-runtime", "dab-security", "drools-runtime", "galaxy-runtime",
+            "hub-security", "receptor-runtime", "rpm-security", "runtime-security",
+            "ee-base/pip-security",
+        )]),
+        ("pip", [ROOT / "images" / name for name in (
+            "dab-security", "runtime-security", "ee-base/pip-security",
+        )]),
+    ):
+        directories = {
+            directory for update in updates if update["package-ecosystem"] == ecosystem
+            for directory in update.get("directories", [])
+        }
+        for path in paths:
+            assert "/" + path.relative_to(ROOT).as_posix() in directories
+            if ecosystem == "pip":
+                assert list(path.glob("requirements*.txt"))
 
 
 @pytest.mark.parametrize("contents", ["{}", "[]", "null", "not json"])

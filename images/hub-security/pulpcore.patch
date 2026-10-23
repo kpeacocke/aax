@@ -1,0 +1,12 @@
+diff --git a/pyproject.toml b/pyproject.toml
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -8,3 +8,3 @@
+ [project]
+ name = "pulpcore"
+-version = "3.105.23"
++version = "3.105.23+aax.1"
+@@ -67,2 +67,2 @@
+-  "yarl>=1.12.0,<1.24",  # Seems to follow SemVer https://yarl.aio-libs.org/en/latest/contributing/release_guide/#pre-release-activities .
++  "yarl>=1.25.1,<1.26",  # Downstream compatibility range for patched aiohttp.
+ ]

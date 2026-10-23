@@ -1,3 +1,11 @@
+FROM python:3.12-slim-bookworm AS pip-builder
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends git build-essential && \
+  rm -rf /var/lib/apt/lists/*
+COPY pip-security /patches
+WORKDIR /source
+RUN sh /patches/build.sh
+
 FROM python:3.14-slim
 
 # Build arguments for metadata
@@ -18,6 +26,7 @@ COPY requirements.txt /tmp/requirements.txt
 COPY constraints.txt /etc/pip/constraints.txt
 COPY ansible.cfg /etc/ansible/ansible.cfg
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY --from=pip-builder /wheels /tmp/aax-pip-wheels
 
 # Install system packages, create user, install Python packages
 # hadolint ignore=DL3008
@@ -36,8 +45,10 @@ RUN mkdir -p /etc/ansible && \
   rsync \
   jq && \
   rm -rf /var/lib/apt/lists/* && \
+  pip install --no-cache-dir /tmp/aax-pip-wheels/*.whl && \
   pip install --no-cache-dir -r /tmp/requirements.txt && \
-  rm /tmp/requirements.txt && \
+  pip check && \
+  rm /tmp/requirements.txt /tmp/aax-pip-wheels/*.whl && \
   chmod +x /usr/local/bin/entrypoint.sh
 
 # OCI metadata labels

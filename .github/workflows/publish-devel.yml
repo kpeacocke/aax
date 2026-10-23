@@ -21,6 +21,16 @@ on:
       - images/gateway/**
       - images/eda-server/**
       - images/awx-ui-runtime/**
+      - images/galaxy-runtime/**
+      - images/runtime-security/**
+      - images/receptor-runtime/**
+      - images/awx-ee-runtime/**
+      - images/ee-base/pip-security/**
+      - images/hub-security/**
+      - images/drools-runtime/**
+      - images/dab-security/**
+      - images/rpm-security/**
+      - scripts/build-rpm-security.sh
       - scripts/build-upstream.sh
       - scripts/check-vulnerability-reports.sh
   schedule:
@@ -43,7 +53,7 @@ env:
 jobs:
   build-and-publish:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 360
     steps:
       - name: Check out AAX
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -120,11 +130,105 @@ jobs:
           docker buildx build --load -t galaxy-ng:devel \
             --build-arg GIT_COMMIT=${{ github.sha }} .
 
+      - name: Add durable Hub bootstrap
+        run: |
+          docker build --build-arg BASE_IMAGE=galaxy-ng:devel \
+            -t galaxy-ng:runtime images/galaxy-runtime
+          docker tag galaxy-ng:runtime galaxy-ng:devel
+
       - name: Build AAX gateway devel
         run: docker buildx build --load -t gateway:devel images/gateway
 
       - name: Build AAX EDA controller devel
         run: docker buildx build --load -t eda-controller:devel images/eda-server
+
+      - name: Apply maintained runtime security patches
+        run: |
+          set -euo pipefail
+          docker build -f images/ee-base/pip-security/Dockerfile \
+            -t aax/pip-security:devel images/ee-base
+          docker build -f images/receptor-runtime/Dockerfile \
+            --build-arg BASE_IMAGE=receptor:devel \
+            --build-arg VERSION=1.6.9.dev1+g${{ github.sha }} \
+            -t receptor:patched .upstream/receptor
+          docker tag receptor:patched receptor:devel
+          for name in awx awx-ee galaxy-ng eda-controller ansible-rulebook receptor; do
+            runtime_user="$(docker image inspect --format '{{.Config.User}}' "$name:devel")"
+            docker build -f images/runtime-security/OS.Dockerfile \
+              --build-arg BASE_IMAGE="$name:devel" \
+              --build-arg RUNTIME_USER="${runtime_user:-root}" \
+              -t "$name:os-patched" images/runtime-security
+            docker tag "$name:os-patched" "$name:devel"
+          done
+          mkdir -p bundle-reports
+          bash scripts/build-rpm-security.sh bundle-reports/rpm-security
+          for name in awx awx-ee galaxy-ng eda-controller ansible-rulebook receptor; do
+            runtime_user="$(docker image inspect --format '{{.Config.User}}' "$name:devel")"
+            docker build -f images/rpm-security/Runtime.Dockerfile \
+              --build-arg BASE_IMAGE="$name:devel" \
+              --build-arg RUNTIME_USER="${runtime_user:-root}" \
+              -t "$name:rpm-patched" bundle-reports/rpm-security
+            docker tag "$name:rpm-patched" "$name:devel"
+          done
+          for entry in \
+            'awx /var/lib/awx/venv/awx/bin/python' \
+            'galaxy-ng /venv/bin/python' \
+            'eda-controller /app/venv/bin/python'; do
+            read -r name python <<< "$entry"
+            read -r revision version < <(
+              docker run --rm --entrypoint "$python" "$name:devel" -c \
+                'import importlib.metadata as m,json; d=m.distribution("django-ansible-base"); print(json.loads(d.read_text("direct_url.json"))["vcs_info"]["commit_id"], d.version.split("+")[0]+"+aax.1")'
+            )
+            [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "Missing exact DAB source revision for $name" >&2
+              exit 1
+            }
+            jq -n --arg service "$name" --arg revision "$revision" --arg version "$version" \
+              '{service: $service, repository: "https://github.com/ansible/django-ansible-base", revision: $revision, version: $version}' \
+              > "bundle-reports/$name-dab-source.json"
+            docker build --build-arg DAB_REVISION="$revision" \
+              --build-arg DAB_VERSION="$version" \
+              -t "aax/dab-security:$name" images/dab-security
+          done
+          for entry in \
+            'awx /var/lib/awx/venv/awx/bin/python 1000' \
+            'awx-ee /usr/bin/python3.12 1000' \
+            'galaxy-ng /venv/bin/python galaxy' \
+            'eda-controller /app/venv/bin/python 1001'; do
+            read -r name python runtime_user <<< "$entry"
+            requirements="$name"
+            case "$name" in
+              galaxy-ng) requirements=galaxy ;;
+              eda-controller) requirements=eda ;;
+            esac
+            docker build --build-arg BASE_IMAGE="$name:devel" \
+              --build-arg PYTHON="$python" \
+              --build-arg REQUIREMENTS="requirements-$requirements.txt" \
+              --build-arg RUNTIME_USER="$runtime_user" \
+              -t "$name:python-patched" images/runtime-security
+            docker tag "$name:python-patched" "$name:devel"
+          done
+          docker build -f images/runtime-security/DAB.Dockerfile \
+            --build-arg BASE_IMAGE=awx:devel \
+            --build-arg DAB_IMAGE=aax/dab-security:awx \
+            -t awx:patched images/runtime-security
+          docker tag awx:patched awx:devel
+          docker build --build-arg BASE_IMAGE=awx-ee:devel \
+            --build-arg RECEPTOR_IMAGE=receptor:devel \
+            -t awx-ee:patched images/awx-ee-runtime
+          docker tag awx-ee:patched awx-ee:devel
+          docker build -f images/runtime-security/EDA.Dockerfile \
+            --build-arg BASE_IMAGE=eda-controller:devel \
+            --build-arg DAB_IMAGE=aax/dab-security:eda-controller \
+            -t eda-controller:patched images/runtime-security
+          docker tag eda-controller:patched eda-controller:devel
+          docker build --build-arg BASE_IMAGE=galaxy-ng:devel \
+            --build-arg DAB_IMAGE=aax/dab-security:galaxy-ng \
+            -t galaxy-ng:patched images/hub-security
+          docker tag galaxy-ng:patched galaxy-ng:devel
+          docker build --build-arg BASE_IMAGE=ansible-rulebook:devel \
+            -t ansible-rulebook:patched images/drools-runtime
+          docker tag ansible-rulebook:patched ansible-rulebook:devel
 
       - name: Record exact build sources
         run: |
@@ -139,13 +243,29 @@ jobs:
             '{aax_revision: $aax, image_tag: $tag, sources: .}' > bundle-reports/sources.json
           cp images/eda-server/Dockerfile bundle-reports/eda-runtime.Dockerfile
           cp images/awx-ui-runtime/Dockerfile bundle-reports/awx-ui.Dockerfile
+          cp -R images/runtime-security bundle-reports/runtime-security
+          cp images/receptor-runtime/Dockerfile bundle-reports/receptor-runtime.Dockerfile
+          cp images/galaxy-runtime/Dockerfile bundle-reports/galaxy-runtime.Dockerfile
+          cp -R images/ee-base/pip-security images/hub-security images/drools-runtime \
+            images/dab-security images/rpm-security bundle-reports/
 
       - name: Install bundle scanner
         uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514 # v0.2.6
         with:
           version: v0.70.0
 
+      - name: Install supplemental OS scanner
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --max-time 120 \
+            --output "$RUNNER_TEMP/grype.tar.gz" \
+            https://github.com/anchore/grype/releases/download/v0.121.0/grype_0.121.0_linux_amd64.tar.gz
+          echo "64e07133d3486115de647a66581461dccf5c732748a0a3119077395565f15519  $RUNNER_TEMP/grype.tar.gz" | sha256sum --check -
+          tar -xzf "$RUNNER_TEMP/grype.tar.gz" -C "$RUNNER_TEMP" grype
+
       - name: Scan exact bundle images
+        env:
+          TRIVY_JAVA_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-java-db:1,ghcr.io/aquasecurity/trivy-java-db:1,public.ecr.aws/aquasecurity/trivy-java-db:1
         run: |
           set -euo pipefail
           for name in awx awx-ee receptor ansible-rulebook galaxy-ng gateway eda-controller; do
@@ -155,6 +275,9 @@ jobs:
               "bundle-reports/$name.json"
             trivy image --format cyclonedx --timeout 15m \
               --output "bundle-reports/$name.cdx.json" "$name:devel"
+            "$RUNNER_TEMP/grype" "docker:$name:devel" --platform linux/amd64 \
+              -o "json=bundle-reports/$name-grype.json" \
+              -o "sarif=bundle-reports/$name-grype.sarif"
           done
 
       - name: Gate on fixable high and critical bundle vulnerabilities
@@ -164,7 +287,7 @@ jobs:
             bundle-reports/awx.json bundle-reports/awx-ee.json \
             bundle-reports/receptor.json bundle-reports/ansible-rulebook.json \
             bundle-reports/galaxy-ng.json bundle-reports/gateway.json \
-            bundle-reports/eda-controller.json
+            bundle-reports/eda-controller.json bundle-reports/*-grype.json
 
       - name: Upload bundle security findings
         if: always()

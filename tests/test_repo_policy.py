@@ -13,7 +13,13 @@ def _read(relative_path: str) -> str:
 
 def _compose_env_var_names(compose_text: str) -> set[str]:
     """Return all ${VAR...} interpolation names used in compose."""
-    return set(re.findall(r"\$\{([A-Z0-9_]+)(?::[-?][^}]*)?\}", compose_text))
+    return set(re.findall(r"\$\{([A-Z0-9_]+)(?::[-?][^}]*)?\}", compose_text.replace("$$", "")))
+
+
+def test_compose_interpolation_excludes_escaped_container_variables() -> None:
+    assert _compose_env_var_names("${HOST} $${CONTAINER:-false} $$${OTHER_HOST}") == {
+        "HOST", "OTHER_HOST",
+    }
 
 
 def _env_example_var_names(env_example_text: str) -> set[str]:

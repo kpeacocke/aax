@@ -23,7 +23,7 @@ bootstrap:
 	@./scripts/bootstrap.sh
 
 test:
-	@$(PYTEST) -q tests/test_repo_policy.py tests/test_docs_contract.py tests/test_bundle_publication.py
+	@$(PYTEST) -q tests/test_repo_policy.py tests/test_docs_contract.py tests/test_bundle_publication.py tests/test_hub_bootstrap.py
 
 lint:
 	@$(PRE_COMMIT) run --all-files

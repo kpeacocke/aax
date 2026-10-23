@@ -14,6 +14,9 @@ This directory contains automated tests for the AAX Docker images using pytest.
 ### Using Command Line
 
 ```bash
+# Run canonical policy, publication-security and Hub-bootstrap tests (no Docker)
+make test
+
 # Run all tests
 pytest tests/
 
@@ -40,7 +43,23 @@ pytest --cov=tests/ tests/
   - Additional test classes for other images can be added here
 - `test_bundle_publication.py` - Executes publication scripts with a fake registry
   client and checks unique run tags, fail-closed vulnerability thresholds, and
-  digest-scoped promotion. Requires `jq`, `bash`, and PyYAML; no registry writes.
+  digest-scoped promotion, exact-image supplemental OS coverage, runtime patch
+  ordering, RPM upgrade selection/postconditions and the Java database fallback.
+  Requires `jq`, `bash`, and PyYAML; no registry writes.
+- `test_hub_bootstrap.py` - Validates durable encryption-key creation, concurrent
+  initialization, malformed-key failure and consistent shared Hub storage settings.
+
+Source-build regressions also run inside their respective Docker builders.
+`images/rpm-security/setuptools_regression.py` must run from the unpacked
+setuptools source, with that source on `PYTHONPATH` and Python 3.12. It tests both
+Unicode normalization forms, all exclusion directives and actual source archive
+contents; it is not a test of whichever setuptools happens to be installed on
+the host.
+
+The EDA source build runs `images/runtime-security/test_eda_crypto.py` against
+the installed wheel. It checks AES-256 round trips, legacy ciphertext, tampering,
+expiry and invalid keys after upgrading cryptography; no database values or
+encryption keys are replaced.
 
 ## Writing New Tests
 
