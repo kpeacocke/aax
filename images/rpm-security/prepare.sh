@@ -39,6 +39,11 @@ case "$package" in
         sed -i 's/GO111MODULE=off/GO111MODULE=on/g' "$spec"
         ;;
 esac
+if [[ "$package" == podman ]]; then
+    # The EL9 recipe's GOPATH-era import path omits Podman's /v5 module suffix.
+    sed -i 's|%{import_path}/cmd/|./cmd/|g' "$spec"
+    sed -i 's|%{import_path}/libpod/|%{import_path}/v5/libpod/|g' "$spec"
+fi
 printf '%s\n' "$package" > /build/package
 cp /aax/sources.json /build/output/sources.json
 rpm -qp --queryformat '%{NAME} %{EPOCHNUM}:%{VERSION}-%{RELEASE}\n' \

@@ -92,6 +92,8 @@ populate transitive checksums. New vendored sources, module checksums
 and licenses are included in the corresponding source RPM, not just downloaded
 and discarded. An existing newer dependency fails the build rather than being
 downgraded.
+Podman's legacy EL9 recipe uses module-relative command targets and its v5 module
+path for embedded build metadata; the upstream source archive URL is unchanged.
 
 Runtime images upgrade only subpackages already installed, verify the resulting
 RPM versions and run the dependency check. The build retains corresponding

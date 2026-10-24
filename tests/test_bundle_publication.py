@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 
 import pytest
@@ -384,6 +385,36 @@ def test_native_go_vendoring_preserves_sources_and_rejects_downgrades(
     assert log.read_text().splitlines() == commands
     assert not (tmp_path / "vendor/obsolete.go").exists()
     assert (tmp_path / "vendor/module.go").read_text() == "retained source\n"
+
+
+def test_podman_recipe_uses_module_relative_build_targets() -> None:
+    prepare = (ROOT / "images/rpm-security/prepare.sh").read_text()
+    adaptations = prepare.split('if [[ "$package" == podman ]]; then\n', 1)[1].split(
+        "\nfi", 1
+    )[0]
+    recipe = (
+        "Source0: https://%{import_path}/archive/%{commit0}/source.tar.gz\n"
+        'LDFLAGS="-X %{import_path}/libpod/define.buildInfo=123"\n'
+        "%gobuild -o bin/rootlessport %{import_path}/cmd/rootlessport\n"
+        "%gobuild -o bin/podman %{import_path}/cmd/%{name}\n"
+        "%gobuild -o bin/quadlet %{import_path}/cmd/quadlet\n"
+        "%gobuild -o bin/podman-testing %{import_path}/cmd/podman-testing\n"
+        "%gobuild -o bin/dnsname github.com/containers/dnsname/plugins/meta/dnsname\n"
+    )
+    adapted = recipe
+    for line in adaptations.splitlines():
+        if line.strip().startswith("sed -i "):
+            command = shlex.split(line)
+            result = subprocess.run(
+                ["sed", "-e", command[2]], input=adapted,
+                capture_output=True, text=True, check=True, timeout=10,
+            )
+            adapted = result.stdout
+    assert adapted == (
+        recipe.replace("%{import_path}/cmd/", "./cmd/")
+        .replace("%{import_path}/libpod/", "%{import_path}/v5/libpod/")
+    )
+    assert "%{import_path}/cmd/" not in adapted
 
 
 def test_downstream_dependency_manifests_are_discoverable() -> None:
