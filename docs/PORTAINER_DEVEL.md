@@ -86,8 +86,9 @@ strict-FIPS capability. Compiler crypto and strict-mode tests run during the
 build. This does not make AAX a certified FIPS product.
 The git-lfs, Podman and skopeo builds regenerate their vendored dependencies
 using reviewed security pins and module-aware compilation, so embedded dependency
-inventories remain visible to scanners. The full selected module graph is downloaded
-before vendoring to populate transitive checksums. New vendored sources, module checksums
+inventories remain visible to scanners. After applying the pins, the module graph
+is tidied and downloaded before vendoring to resolve indirect requirements and
+populate transitive checksums. New vendored sources, module checksums
 and licenses are included in the corresponding source RPM, not just downloaded
 and discarded. An existing newer dependency fails the build rather than being
 downgraded.
