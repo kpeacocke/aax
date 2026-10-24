@@ -4,7 +4,7 @@ Upstream: https://github.com/pypa/setuptools/commit/dd9f436a36486b4cb8a4c70a2321
 diff --git a/setuptools/command/egg_info.py b/setuptools/command/egg_info.py
 --- a/setuptools/command/egg_info.py
 +++ b/setuptools/command/egg_info.py
-@@ -34,4 +34,15 @@
+@@ -34,7 +34,18 @@
  PY_MAJOR = '{}.{}'.format(*sys.version_info)
  
  
@@ -20,13 +20,18 @@ diff --git a/setuptools/command/egg_info.py b/setuptools/command/egg_info.py
 +
 +
  def translate_pattern(glob):  # noqa: C901  # is too complex (14)  # FIXME
-@@ -41,5 +52,6 @@
+     """
+     Translate a file path glob like '*.txt' in to a regular expression.
+     This differs from fnmatch.translate which allows wildcards to match
+@@ -41,7 +52,8 @@
      directory separators. It also knows about '**/' which matches any number of
      directories.
      """
 +    glob = unicode_utils.normalize(glob)
      pat = ''
  
+     # This will split on '/' within [character classes]. This is deliberate.
+     chunks = glob.split(os.path.sep)
 @@ -112,7 +124,7 @@
              pat += sep
  

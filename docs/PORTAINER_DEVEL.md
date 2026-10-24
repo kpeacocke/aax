@@ -94,6 +94,8 @@ and discarded. An existing newer dependency fails the build rather than being
 downgraded.
 Podman's legacy EL9 recipe uses module-relative command targets and its v5 module
 path for embedded build metadata; the upstream source archive URL is unchanged.
+The setuptools backport is applied with RPM's zero-fuzz patch policy and tested
+against the downstream source, including its existing vendor patches.
 
 Runtime images upgrade only subpackages already installed, verify the resulting
 RPM versions and run the dependency check. The build retains corresponding
