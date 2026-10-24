@@ -15,6 +15,10 @@ services:
       PULP_REDIS_HOST: hub-redis
       PULP_REDIS_PORT: "6379"
       PULP_SECRET_KEY: ${PULP_SECRET_KEY}
+      PULP_DEFAULT_FILE_STORAGE: pulpcore.app.models.storage.FileSystem
+      PULP_MEDIA_ROOT: /var/lib/pulp/media
+      PULP_REDIRECT_TO_OBJECT_STORAGE: "false"
+      PULP_DB_ENCRYPTION_KEY: /etc/pulp/certs/database_fields.symmetric.key
       WITH_MIGRATIONS: "1"
       GUNICORN_PORT: "24817"
     volumes:
@@ -34,6 +38,10 @@ services:
       PULP_REDIS_HOST: hub-redis
       PULP_REDIS_PORT: "6379"
       PULP_SECRET_KEY: ${PULP_SECRET_KEY}
+      PULP_DEFAULT_FILE_STORAGE: pulpcore.app.models.storage.FileSystem
+      PULP_MEDIA_ROOT: /var/lib/pulp/media
+      PULP_REDIRECT_TO_OBJECT_STORAGE: "false"
+      PULP_DB_ENCRYPTION_KEY: /etc/pulp/certs/database_fields.symmetric.key
       GUNICORN_PORT: "24816"
     volumes:
       - hub_pulp_certs:/etc/pulp/certs
@@ -50,6 +58,10 @@ services:
       PULP_REDIS_HOST: hub-redis
       PULP_REDIS_PORT: "6379"
       PULP_SECRET_KEY: ${PULP_SECRET_KEY}
+      PULP_DEFAULT_FILE_STORAGE: pulpcore.app.models.storage.FileSystem
+      PULP_MEDIA_ROOT: /var/lib/pulp/media
+      PULP_REDIRECT_TO_OBJECT_STORAGE: "false"
+      PULP_DB_ENCRYPTION_KEY: /etc/pulp/certs/database_fields.symmetric.key
       GUNICORN_PORT: "24817"
     volumes:
       - hub_pulp_certs:/etc/pulp/certs
@@ -76,6 +88,10 @@ services:
       PULP_DB_PASSWORD: ${HUB_DB_PASSWORD}
       SECRET_KEY: ${GALAXY_SECRET_KEY}
       PULP_SECRET_KEY: ${PULP_SECRET_KEY}
+      PULP_DEFAULT_FILE_STORAGE: pulpcore.app.models.storage.FileSystem
+      PULP_MEDIA_ROOT: /var/lib/pulp/media
+      PULP_REDIRECT_TO_OBJECT_STORAGE: "false"
+      PULP_DB_ENCRYPTION_KEY: /etc/pulp/certs/database_fields.symmetric.key
       GUNICORN_PORT: "8000"
     volumes:
       - hub_pulp_certs:/etc/pulp/certs

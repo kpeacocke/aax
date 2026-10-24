@@ -27,7 +27,9 @@ The upstream development stack uses Python 3.12, Django 5.2, and the matching
 `django-ansible-base` development branch. The AWX image retains an explicit
 compatibility pin for callers who build the older `24.6.1` stable tag.
 
-The execution environment uses `ansible-core` 2.21.4 and Python 3.14. EDA uses
+The execution environment uses `ansible-core` 2.21.5, `ansible-runner` 2.4.3,
+and Python 3.14. Development tools use `ansible-navigator` 26.10.0,
+`ansible-lint` 26.10.1, and `ansible-dev-tools` 26.10.0. EDA uses
 `ansible-rulebook` 1.3.2. Galaxy NG uses its latest tagged release, 4.10.6,
 with Pulp 3.49.40, `pulp-ansible` 0.25.1, and `pulp-container` 2.19.2, matching
 that release's dependency constraints.
@@ -52,6 +54,13 @@ must be advanced deliberately as a separate deployment target.
   or `.env.example`.
 - Keep CI/release workflows aligned with these defaults.
 - Run policy and docs contract tests after any version change.
+- Dependabot checks Python manifests and image build directories weekly.
+- Main-channel images are rebuilt weekly with fresh bases and package installs.
+  Both architectures of each candidate digest must pass the fixable HIGH/CRITICAL
+  vulnerability gate before `latest`/`main` tags are promoted. The execution-image
+  descendants use the exact scanned base digest, not a moving base tag.
+- The upstream development bundle uses a distinct tag per workflow run and retry;
+  see [Portainer devel deployment](PORTAINER_DEVEL.md) for its source/SBOM evidence.
 
 ## Digest Pinning Strategy
 

@@ -8,6 +8,7 @@ repos:
     hooks:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
+        exclude: \.patch$
       - id: end-of-file-fixer
       - id: check-yaml
         args: [--allow-multiple-documents]
@@ -53,6 +54,7 @@ repos:
     rev: v2.12.0
     hooks:
       - id: hadolint
+        exclude: \.dockerignore$
 
   # Secrets detection
   - repo: https://github.com/Yelp/detect-secrets

@@ -8,7 +8,6 @@ script runs once at awx-task startup and:
   2. Makes the isolation executable env-configurable as a safety net
 """
 
-import os
 from pathlib import Path
 
 JOBS_PY = Path(

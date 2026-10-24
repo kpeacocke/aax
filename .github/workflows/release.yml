@@ -178,12 +178,12 @@ jobs:
           output: trivy-${{ matrix.image }}.sarif
           severity: LOW,MEDIUM,HIGH,CRITICAL
 
-      - name: Gate on fixable critical vulnerabilities
+      - name: Gate on fixable high and critical vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
         with:
           image-ref: aax/${{ matrix.image }}:1.0.0
           format: table
-          severity: CRITICAL
+          severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: 1
 
@@ -210,10 +210,10 @@ jobs:
           cache: "pip"
 
       - name: Install policy test dependencies
-        run: pip install pytest pytest-cov
+        run: pip install pytest pytest-cov PyYAML
 
       - name: Run repository policy and docs contract tests
-        run: pytest -q tests/test_repo_policy.py tests/test_docs_contract.py
+        run: pytest -q tests/test_repo_policy.py tests/test_docs_contract.py tests/test_bundle_publication.py tests/test_hub_bootstrap.py
 
   release-please:
     name: Create Release

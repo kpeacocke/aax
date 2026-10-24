@@ -1,0 +1,18 @@
+diff --git a/setup.py b/setup.py
+--- a/setup.py
++++ b/setup.py
+@@ -7,3 +7,3 @@
+     name="galaxy-ng",
+-    version="4.12.0dev",
++    version="4.12.0.dev0+aax.1",
+     description="galaxy-ng plugin for the Pulp Project",
+@@ -35,3 +35,3 @@
+         "django-flags>=5.0.13",
+-        "django-ansible-base[jwt-consumer,feature-flags] @ git+https://github.com/ansible/django-ansible-base@ef2ceb250322272451ce220d10c20947898d36d3",
++        "django-ansible-base[jwt-consumer,feature-flags]==2026.10.9.0.dev104+aax.1",
+         "django-crum==0.7.9",
+@@ -52,3 +52,3 @@
+         # https://github.com/ansible-automation-platform/django-ansible-base/blob/devel/requirements/requirements.in#L7
+-        "djangorestframework<3.16",
++        "djangorestframework>=3.17.2,<3.18",
+         "gitpython>=3.1.60",  # minimum version enforced to address AAP-92294, AAP-92292,AAP-92284

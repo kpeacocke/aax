@@ -54,6 +54,7 @@ MANIFEST
 # PyInstaller
 *.manifest
 *.spec
+!images/rpm-security/go-toolchain.spec
 
 # Installer logs
 pip-log.txt

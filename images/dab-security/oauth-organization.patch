@@ -1,0 +1,21 @@
+diff --git a/requirements/requirements.in b/requirements/requirements.in
+--- a/requirements/requirements.in
++++ b/requirements/requirements.in
+@@ -7,2 +7,2 @@
+-djangorestframework<3.16 # problem with OAuth2Application.organization null handling
++djangorestframework>=3.17.2,<3.18
+ django-crum
+diff --git a/ansible_base/oauth2_provider/serializers/application.py b/ansible_base/oauth2_provider/serializers/application.py
+--- a/ansible_base/oauth2_provider/serializers/application.py
++++ b/ansible_base/oauth2_provider/serializers/application.py
+@@ -3,3 +3,4 @@
+ from oauth2_provider.generators import generate_client_secret
++from rest_framework.fields import empty
+ 
+ from ansible_base.lib.serializers.common import NamedCommonModelSerializer
+@@ -19,4 +19,4 @@
+         extra_kwargs = {
+             'user': {'allow_null': True, 'required': False},
+-            'organization': {'allow_null': False},
++            'organization': {'allow_null': False, 'required': True, 'default': empty},
+             'authorization_grant_type': {'allow_null': False, 'label': _('Authorization Grant Type')},

@@ -1,0 +1,8 @@
+cryptography==50.0.2
+msgpack==1.2.1
+setuptools==84.2.1
+urllib3==2.8.0
+pip==26.2.2
+msal==1.39.0
+pyOpenSSL==26.4.0
+azure-cli==2.91.0

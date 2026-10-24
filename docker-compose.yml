@@ -60,7 +60,6 @@ services:
     volumes:
       - ee_definitions:/workspace:rw
       - ee_builds:/builds:rw
-      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       ANSIBLE_NOCOWS: "1"
     security_opt:
@@ -490,15 +489,13 @@ services:
       - -c
       - |
         set -e
-        # Pin ansible-runner to match awx-task (2.4.1.dev6+gc3e8cdb)
-        pip install --no-cache-dir \
-          git+https://github.com/ansible/ansible-runner.git@c3e8cdb24f784a70328f1bfb54eb9c886148acef 2>/dev/null
-        # Jobs execute in this receptor sidecar with process isolation disabled.
-        # Install the GitOps-declared collection majors here so network and
-        # Docker modules remain available after every container recreation.
-        ansible-galaxy collection install \
-          'ansible.posix:>=2.1.0,<3.0.0' \
-          'community.docker:>=5.2.2,<6.0.0'
+        if [ "$${AAX_BAKED_EXECUTOR_DEPENDENCIES:-false}" != true ]; then
+          pip install --no-cache-dir \
+            git+https://github.com/ansible/ansible-runner.git@c3e8cdb24f784a70328f1bfb54eb9c886148acef
+          ansible-galaxy collection install \
+            'ansible.posix:>=2.1.0,<3.0.0' \
+            'community.docker:>=5.2.2,<6.0.0'
+        fi
         mkdir -p /etc/receptor
         cat > /usr/local/bin/ansible-runner-locked << 'WEOF'
         #!/bin/sh

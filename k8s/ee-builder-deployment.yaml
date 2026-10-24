@@ -22,6 +22,7 @@ spec:
         app.kubernetes.io/component: builder
         app.kubernetes.io/part-of: aax
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: ee-builder
           image: aax/ee-builder:1.0.0
@@ -43,8 +44,6 @@ spec:
               mountPath: /workspace
             - name: ee-builds
               mountPath: /builds
-            - name: docker-sock
-              mountPath: /var/run/docker.sock
           livenessProbe:
             exec:
               command:
@@ -79,10 +78,6 @@ spec:
         - name: ee-builds
           persistentVolumeClaim:
             claimName: ee-builds
-        - name: docker-sock
-          hostPath:
-            path: /var/run/docker.sock
-            type: Socket
       securityContext:
         fsGroup: 1000
 ---

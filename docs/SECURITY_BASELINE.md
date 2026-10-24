@@ -18,16 +18,34 @@ This document defines baseline controls for local-dev and production-like AAX op
 - Required secrets must be strong operator-provided values.
 - No weak fallback passwords or secret defaults in runtime config.
 - Policy checks must pass (repo policy + docs contract tests).
-- Secret scanning and remediable critical vulnerabilities are treated as release gates.
+- Secret scanning and remediable HIGH/CRITICAL vulnerabilities are release gates.
 
 ## Mandatory CI Baseline Gates
 
 - `tests/test_repo_policy.py`
 - `tests/test_docs_contract.py`
+- `tests/test_bundle_publication.py`
 - Secret scanning workflow checks
 - Image vulnerability scanning in CI/release workflows. All findings are retained
-  in GitHub Security; CI blocks critical findings when an upstream fix exists so
-  an unfixed distribution advisory cannot permanently freeze the lab.
+  in GitHub Security; required PR checks retain their fixable CRITICAL threshold
+  so existing HIGH findings do not prevent remediation PRs. Publication blocks
+  HIGH/CRITICAL findings with a scanner-reported fix.
+  Main-channel multi-architecture candidates are scanned by
+  digest before deployment tags are promoted. Candidate tags are not deployment tags.
+
+## Upstream Blockers
+
+A clean package resolver does not establish a clean image. In particular, pip
+vendors its own copies of libraries: constraints on installed `urllib3`, `msgpack`,
+or `setuptools` do not replace pip's vendored code. If a scanner reports fixes for
+those libraries but current pip has not incorporated them, publication remains
+blocked. Do not delete vulnerability metadata, patch vendored code ad hoc, or add
+blanket ignores to turn the gate green.
+
+Distribution findings without patched vendor packages remain visible. A passing
+fixable-vulnerability gate does not certify that the image has no known issues,
+nor does it replace full-stack runtime tests. Review the exact bundle reports
+and deployed image digests before production use.
 
 ## Operator Checklist
 
