@@ -25,6 +25,7 @@ else
     if (( ${#updates[@]} )); then
         GOFLAGS=-mod=mod go get "${updates[@]}"
     fi
+    go mod download all
     go mod vendor
     tar -czf "$archive" go.mod go.sum vendor
 fi

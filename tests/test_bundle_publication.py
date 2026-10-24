@@ -309,8 +309,10 @@ def test_rpm_installer_only_upgrades_existing_packages_and_checks_result(
     [("v0.59.0", False, True), ("v0.61.0", False, False),
      ("", False, True), ("v0.59.0", True, False)],
 )
+@pytest.mark.parametrize("download_failure", [False, True])
 def test_native_go_vendoring_preserves_sources_and_rejects_downgrades(
-    tmp_path: Path, current: str, list_failure: bool, success: bool
+    tmp_path: Path, current: str, list_failure: bool, success: bool,
+    download_failure: bool,
 ) -> None:
     binary = tmp_path / "bin"
     binary.mkdir()
@@ -321,7 +323,13 @@ def test_native_go_vendoring_preserves_sources_and_rejects_downgrades(
         'if [[ "$1" == list ]]; then\n'
         '  if [[ "$LIST_FAILURE" == true ]]; then exit 1; fi\n'
         '  printf "%s\\n" "$MODULES"\n'
+        'elif [[ "$1 $2 $3" == "mod download all" ]]; then\n'
+        '  if [[ "$DOWNLOAD_FAILURE" == true ]]; then exit 1; fi\n'
+        '  touch checksums-complete\n'
         'elif [[ "$1 $2" == "mod vendor" ]]; then\n'
+        '  if [[ ! -f checksums-complete ]]; then\n'
+        '    echo "missing go.sum entry" >&2; exit 1\n'
+        '  fi\n'
         '  mkdir -p vendor; printf "retained source\\n" > vendor/module.go\n'
         'fi\n'
     )
@@ -337,14 +345,19 @@ def test_native_go_vendoring_preserves_sources_and_rejects_downgrades(
     env = {
         **os.environ, "PATH": f"{binary}:{os.environ['PATH']}", "GO_LOG": str(log),
         "MODULES": json.dumps(modules), "LIST_FAILURE": str(list_failure).lower(),
+        "DOWNLOAD_FAILURE": str(download_failure).lower(),
     }
     command = ["bash", str(ROOT / "images/rpm-security/go-vendor.sh"),
                str(pins), str(archive)]
     result = subprocess.run(
         command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30,
     )
-    assert (result.returncode == 0) == success, result.stderr
+    assert (result.returncode == 0) == (success and not download_failure), result.stderr
     commands = log.read_text().splitlines()
+    if success and download_failure:
+        assert archive.stat().st_size == 0
+        assert "mod vendor" not in commands
+        return
     if not success:
         assert archive.stat().st_size == 0
         assert not any(command.startswith("get ") for command in commands)
@@ -352,7 +365,7 @@ def test_native_go_vendoring_preserves_sources_and_rejects_downgrades(
             assert "Refusing to downgrade" in result.stderr
         return
     assert ("get golang.org/x/net@v0.60.0" in commands) == bool(current)
-    assert "mod vendor" in commands
+    assert commands.index("mod download all") < commands.index("mod vendor")
     assert archive.stat().st_size > 0
     (tmp_path / "vendor/obsolete.go").touch()
     restored = subprocess.run(
