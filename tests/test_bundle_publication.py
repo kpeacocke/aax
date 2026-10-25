@@ -48,6 +48,34 @@ def script(name: str) -> str:
     return next(step["run"] for step in STEPS if step["name"] == name)
 
 
+@pytest.mark.parametrize("layout", ["setup.py", "pyproject.toml", "missing"])
+def test_hub_patch_selection_checks_before_applying(tmp_path: Path, layout: str) -> None:
+    if layout != "missing":
+        (tmp_path / layout).touch()
+    git = tmp_path / "git"
+    git.write_text('#!/bin/bash\nprintf "%s\\n" "$*" >> "$GIT_LOG"\n')
+    git.chmod(0o755)
+    log = tmp_path / "git.log"
+    result = subprocess.run(
+        ["bash", str(ROOT / "images/hub-security/patch-galaxy.sh"),
+         str(tmp_path), str(ROOT / "images/hub-security")],
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
+             "GIT_LOG": str(log)},
+        capture_output=True, text=True, timeout=10,
+    )
+    if layout == "missing":
+        assert result.returncode != 0
+        assert "No supported Galaxy packaging" in result.stderr
+        assert not log.exists()
+        return
+    assert result.returncode == 0, result.stderr
+    patch = "galaxy.patch" if layout == "setup.py" else "galaxy-pyproject.patch"
+    assert log.read_text().splitlines() == [
+        f"-C {tmp_path} apply --check {ROOT / 'images/hub-security' / patch}",
+        f"-C {tmp_path} apply {ROOT / 'images/hub-security' / patch}",
+    ]
+
+
 @pytest.mark.parametrize("version", ["2026.9.17.0.dev74+aax.1", "2026.10.9.0.dev104+aax.1"])
 def test_eda_requires_exact_verified_dab_wheel(tmp_path: Path, version: str) -> None:
     pin = runpy.run_path(str(ROOT / "images/runtime-security/pin_eda_dab.py"))["pin"]

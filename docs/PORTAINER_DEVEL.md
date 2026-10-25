@@ -112,6 +112,9 @@ DRF installation and OAuth test suite before wheel creation.
 EDA's rebuilt metadata pins the exact source-patched DAB wheel provided by the
 bundle build, preserving EDA's upstream source selection without guessing a
 date-based version floor. Missing or ambiguous wheel inputs stop the build.
+Hub metadata patches support both the older `setup.py` layout and upstream's
+`pyproject.toml` layout. Each patch is checked before application; unknown
+packaging changes fail the build rather than skipping the dependency fixes.
 
 Runtime images upgrade only subpackages already installed, verify the resulting
 RPM versions and run the dependency check. The build retains corresponding

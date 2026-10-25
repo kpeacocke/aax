@@ -25,8 +25,8 @@ FROM ${BASE_IMAGE}
 USER root
 COPY --from=builder /wheels /tmp/aax-wheels
 COPY --from=dab /wheels /tmp/aax-wheels
-COPY galaxy.patch /tmp/galaxy.patch
-RUN git -C /app apply /tmp/galaxy.patch && \
+COPY galaxy.patch galaxy-pyproject.patch patch-galaxy.sh /tmp/
+RUN bash /tmp/patch-galaxy.sh /app /tmp && \
     /venv/bin/python -m pip wheel --no-deps --wheel-dir /tmp/aax-wheels /app && \
     /venv/bin/python -m pip install --no-cache-dir --upgrade /tmp/aax-wheels/*.whl \
       aiohttp==3.14.5 social-auth-core==6.2.0 social-auth-app-django==7.2.0 \
