@@ -6,6 +6,7 @@ from pathlib import Path
 import shlex
 import subprocess
 import runpy
+import zipfile
 
 import pytest
 import yaml
@@ -45,6 +46,28 @@ def test_upstream_oauth_fix_requires_explicit_safe_field(
 
 def script(name: str) -> str:
     return next(step["run"] for step in STEPS if step["name"] == name)
+
+
+@pytest.mark.parametrize("version", ["2026.9.17.0.dev74+aax.1", "2026.10.9.0.dev104+aax.1"])
+def test_eda_requires_exact_verified_dab_wheel(tmp_path: Path, version: str) -> None:
+    pin = runpy.run_path(str(ROOT / "images/runtime-security/pin_eda_dab.py"))["pin"]
+    project = tmp_path / "pyproject.toml"
+    original = (
+        'django-ansible-base = { version = ">=2026.10.21.1.dev2", extras = ["rbac"] }\n'
+    )
+    project.write_text(original)
+    with pytest.raises(ValueError, match="Expected one verified"):
+        pin(project, tmp_path)
+    wheel_path = tmp_path / f"django_ansible_base-{version}-py3-none-any.whl"
+    with zipfile.ZipFile(wheel_path, "w") as wheel:
+        wheel.writestr(
+            f"django_ansible_base-{version}.dist-info/METADATA",
+            f"Name: django-ansible-base\nVersion: {version}\n",
+        )
+    pin(project, tmp_path)
+    assert project.read_text() == original.replace(">=2026.10.21.1.dev2", f"=={version}")
+    with pytest.raises(ValueError, match="Expected one patched"):
+        pin(project, tmp_path)
 
 
 def grype_report(image_id: str = "sha256:test", matches: tuple[dict, ...] = ()) -> dict:

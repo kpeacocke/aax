@@ -109,6 +109,9 @@ The DAB OAuth compatibility layer applies its backport to older sources, or
 verifies the explicit required, non-null organization field in newer upstream
 sources. Unknown patch conflicts stop the build. Both paths retain the pinned
 DRF installation and OAuth test suite before wheel creation.
+EDA's rebuilt metadata pins the exact source-patched DAB wheel provided by the
+bundle build, preserving EDA's upstream source selection without guessing a
+date-based version floor. Missing or ambiguous wheel inputs stop the build.
 
 Runtime images upgrade only subpackages already installed, verify the resulting
 RPM versions and run the dependency check. The build retains corresponding
