@@ -98,7 +98,9 @@ The setuptools backport is applied with RPM's zero-fuzz patch policy and tested
 against the downstream source, including its existing vendor patches.
 Skopeo uses libtrust's standard Go crypto implementation with the maintained
 Go/FIPS toolchain, rather than the legacy `libtrust_openssl` build tag that calls
-the removed nonstandard `ecdsa.HashSign` API. This does not disable Go FIPS mode
+the removed nonstandard `ecdsa.HashSign` API. The recipe overrides the EL9 Go RPM
+macro's injected legacy tag as well as the recipe's own tag. Other compiler and
+hardening flags are preserved. This does not disable Go FIPS mode
 or constitute a certification claim.
 
 Runtime images upgrade only subpackages already installed, verify the resulting

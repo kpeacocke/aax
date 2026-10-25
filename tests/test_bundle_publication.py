@@ -417,7 +417,10 @@ def test_podman_recipe_uses_module_relative_build_targets() -> None:
     assert "%{import_path}/cmd/" not in adapted
 
 
-def test_skopeo_recipe_uses_standard_go_fips_crypto() -> None:
+@pytest.mark.parametrize("valid_macro", [True, False])
+def test_skopeo_recipe_uses_standard_go_fips_crypto(
+    tmp_path: Path, valid_macro: bool
+) -> None:
     prepare = (ROOT / "images/rpm-security/prepare.sh").read_text()
     adaptations = prepare.split('if [[ "$package" == skopeo ]]; then\n', 1)[1].split(
         "\nfi", 1
@@ -426,16 +429,31 @@ def test_skopeo_recipe_uses_standard_go_fips_crypto() -> None:
         '%if %{defined fips}\nexport BUILDTAGS="$BUILDTAGS libtrust_openssl"\n%endif\n'
         '%gobuild -o bin/%{name} ./cmd/%{name}\n'
     )
-    adapted = recipe
-    for line in adaptations.splitlines():
-        if line.strip().startswith("sed -i "):
-            command = shlex.split(line)
-            result = subprocess.run(
-                ["sed", "-e", command[2]], input=adapted,
-                capture_output=True, text=True, check=True, timeout=10,
-            )
-            adapted = result.stdout
-    assert adapted == recipe.replace(" libtrust_openssl", "")
+    macro = (
+        'GOAMD64=v2 go build -buildmode pie -tags="rpm_crashtraceback libtrust_openssl'
+        ' ${BUILDTAGS-}" -ldflags "-linkmode=external" $(printf "\\\\n") %{?**};'
+    ) if valid_macro else "%{macrobody:gobuild}"
+    rpm = tmp_path / "rpm"
+    rpm.write_text('#!/bin/bash\nprintf "%s\\n" "$TEST_MACRO"\n')
+    rpm.chmod(0o755)
+    spec = tmp_path / "skopeo.spec"
+    spec.write_text(recipe)
+    result = subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", adaptations],
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
+             "TEST_MACRO": macro, "spec": str(spec)},
+        capture_output=True, text=True, timeout=10,
+    )
+    if not valid_macro:
+        assert result.returncode != 0
+        assert "missing Go RPM build macro" in result.stderr
+        return
+    assert result.returncode == 0, result.stderr
+    assert spec.read_text() == (
+        "%define gobuild(o:) \\\n"
+        + macro.replace(" libtrust_openssl", "").replace("\\", "\\\\") + "\n\n"
+        + recipe.replace(" libtrust_openssl", "")
+    )
 
 
 def test_downstream_dependency_manifests_are_discoverable() -> None:

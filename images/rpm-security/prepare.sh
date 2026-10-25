@@ -46,7 +46,18 @@ if [[ "$package" == podman ]]; then
 fi
 if [[ "$package" == skopeo ]]; then
     # Modern Go/FIPS uses standard crypto APIs, not the removed ecdsa.HashSign API.
-    sed -i 's/ libtrust_openssl//g' "$spec"
+    macro="$(rpm --eval '%{macrobody:gobuild}' | sed '/^$/d')"
+    [[ "$macro" == *"go build "* ]] || {
+        echo "Cannot adapt skopeo: missing Go RPM build macro" >&2
+        exit 1
+    }
+    macro="${macro//\\/\\\\}"
+    temporary="$(mktemp)"
+    {
+        printf '%%define gobuild(o:) \\\n%s\n\n' "${macro// libtrust_openssl/}"
+        sed 's/ libtrust_openssl//g' "$spec"
+    } > "$temporary"
+    mv "$temporary" "$spec"
 fi
 printf '%s\n' "$package" > /build/package
 cp /aax/sources.json /build/output/sources.json
