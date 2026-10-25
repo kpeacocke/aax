@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
+import runpy
 
 import pytest
 import yaml
@@ -14,6 +15,32 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = yaml.safe_load((ROOT / ".github/workflows/publish-devel.yml").read_text())
 STEPS = WORKFLOW["jobs"]["build-and-publish"]["steps"]
 IMAGES = ["awx", "awx-ee", "receptor", "ansible-rulebook", "galaxy-ng", "gateway", "eda-controller"]
+
+
+@pytest.mark.parametrize(
+    ("options", "valid"),
+    [("required=True, allow_null=False", True),
+     ("required=False, allow_null=False", False),
+     ("required=True, allow_null=True", False),
+     ("allow_null=False", False),
+     ("required=True, allow_null=False, default=None", False)],
+)
+def test_upstream_oauth_fix_requires_explicit_safe_field(
+    tmp_path: Path, options: str, valid: bool
+) -> None:
+    verify = runpy.run_path(str(ROOT / "images/dab-security/apply-oauth-patch.py"))[
+        "verify_upstream_fix"
+    ]
+    source = tmp_path / "application.py"
+    source.write_text(
+        "class OAuth2ApplicationSerializer:\n"
+        f"    organization = serializers.PrimaryKeyRelatedField({options})\n"
+    )
+    if valid:
+        verify(source)
+    else:
+        with pytest.raises(ValueError):
+            verify(source)
 
 
 def script(name: str) -> str:

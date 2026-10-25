@@ -105,6 +105,10 @@ or constitute a certification claim.
 Source preparation and dependency installation use root, then RPM compilation
 and `%check` run as an unprivileged build account. This preserves permission-sensitive
 tests such as SQLite's, which refuse to run as root.
+The DAB OAuth compatibility layer applies its backport to older sources, or
+verifies the explicit required, non-null organization field in newer upstream
+sources. Unknown patch conflicts stop the build. Both paths retain the pinned
+DRF installation and OAuth test suite before wheel creation.
 
 Runtime images upgrade only subpackages already installed, verify the resulting
 RPM versions and run the dependency check. The build retains corresponding

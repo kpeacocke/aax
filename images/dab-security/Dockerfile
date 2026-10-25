@@ -13,7 +13,8 @@ RUN git init && git remote add origin https://github.com/ansible/django-ansible-
     git fetch --depth 1 origin "${DAB_REVISION}" && git checkout --detach FETCH_HEAD
 COPY oauth-organization.patch /tmp/oauth-organization.patch
 COPY requirements-test.txt /tmp/requirements-test.txt
-RUN git apply /tmp/oauth-organization.patch
+COPY apply-oauth-patch.py /tmp/apply-oauth-patch.py
+RUN python /tmp/apply-oauth-patch.py /tmp/oauth-organization.patch
 ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_DJANGO_ANSIBLE_BASE=${DAB_VERSION}
 # BuildKit retains the download cache outside the resulting image.
 # hadolint ignore=DL3042
