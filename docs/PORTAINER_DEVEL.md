@@ -102,6 +102,9 @@ the removed nonstandard `ecdsa.HashSign` API. The recipe overrides the EL9 Go RP
 macro's injected legacy tag as well as the recipe's own tag. Other compiler and
 hardening flags are preserved. This does not disable Go FIPS mode
 or constitute a certification claim.
+Source preparation and dependency installation use root, then RPM compilation
+and `%check` run as an unprivileged build account. This preserves permission-sensitive
+tests such as SQLite's, which refuse to run as root.
 
 Runtime images upgrade only subpackages already installed, verify the resulting
 RPM versions and run the dependency check. The build retains corresponding

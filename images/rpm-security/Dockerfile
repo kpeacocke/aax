@@ -10,7 +10,7 @@ USER root
 # hadolint ignore=DL3041
 RUN dnf -y --enablerepo=crb install \
       dnf-plugins-core rpm-build rpmdevtools redhat-rpm-config \
-      make gcc gcc-c++ git jq curl-minimal && dnf clean all
+      make gcc gcc-c++ git jq curl-minimal shadow-utils && dnf clean all
 ARG GO_ROOT=/usr/local/go
 COPY --from=go ${GO_ROOT} /opt/aax-go
 COPY go-toolchain.spec /tmp/go-toolchain.spec
@@ -32,6 +32,10 @@ RUN bash /aax/prepare.sh "${PACKAGE}"
 RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked \
     dnf -y --setopt=keepcache=True --enablerepo=crb builddep /build/rpmbuild/SPECS/*.spec
 COPY build.sh /aax/build.sh
+RUN useradd --uid 10001 --create-home aax-builder && \
+    chown -R aax-builder:aax-builder /build
+ENV HOME=/home/aax-builder
+USER 10001
 RUN bash /aax/build.sh
 FROM scratch AS artifacts
 COPY --from=builder /build/output/ /

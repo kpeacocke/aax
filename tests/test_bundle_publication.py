@@ -456,6 +456,22 @@ def test_skopeo_recipe_uses_standard_go_fips_crypto(
     )
 
 
+def test_source_rpm_compilation_and_checks_are_unprivileged() -> None:
+    dockerfile = (ROOT / "images/rpm-security/Dockerfile").read_text()
+    builder = dockerfile.split("FROM builder-base AS builder\n", 1)[1].split(
+        "FROM scratch AS artifacts", 1
+    )[0]
+    assert builder.index("dnf -y") < builder.index("USER 10001")
+    assert "useradd --uid 10001 --create-home aax-builder" in builder
+    assert "chown -R aax-builder:aax-builder /build" in builder
+    assert "ENV HOME=/home/aax-builder" in builder
+    assert builder.index("USER 10001") < builder.index("RUN bash /aax/build.sh")
+    assert "USER root" not in builder
+    build = (ROOT / "images/rpm-security/build.sh").read_text()
+    assert "rpmbuild -ba" in build
+    assert "--nocheck" not in build
+
+
 def test_downstream_dependency_manifests_are_discoverable() -> None:
     toolchain_spec = ROOT / "images/rpm-security/go-toolchain.spec"
     assert toolchain_spec.is_file()
