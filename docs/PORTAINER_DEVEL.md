@@ -96,6 +96,10 @@ Podman's legacy EL9 recipe uses module-relative command targets and its v5 modul
 path for embedded build metadata; the upstream source archive URL is unchanged.
 The setuptools backport is applied with RPM's zero-fuzz patch policy and tested
 against the downstream source, including its existing vendor patches.
+Skopeo uses libtrust's standard Go crypto implementation with the maintained
+Go/FIPS toolchain, rather than the legacy `libtrust_openssl` build tag that calls
+the removed nonstandard `ecdsa.HashSign` API. This does not disable Go FIPS mode
+or constitute a certification claim.
 
 Runtime images upgrade only subpackages already installed, verify the resulting
 RPM versions and run the dependency check. The build retains corresponding

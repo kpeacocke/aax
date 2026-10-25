@@ -44,6 +44,10 @@ if [[ "$package" == podman ]]; then
     sed -i 's|%{import_path}/cmd/|./cmd/|g' "$spec"
     sed -i 's|%{import_path}/libpod/|%{import_path}/v5/libpod/|g' "$spec"
 fi
+if [[ "$package" == skopeo ]]; then
+    # Modern Go/FIPS uses standard crypto APIs, not the removed ecdsa.HashSign API.
+    sed -i 's/ libtrust_openssl//g' "$spec"
+fi
 printf '%s\n' "$package" > /build/package
 cp /aax/sources.json /build/output/sources.json
 rpm -qp --queryformat '%{NAME} %{EPOCHNUM}:%{VERSION}-%{RELEASE}\n' \

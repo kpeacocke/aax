@@ -417,6 +417,27 @@ def test_podman_recipe_uses_module_relative_build_targets() -> None:
     assert "%{import_path}/cmd/" not in adapted
 
 
+def test_skopeo_recipe_uses_standard_go_fips_crypto() -> None:
+    prepare = (ROOT / "images/rpm-security/prepare.sh").read_text()
+    adaptations = prepare.split('if [[ "$package" == skopeo ]]; then\n', 1)[1].split(
+        "\nfi", 1
+    )[0]
+    recipe = (
+        '%if %{defined fips}\nexport BUILDTAGS="$BUILDTAGS libtrust_openssl"\n%endif\n'
+        '%gobuild -o bin/%{name} ./cmd/%{name}\n'
+    )
+    adapted = recipe
+    for line in adaptations.splitlines():
+        if line.strip().startswith("sed -i "):
+            command = shlex.split(line)
+            result = subprocess.run(
+                ["sed", "-e", command[2]], input=adapted,
+                capture_output=True, text=True, check=True, timeout=10,
+            )
+            adapted = result.stdout
+    assert adapted == recipe.replace(" libtrust_openssl", "")
+
+
 def test_downstream_dependency_manifests_are_discoverable() -> None:
     toolchain_spec = ROOT / "images/rpm-security/go-toolchain.spec"
     assert toolchain_spec.is_file()
