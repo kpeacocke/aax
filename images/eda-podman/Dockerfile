@@ -1,4 +1,5 @@
 ARG BASE_IMAGE=quay.io/centos/centos@sha256:6f8045fc4f552544d8a401d61848bafc8d06ca7c11897c5b54a2c37fc419a20a
+# hadolint ignore=DL3006
 FROM ${BASE_IMAGE}
 
 # The nested Podman API runs as root inside its isolated privileged service.

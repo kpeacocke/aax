@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import secrets
 import subprocess
 
 
@@ -13,14 +14,14 @@ def _compose_config() -> dict:
     env = os.environ.copy()
     env.update(
         {
-            "DATABASE_PASSWORD": "test-database-password",
-            "AWX_ADMIN_PASSWORD": "test-awx-admin-password",
-            "SECRET_KEY": "test-secret-key",
-            "HUB_DB_PASSWORD": "test-hub-db-password",
-            "HUB_ADMIN_PASSWORD": "test-hub-admin-password",
-            "GALAXY_SECRET_KEY": "test-galaxy-secret-key",
-            "PULP_SECRET_KEY": "test-pulp-secret-key",
-            "EDA_DB_PASSWORD": "test-eda-db-password",
+            "DATABASE_PASSWORD": secrets.token_urlsafe(32),
+            "AWX_ADMIN_PASSWORD": secrets.token_urlsafe(32),
+            "SECRET_KEY": secrets.token_urlsafe(32),
+            "HUB_DB_PASSWORD": secrets.token_urlsafe(32),
+            "HUB_ADMIN_PASSWORD": secrets.token_urlsafe(32),
+            "GALAXY_SECRET_KEY": secrets.token_urlsafe(32),
+            "PULP_SECRET_KEY": secrets.token_urlsafe(32),
+            "EDA_DB_PASSWORD": secrets.token_urlsafe(32),
             "EDA_CONTROLLER_URL": "https://awx.ambitiouscake.com",
             "EDA_CONTROLLER_SSL_VERIFY": "true",
             "EDA_WEBSOCKET_BASE_URL": "wss://awx.ambitiouscake.com/eda/ws",
