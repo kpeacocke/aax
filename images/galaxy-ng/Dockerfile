@@ -10,7 +10,7 @@ ARG VCS_REF
 ARG GALAXY_NG_REF=4.10.6
 
 # Stage 1: Builder
-FROM python:3.11-slim-bookworm AS builder
+FROM python:3.15-slim-bookworm AS builder
 
 ARG GALAXY_NG_REF
 
@@ -39,7 +39,7 @@ RUN pip install --no-cache-dir --upgrade pip==26.2.1 setuptools==81.0.0 wheel==0
   django-environ==0.11.2
 
 # Stage 2: Runtime
-FROM python:3.11-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 ARG VERSION
 ARG BUILD_DATE
