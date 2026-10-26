@@ -10,7 +10,7 @@ ARG VCS_REF
 ARG EDA_VERSION=1.3.2
 
 # Stage 1: Builder
-FROM python:3.11-slim-bookworm AS builder
+FROM python:3.15-slim-bookworm AS builder
 
 ARG EDA_VERSION
 
@@ -39,7 +39,7 @@ RUN pip install --no-cache-dir --upgrade pip==24.0 setuptools==69.1.1 wheel==0.4
     python-daemon==3.0.1
 
 # Stage 2: Runtime
-FROM python:3.11-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 ARG VERSION
 ARG BUILD_DATE
