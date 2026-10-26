@@ -342,6 +342,14 @@ def test_bundle_scan_precedes_publication() -> None:
     assert "sha256sum --check -" in script("Install supplemental OS scanner")
 
 
+def test_nested_podman_uses_explicit_local_decision_environment() -> None:
+    nested_podman = script("Verify nested Podman execution and outbound HTTPS")
+    image = "localhost/eda-decision-environment:devel"
+    assert f"docker tag eda-decision-environment:devel {image}" in nested_podman
+    assert f"docker save {image}" in nested_podman
+    assert f"{image} python3.12 -c" in nested_podman
+
+
 @pytest.mark.parametrize(
     ("severity", "state", "blocked"),
     [("Critical", "fixed", True), ("High", "fixed", True),

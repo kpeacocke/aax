@@ -282,7 +282,8 @@ jobs:
           trap cleanup EXIT
           docker network create "$network"
           docker volume create "$volume"
-          docker save eda-decision-environment:devel -o "$archive"
+          docker tag eda-decision-environment:devel localhost/eda-decision-environment:devel
+          docker save localhost/eda-decision-environment:devel -o "$archive"
           docker run -d --name aax-eda-podman-test --privileged \
             --network "$network" --dns 1.1.1.1 \
             -v "$volume:/var/lib/containers/storage" \
@@ -307,7 +308,7 @@ jobs:
             quay.io/ansible/ansible-rulebook@sha256:68bb8aae9ad8be20863a6d42a97cea8a4865d393e1ed63f29259162e5e6108dd
           docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
             --remote --url tcp://aax-eda-podman-test:8888 run --rm \
-            aax-eda-decision-environment:devel python3.12 -c \
+            localhost/eda-decision-environment:devel python3.12 -c \
             "import urllib.request; assert urllib.request.urlopen('https://api.github.com', timeout=20).status == 200"
 
       - name: Record exact build sources
