@@ -30,6 +30,14 @@ security reports, and registry manifests with image digests. Use the tag printed
 in the successful workflow summary rather than constructing one from a commit.
 This scan gate does not replace full-stack runtime/compatibility validation.
 
+For a source-pinned remediation retry, supply `upstream_revisions` as a JSON
+object mapping `awx`, `awx-ee`, `receptor`, `ansible-rulebook` and `galaxy-ng`
+to full Git commit hashes from the previous artifact's `sources.json`.
+The workflow fetches and verifies those exact revisions instead of advancing
+upstream branches. Leaving the input empty preserves daily upstream tracking.
+This freezes those source repositories, not external package repositories or
+mutable base-image tags.
+
 ### Maintained downstream security patches
 
 AAX maintains source patches where an upstream dependency constraint prevents a
@@ -42,16 +50,24 @@ security update. These are downstream builds, not unmodified upstream releases:
   `importlib.metadata` backend. Explicitly selecting the removed backend fails.
 - Django Ansible Base is rebuilt from each service's actual installed Git
   revision. Its OAuth application serializer explicitly requires an organization,
-  preserving the pre-3.16 behavior while allowing REST framework 3.17.2.
+  preserving the pre-3.16 behavior while allowing REST framework 3.18.2.
   The build runs the upstream OAuth provider tests before producing a wheel.
 - Hub rebuilds Galaxy NG, pulpcore and pulp-glue source wheels to allow the
-  patched REST framework, yarl, requests and multidict versions.
+  patched REST framework, yarl, requests and multidict versions. Pulpcore's
+  REST framework cap is widened alongside Galaxy NG's. Changed source wheels
+  carry incremented AAX versions so pip cannot retain an older same-version
+  wheel with obsolete dependency constraints.
 - EDA rebuilds the source shipped in its pinned upstream image to support the
   patched cryptography, ECDSA, setuptools and REST framework dependencies.
   Its AES-256 implementation initializes the cipher required by cryptography 50
   while preserving existing ciphertext; build-time tests cover legacy values,
   tampering, expiry and invalid keys. AWX and EDA also check actual WebSocket
   imports after upgrading Autobahn.
+- AWX's system virtualenv/filelock packages are maintained separately from its
+  application virtualenv; EDA's user-site tooling receives its own updates.
+- AWX and EDA pin Twisted 26.10.0rc1 because it is the currently published
+  security-fixed release; no patched stable release is available. This
+  prerelease choice requires compatibility validation before production use.
 - The rulebook integration is rebuilt against the public Drools 10.2.0 engine
   and Jackson 2.21.7 BOM, with its upstream Maven tests enabled.
 - Receptor is rebuilt with patched Go dependencies. The execution image uses
@@ -115,6 +131,16 @@ date-based version floor. Missing or ambiguous wheel inputs stop the build.
 Hub metadata patches support both the older `setup.py` layout and upstream's
 `pyproject.toml` layout. Each patch is checked before application; unknown
 packaging changes fail the build rather than skipping the dependency fixes.
+After native RPM builds, the runtime layers remove the old system
+`python3.12-setuptools` build-helper RPM before installing maintained Python
+packages. Application virtualenvs retain their maintained setuptools; the
+execution image installs its maintained system setuptools after removal.
+Removal uses normal RPM dependency checks,
+not forced removal or version-metadata changes; a required helper blocks the
+build instead of leaving broken dependencies.
+
+Each image/scanner SARIF report has its own analysis identity, so GitHub can
+accept all Trivy and Grype results without duplicate-category upload failures.
 
 Runtime images upgrade only subpackages already installed, verify the resulting
 RPM versions and run the dependency check. The build retains corresponding

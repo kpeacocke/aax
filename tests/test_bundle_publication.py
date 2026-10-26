@@ -48,6 +48,132 @@ def script(name: str) -> str:
     return next(step["run"] for step in STEPS if step["name"] == name)
 
 
+@pytest.mark.parametrize("incomplete", [False, True])
+def test_sarif_has_unique_image_scanner_identities(tmp_path: Path, incomplete: bool) -> None:
+    reports = tmp_path / "bundle-reports"
+    reports.mkdir()
+    original = {
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {"driver": {"name": "scanner"}},
+            "results": [{"ruleId": "TEST-CVE", "message": {"text": "preserve me"}}],
+        }],
+    }
+    expected = set()
+    for name in IMAGES:
+        for scanner in ("trivy", "grype"):
+            if incomplete and scanner == "grype":
+                continue
+            filename = f"{name}-grype.sarif" if scanner == "grype" else f"{name}.sarif"
+            (reports / filename).write_text(json.dumps(original))
+            expected.add(f"devel-bundle/{scanner}/{name}/")
+    result = subprocess.run(
+        ["bash", "-c", script("Give security reports distinct analysis identities")],
+        cwd=tmp_path, capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+    identities = []
+    for report in (tmp_path / "bundle-sarif").glob("*.sarif"):
+        data = json.loads(report.read_text())
+        assert data["runs"][0]["results"] == original["runs"][0]["results"]
+        identities.append(data["runs"][0]["automationDetails"]["id"])
+    assert len(identities) == len(set(identities))
+    assert set(identities) == expected
+    upload = next(step for step in STEPS if step["name"] == "Upload bundle security findings")
+    assert upload["with"] == {"sarif_file": "bundle-sarif"}
+
+
+@pytest.mark.parametrize("installed,removal_fails", [(False, False), (True, False), (True, True)])
+def test_system_setuptools_removal_respects_rpm_dependencies(
+    tmp_path: Path, installed: bool, removal_fails: bool
+) -> None:
+    rpm = tmp_path / "rpm"
+    rpm.write_text(
+        '#!/bin/sh\n'
+        'echo "$*" >> "$RPM_LOG"\n'
+        'if [ "$1" = -qa ]; then printf "%s\\n" "$PACKAGES"; exit 0; fi\n'
+        'if [ "$*" != "--erase python3.12-setuptools" ]; then exit 2; fi\n'
+        'if [ "$REMOVAL_FAILS" = true ]; then echo "Failed dependencies" >&2; exit 1; fi\n'
+    )
+    rpm.chmod(0o755)
+    log = tmp_path / "rpm.log"
+    result = subprocess.run(
+        ["sh", str(ROOT / "images/runtime-security/remove-build-setuptools.sh")],
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
+             "RPM_LOG": str(log), "REMOVAL_FAILS": str(removal_fails).lower(),
+             "PACKAGES": "python3.12-setuptools\npython3.12-pip" if installed else "python3.12-pip"},
+        capture_output=True, text=True, timeout=10,
+    )
+    assert (result.returncode != 0) == removal_fails
+    commands = log.read_text().splitlines()
+    assert ("--erase python3.12-setuptools" in commands) == installed
+    runtime = script("Apply maintained runtime security patches")
+    assert runtime.index('docker tag "$name:rpm-patched"') < runtime.index(
+        "images/runtime-security/Finalize.Dockerfile"
+    ) < runtime.index("'awx-ee /usr/bin/python3.12 1000 awx-ee'")
+
+
+@pytest.mark.parametrize("valid", [True, False])
+def test_frozen_upstream_input_is_validated_before_checkout(tmp_path: Path, valid: bool) -> None:
+    (tmp_path / "scripts").mkdir()
+    checkout = tmp_path / "scripts/build-upstream.sh"
+    checkout.write_text(
+        '#!/bin/sh\nprintf "%s\\n" "$AWX_BRANCH" "$AWX_EE_BRANCH" "$RECEPTOR_BRANCH" '
+        '"$RULEBOOK_BRANCH" "$GALAXY_NG_BRANCH" > checked-out\n'
+    )
+    checkout.chmod(0o755)
+    revisions = {name: str(index) * 40 for index, name in enumerate(IMAGES[:5], 1)}
+    if not valid:
+        revisions["awx"] = "devel"
+    result = subprocess.run(
+        ["bash", "-c", script("Check out upstream sources")],
+        cwd=tmp_path, env={**os.environ, "UPSTREAM_REVISIONS": json.dumps(revisions)},
+        capture_output=True, text=True, timeout=10,
+    )
+    assert (result.returncode == 0) == valid, result.stderr
+    if valid:
+        assert (tmp_path / "checked-out").read_text().splitlines() == list(revisions.values())
+    else:
+        assert not (tmp_path / "checked-out").exists()
+
+
+@pytest.mark.parametrize("cached_mismatch", [False, True])
+def test_upstream_checkout_fetches_and_checks_exact_commits(
+    tmp_path: Path, cached_mismatch: bool
+) -> None:
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    checkout = scripts / "build-upstream.sh"
+    checkout.write_text((ROOT / "scripts/build-upstream.sh").read_text())
+    git = tmp_path / "git"
+    git.write_text(
+        '#!/bin/sh\nprintf "%s\\n" "$*" >> "$GIT_LOG"\n'
+        'if [ "$3" = rev-parse ]; then printf "%s\\n" "$ACTUAL_SHA"; fi\n'
+    )
+    git.chmod(0o755)
+    revision = "a" * 40
+    if cached_mismatch:
+        (tmp_path / ".upstream/awx/.git").mkdir(parents=True)
+    log = tmp_path / "git.log"
+    result = subprocess.run(
+        ["bash", str(checkout)], capture_output=True, text=True, timeout=10,
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
+             "GIT_LOG": str(log), "AWX_DAB_REF": "",
+             "ACTUAL_SHA": "b" * 40 if cached_mismatch else revision,
+             **{key: revision for key in ("AWX_BRANCH", "AWX_EE_BRANCH", "RECEPTOR_BRANCH",
+                                         "RULEBOOK_BRANCH", "GALAXY_NG_BRANCH")}},
+    )
+    commands = log.read_text().splitlines()
+    if cached_mismatch:
+        assert result.returncode != 0
+        assert "does not match requested commit" in result.stderr
+        assert len(commands) == 1
+    else:
+        assert result.returncode == 0, result.stderr
+        assert sum(f"fetch --depth 1 origin {revision}" in command for command in commands) == 5
+        assert sum("checkout --detach FETCH_HEAD" in command for command in commands) == 5
+
+
 @pytest.mark.parametrize("layout", ["setup.py", "pyproject.toml", "missing"])
 def test_hub_patch_selection_checks_before_applying(tmp_path: Path, layout: str) -> None:
     if layout != "missing":
@@ -266,7 +392,7 @@ def test_runtime_security_updates_precede_exact_image_scans(tmp_path: Path) -> N
     docker = tmp_path / "docker"
     docker.write_text(
         '#!/bin/bash\nprintf "%s\\n" "$*" >> "$DOCKER_LOG"\n'
-        'if [[ "$1" == run ]]; then printf "%040d 2026.10.21.1.dev2+aax.1\\n" 1; fi\n'
+        'if [[ "$1" == run ]]; then printf "%040d 2026.10.21.1.dev2+aax.2\\n" 1; fi\n'
     )
     docker.chmod(0o755)
     scripts = tmp_path / "scripts"
@@ -309,12 +435,18 @@ def test_runtime_security_updates_precede_exact_image_scans(tmp_path: Path) -> N
             command for command in commands if f"-t aax/dab-security:{name} " in command
         )
         assert "DAB_REVISION=" + "0" * 39 + "1" in source_build
-        assert "DAB_VERSION=2026.10.21.1.dev2+aax.1" in source_build
+        assert "DAB_VERSION=2026.10.21.1.dev2+aax.2" in source_build
         assert any(f"DAB_IMAGE=aax/dab-security:{name}" in command for command in commands)
         evidence = json.loads((tmp_path / f"bundle-reports/{name}-dab-source.json").read_text())
         assert evidence["revision"] == "0" * 39 + "1"
     dockerfile = (ROOT / "images/runtime-security/Dockerfile").read_text()
     assert '"${PYTHON}" -m pip check' in dockerfile
+    assert any(
+        "BASE_IMAGE=awx:devel" in command
+        and "PYTHON=/usr/bin/python3.12" in command
+        and "REQUIREMENTS=requirements-awx-system.txt" in command
+        for command in commands
+    )
 
 
 def test_java_database_has_independent_public_registry_fallback() -> None:
@@ -481,7 +613,7 @@ def test_podman_recipe_uses_module_relative_build_targets() -> None:
     )
     adapted = recipe
     for line in adaptations.splitlines():
-        if line.strip().startswith("sed -i "):
+        if line.strip().startswith("sed -i 's|%{import_path}/"):
             command = shlex.split(line)
             result = subprocess.run(
                 ["sed", "-e", command[2]], input=adapted,

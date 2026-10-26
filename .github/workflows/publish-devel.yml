@@ -7,6 +7,10 @@ on:
         description: AWX ref to build
         required: false
         default: devel
+      upstream_revisions:
+        description: Optional JSON map of exact awx, awx-ee, receptor, ansible-rulebook and galaxy-ng commits
+        required: false
+        default: ''
       publish_latest_devel:
         description: Also move the mutable devel tag
         required: true
@@ -80,7 +84,23 @@ jobs:
           RECEPTOR_BRANCH: devel
           RULEBOOK_BRANCH: main
           GALAXY_NG_BRANCH: main
-        run: ./scripts/build-upstream.sh
+          UPSTREAM_REVISIONS: ${{ inputs.upstream_revisions }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$UPSTREAM_REVISIONS" ]]; then
+            jq --exit-status '
+              type == "object" and
+              (keys == ["ansible-rulebook", "awx", "awx-ee", "galaxy-ng", "receptor"]) and
+              all(.[]; type == "string" and test("^[0-9a-f]{40}$"))
+            ' <<< "$UPSTREAM_REVISIONS" >/dev/null
+            AWX_BRANCH="$(jq -r '.awx' <<< "$UPSTREAM_REVISIONS")"
+            AWX_EE_BRANCH="$(jq -r '."awx-ee"' <<< "$UPSTREAM_REVISIONS")"
+            RECEPTOR_BRANCH="$(jq -r '.receptor' <<< "$UPSTREAM_REVISIONS")"
+            RULEBOOK_BRANCH="$(jq -r '."ansible-rulebook"' <<< "$UPSTREAM_REVISIONS")"
+            GALAXY_NG_BRANCH="$(jq -r '."galaxy-ng"' <<< "$UPSTREAM_REVISIONS")"
+            export AWX_BRANCH AWX_EE_BRANCH RECEPTOR_BRANCH RULEBOOK_BRANCH GALAXY_NG_BRANCH
+          fi
+          ./scripts/build-upstream.sh
 
       - name: Build AWX devel
         working-directory: .upstream/awx
@@ -170,6 +190,14 @@ jobs:
               -t "$name:rpm-patched" bundle-reports/rpm-security
             docker tag "$name:rpm-patched" "$name:devel"
           done
+          for name in awx awx-ee galaxy-ng eda-controller ansible-rulebook receptor; do
+            runtime_user="$(docker image inspect --format '{{.Config.User}}' "$name:devel")"
+            docker build -f images/runtime-security/Finalize.Dockerfile \
+              --build-arg BASE_IMAGE="$name:devel" \
+              --build-arg RUNTIME_USER="${runtime_user:-root}" \
+              -t "$name:finalized" images/runtime-security
+            docker tag "$name:finalized" "$name:devel"
+          done
           for entry in \
             'awx /var/lib/awx/venv/awx/bin/python' \
             'galaxy-ng /venv/bin/python' \
@@ -177,7 +205,7 @@ jobs:
             read -r name python <<< "$entry"
             read -r revision version < <(
               docker run --rm --entrypoint "$python" "$name:devel" -c \
-                'import importlib.metadata as m,json; d=m.distribution("django-ansible-base"); print(json.loads(d.read_text("direct_url.json"))["vcs_info"]["commit_id"], d.version.split("+")[0]+"+aax.1")'
+                'import importlib.metadata as m,json; d=m.distribution("django-ansible-base"); print(json.loads(d.read_text("direct_url.json"))["vcs_info"]["commit_id"], d.version.split("+")[0]+"+aax.2")'
             )
             [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || {
               echo "Missing exact DAB source revision for $name" >&2
@@ -191,16 +219,12 @@ jobs:
               -t "aax/dab-security:$name" images/dab-security
           done
           for entry in \
-            'awx /var/lib/awx/venv/awx/bin/python 1000' \
-            'awx-ee /usr/bin/python3.12 1000' \
-            'galaxy-ng /venv/bin/python galaxy' \
-            'eda-controller /app/venv/bin/python 1001'; do
-            read -r name python runtime_user <<< "$entry"
-            requirements="$name"
-            case "$name" in
-              galaxy-ng) requirements=galaxy ;;
-              eda-controller) requirements=eda ;;
-            esac
+            'awx /var/lib/awx/venv/awx/bin/python 1000 awx' \
+            'awx /usr/bin/python3.12 1000 awx-system' \
+            'awx-ee /usr/bin/python3.12 1000 awx-ee' \
+            'galaxy-ng /venv/bin/python galaxy galaxy' \
+            'eda-controller /app/venv/bin/python 1001 eda'; do
+            read -r name python runtime_user requirements <<< "$entry"
             docker build --build-arg BASE_IMAGE="$name:devel" \
               --build-arg PYTHON="$python" \
               --build-arg REQUIREMENTS="requirements-$requirements.txt" \
@@ -289,12 +313,29 @@ jobs:
             bundle-reports/galaxy-ng.json bundle-reports/gateway.json \
             bundle-reports/eda-controller.json bundle-reports/*-grype.json
 
+      - name: Give security reports distinct analysis identities
+        if: always() && hashFiles('bundle-reports/*.sarif') != ''
+        run: |
+          set -euo pipefail
+          mkdir -p bundle-sarif
+          for name in awx awx-ee receptor ansible-rulebook galaxy-ng gateway eda-controller; do
+            for scanner in trivy grype; do
+              source="bundle-reports/$name.sarif"
+              if [[ "$scanner" == grype ]]; then
+                source="bundle-reports/$name-grype.sarif"
+              fi
+              [[ -f "$source" ]] || continue
+              jq --arg id "devel-bundle/$scanner/$name/" \
+                '.runs |= map(.automationDetails.id = $id)' \
+                "$source" > "bundle-sarif/$scanner-$name.sarif"
+            done
+          done
+
       - name: Upload bundle security findings
-        if: always()
+        if: always() && hashFiles('bundle-sarif/*.sarif') != ''
         uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
-          sarif_file: bundle-reports
-          category: devel-bundle
+          sarif_file: bundle-sarif
 
       - name: Tag and push bundle
         env:

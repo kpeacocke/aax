@@ -30,7 +30,8 @@ RUN bash /tmp/patch-galaxy.sh /app /tmp && \
     /venv/bin/python -m pip wheel --no-deps --wheel-dir /tmp/aax-wheels /app && \
     /venv/bin/python -m pip install --no-cache-dir --upgrade /tmp/aax-wheels/*.whl \
       aiohttp==3.14.5 social-auth-core==6.2.0 social-auth-app-django==7.2.0 \
-      djangorestframework==3.17.2 multidict==6.9.1 oauthlib==4.0.0 tablib==3.10.0 && \
+      djangorestframework==3.18.2 multidict==6.9.1 oauthlib==4.0.0 tablib==3.10.0 \
+      black==26.10.1 filelock==4.2.1 && \
     /venv/bin/python -m pip check && rm /tmp/aax-wheels/*.whl
 # hadolint ignore=DL3066
 USER galaxy

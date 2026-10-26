@@ -9,7 +9,7 @@ ARG PYTHON=/var/lib/awx/venv/awx/bin/python
 USER root
 COPY --from=dab /wheels /tmp/aax-dab-wheels
 RUN "${PYTHON}" -m pip install --no-cache-dir --upgrade /tmp/aax-dab-wheels/*.whl \
-      djangorestframework==3.17.2 && \
+      djangorestframework==3.18.2 && \
     "${PYTHON}" -m pip check && \
     "${PYTHON}" -c 'import autobahn.twisted.websocket' && rm /tmp/aax-dab-wheels/*.whl
 # hadolint ignore=DL3066
