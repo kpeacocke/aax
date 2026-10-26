@@ -22,8 +22,12 @@ on:
     paths:
       - .github/workflows/publish-devel.yml
       - docker-compose.devel.yml
+      - docker-compose.yml
+      - .env.example
       - images/gateway/**
       - images/eda-server/**
+      - images/eda-podman/**
+      - images/eda-decision-environment/**
       - images/awx-ui-runtime/**
       - images/galaxy-runtime/**
       - images/runtime-security/**
@@ -162,6 +166,15 @@ jobs:
       - name: Build AAX EDA controller devel
         run: docker buildx build --load -t eda-controller:devel images/eda-server
 
+      - name: Build EDA Podman backend and decision environment
+        run: |
+          set -euo pipefail
+          docker buildx build --load \
+            --build-arg BASE_IMAGE=quay.io/centos/centos@sha256:6f8045fc4f552544d8a401d61848bafc8d06ca7c11897c5b54a2c37fc419a20a \
+            -t eda-podman:devel images/eda-podman
+          docker buildx build --load \
+            -t eda-decision-environment:devel images/eda-decision-environment
+
       - name: Apply maintained runtime security patches
         run: |
           set -euo pipefail
@@ -172,7 +185,7 @@ jobs:
             --build-arg VERSION=1.6.9.dev1+g${{ github.sha }} \
             -t receptor:patched .upstream/receptor
           docker tag receptor:patched receptor:devel
-          for name in awx awx-ee galaxy-ng eda-controller ansible-rulebook receptor; do
+          for name in awx awx-ee galaxy-ng eda-controller ansible-rulebook receptor eda-podman eda-decision-environment; do
             runtime_user="$(docker image inspect --format '{{.Config.User}}' "$name:devel")"
             docker build -f images/runtime-security/OS.Dockerfile \
               --build-arg BASE_IMAGE="$name:devel" \
@@ -182,7 +195,7 @@ jobs:
           done
           mkdir -p bundle-reports
           bash scripts/build-rpm-security.sh bundle-reports/rpm-security
-          for name in awx awx-ee galaxy-ng eda-controller ansible-rulebook receptor; do
+          for name in awx awx-ee galaxy-ng eda-controller ansible-rulebook receptor eda-podman eda-decision-environment; do
             runtime_user="$(docker image inspect --format '{{.Config.User}}' "$name:devel")"
             docker build -f images/rpm-security/Runtime.Dockerfile \
               --build-arg BASE_IMAGE="$name:devel" \
@@ -190,7 +203,7 @@ jobs:
               -t "$name:rpm-patched" bundle-reports/rpm-security
             docker tag "$name:rpm-patched" "$name:devel"
           done
-          for name in awx awx-ee galaxy-ng eda-controller ansible-rulebook receptor; do
+          for name in awx awx-ee galaxy-ng eda-controller ansible-rulebook receptor eda-podman eda-decision-environment; do
             runtime_user="$(docker image inspect --format '{{.Config.User}}' "$name:devel")"
             docker build -f images/runtime-security/Finalize.Dockerfile \
               --build-arg BASE_IMAGE="$name:devel" \
@@ -254,6 +267,49 @@ jobs:
             -t ansible-rulebook:patched images/drools-runtime
           docker tag ansible-rulebook:patched ansible-rulebook:devel
 
+      - name: Verify nested Podman execution and outbound HTTPS
+        run: |
+          set -euo pipefail
+          network=aax-eda-backend-test
+          volume=aax-eda-backend-storage-test
+          archive="$RUNNER_TEMP/eda-decision-environment.tar"
+          cleanup() {
+            docker rm -f aax-eda-podman-test >/dev/null 2>&1 || true
+            docker volume rm "$volume" >/dev/null 2>&1 || true
+            docker network rm "$network" >/dev/null 2>&1 || true
+            rm -f "$archive"
+          }
+          trap cleanup EXIT
+          docker network create "$network"
+          docker volume create "$volume"
+          docker save eda-decision-environment:devel -o "$archive"
+          docker run -d --name aax-eda-podman-test --privileged \
+            --network "$network" --dns 1.1.1.1 \
+            -v "$volume:/var/lib/containers/storage" \
+            -v "$archive:/tmp/eda-decision-environment.tar:ro" \
+            eda-podman:devel
+          for attempt in $(seq 1 30); do
+            if docker exec aax-eda-podman-test \
+              curl --fail --silent http://127.0.0.1:8888/_ping; then
+              break
+            fi
+            test "$(docker inspect -f '{{.State.Running}}' aax-eda-podman-test)" = true || {
+              docker logs aax-eda-podman-test
+              exit 1
+            }
+            sleep 2
+          done
+          docker exec aax-eda-podman-test podman load -i /tmp/eda-decision-environment.tar
+          docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
+            --remote --url tcp://aax-eda-podman-test:8888 info
+          docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
+            --remote --url tcp://aax-eda-podman-test:8888 pull \
+            quay.io/ansible/ansible-rulebook@sha256:68bb8aae9ad8be20863a6d42a97cea8a4865d393e1ed63f29259162e5e6108dd
+          docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
+            --remote --url tcp://aax-eda-podman-test:8888 run --rm \
+            aax-eda-decision-environment:devel python3.12 -c \
+            "import urllib.request; assert urllib.request.urlopen('https://api.github.com', timeout=20).status == 200"
+
       - name: Record exact build sources
         run: |
           set -euo pipefail
@@ -266,6 +322,8 @@ jobs:
           done | jq -s --arg aax "$GITHUB_SHA" --arg tag "$IMAGE_TAG" \
             '{aax_revision: $aax, image_tag: $tag, sources: .}' > bundle-reports/sources.json
           cp images/eda-server/Dockerfile bundle-reports/eda-runtime.Dockerfile
+          cp images/eda-podman/Dockerfile bundle-reports/eda-podman.Dockerfile
+          cp images/eda-decision-environment/Dockerfile bundle-reports/eda-decision-environment.Dockerfile
           cp images/awx-ui-runtime/Dockerfile bundle-reports/awx-ui.Dockerfile
           cp -R images/runtime-security bundle-reports/runtime-security
           cp images/receptor-runtime/Dockerfile bundle-reports/receptor-runtime.Dockerfile
@@ -293,7 +351,7 @@ jobs:
           TRIVY_JAVA_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-java-db:1,ghcr.io/aquasecurity/trivy-java-db:1,public.ecr.aws/aquasecurity/trivy-java-db:1
         run: |
           set -euo pipefail
-          for name in awx awx-ee receptor ansible-rulebook galaxy-ng gateway eda-controller; do
+          for name in awx awx-ee receptor ansible-rulebook galaxy-ng gateway eda-controller eda-podman eda-decision-environment; do
             trivy image --scanners vuln --timeout 15m --format json \
               --output "bundle-reports/$name.json" "$name:devel"
             trivy convert --format sarif --output "bundle-reports/$name.sarif" \
@@ -312,14 +370,15 @@ jobs:
             bundle-reports/awx.json bundle-reports/awx-ee.json \
             bundle-reports/receptor.json bundle-reports/ansible-rulebook.json \
             bundle-reports/galaxy-ng.json bundle-reports/gateway.json \
-            bundle-reports/eda-controller.json bundle-reports/*-grype.json
+            bundle-reports/eda-controller.json bundle-reports/eda-podman.json \
+            bundle-reports/eda-decision-environment.json bundle-reports/*-grype.json
 
       - name: Give security reports distinct analysis identities
         if: always() && hashFiles('bundle-reports/*.sarif') != ''
         run: |
           set -euo pipefail
           mkdir -p bundle-sarif
-          for name in awx awx-ee receptor ansible-rulebook galaxy-ng gateway eda-controller; do
+          for name in awx awx-ee receptor ansible-rulebook galaxy-ng gateway eda-controller eda-podman eda-decision-environment; do
             for scanner in trivy grype; do
               source="bundle-reports/$name.sarif"
               if [[ "$scanner" == grype ]]; then
@@ -354,6 +413,8 @@ jobs:
             [pulp]=galaxy-ng:devel
             [gateway]=gateway:devel
             [eda-controller]=eda-controller:devel
+            [eda-podman]=eda-podman:devel
+            [eda-decision-environment]=eda-decision-environment:devel
           )
           for name in "${!images[@]}"; do
             source_image="${images[$name]}"

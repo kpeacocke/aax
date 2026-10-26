@@ -2,7 +2,10 @@ name: Test and publish EDA runtime
 on:
   push:
     branches: [main, fix/portainer-runtime-health]
-    paths: [images/eda-server/**, .github/workflows/eda-runtime.yml]
+    paths:
+      - images/eda-server/**
+      - images/gateway/**
+      - .github/workflows/eda-runtime.yml
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,6 +18,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build controller
         run: docker build -t aax-eda-test images/eda-server
+      - name: Build gateway
+        run: docker build -t aax-gateway-test images/gateway
       - name: Verify migrations and real HTTP API
         run: |
           set -euo pipefail
@@ -23,13 +28,28 @@ jobs:
           export EDA_SECRET_KEY=$(openssl rand -hex 32)
           docker network create eda-test
           docker run -d --name eda-db --network eda-test -e POSTGRES_DB=eda -e POSTGRES_USER=eda -e POSTGRES_PASSWORD postgres:15
-          for i in $(seq 1 30); do docker exec eda-db pg_isready -U eda && break; sleep 2; done
-          docker run -d --name eda-api --network eda-test -p 127.0.0.1:15000:5000 \
+          for i in $(seq 1 30); do
+            if docker exec eda-db psql -v ON_ERROR_STOP=1 -U eda -d eda -tAc 'SELECT 1' | grep -qx '1'; then break; fi
+            sleep 2
+          done
+          docker exec eda-db psql -v ON_ERROR_STOP=1 -U eda -d eda -tAc 'SELECT 1' | grep -qx '1'
+          docker run -d --name eda-redis --network eda-test redis:7.4 redis-server --appendonly yes
+          for i in $(seq 1 30); do
+            if docker exec eda-redis redis-cli ping | grep -q PONG; then break; fi
+            sleep 2
+          done
+          docker exec eda-redis redis-cli ping | grep -q PONG
+          docker run -d --name eda-api --network eda-test --network-alias eda-controller -p 127.0.0.1:15000:5000 \
             -e EDA_DB_HOST=eda-db -e EDA_DB_NAME=eda -e EDA_DB_USER=eda -e EDA_DB_PASSWORD \
+            -e EDA_REDIS_HOST=eda-redis -e EDA_REDIS_PORT=6379 \
             -e EDA_SECRET_KEY \
-            -e EDA_ALLOWED_HOSTS='["127.0.0.1","localhost"]' \
+            -e EDA_ALLOWED_HOSTS='["127.0.0.1","localhost","eda-controller","eda-ws","gateway","awx.ambitiouscake.com"]' \
             -e EDA_RESOURCE_SERVER__URL='@none None' \
-            -e EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT=true aax-eda-test
+            -e EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT=true \
+            -e EDA_CONTROLLER_URL=https://awx.ambitiouscake.com \
+            -e EDA_CONTROLLER_SSL_VERIFY=true \
+            -e EDA_WEBSOCKET_BASE_URL=wss://awx.ambitiouscake.com/eda/ws \
+            -e EDA_WEBSOCKET_SSL_VERIFY=yes aax-eda-test
           for i in $(seq 1 90); do
             if curl -fsS http://127.0.0.1:15000/_healthz; then break; fi
             test "$(docker inspect -f '{{.State.Running}}' eda-api)" = true || { docker logs eda-api; exit 1; }
@@ -38,19 +58,56 @@ jobs:
           curl -fsS http://127.0.0.1:15000/_healthz
           code=$(curl -s -o /tmp/eda-response -w '%{http_code}' http://127.0.0.1:15000/api/eda/v1/projects/)
           test "$code" = 401 -o "$code" = 403
+          docker run -d --name eda-ws --network eda-test --network-alias eda-ws \
+            -e EDA_DB_HOST=eda-db -e EDA_DB_NAME=eda -e EDA_DB_USER=eda -e EDA_DB_PASSWORD \
+            -e EDA_REDIS_HOST=eda-redis -e EDA_REDIS_PORT=6379 \
+            -e EDA_SECRET_KEY -e EDA_RESOURCE_SERVER__URL='@none None' \
+            -e EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT=true -e EDA_WORKER_KIND=websocket \
+            -e EDA_ALLOWED_HOSTS='["127.0.0.1","localhost","eda-controller","eda-ws","gateway","awx.ambitiouscake.com"]' \
+            -e EDA_WEBSOCKET_BASE_URL=wss://awx.ambitiouscake.com/eda/ws \
+            -e EDA_WEBSOCKET_SSL_VERIFY=yes aax-eda-test ws
           docker run -d --name eda-worker --network eda-test \
             -e EDA_DB_HOST=eda-db -e EDA_DB_NAME=eda -e EDA_DB_USER=eda -e EDA_DB_PASSWORD \
+            -e EDA_REDIS_HOST=eda-redis -e EDA_REDIS_PORT=6379 \
             -e EDA_SECRET_KEY -e EDA_RESOURCE_SERVER__URL='@none None' \
             -e EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT=true aax-eda-test worker
+          docker run -d --name eda-activation-worker --network eda-test \
+            -e EDA_DB_HOST=eda-db -e EDA_DB_NAME=eda -e EDA_DB_USER=eda -e EDA_DB_PASSWORD \
+            -e EDA_REDIS_HOST=eda-redis -e EDA_REDIS_PORT=6379 \
+            -e EDA_SECRET_KEY -e EDA_RESOURCE_SERVER__URL='@none None' \
+            -e EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT=true \
+            -e EDA_PODMAN_SOCKET_URL=tcp://eda-podman:8888 \
+            -e EDA_PODMAN_MEM_LIMIT=512m aax-eda-test activation-worker
           sleep 10
           test "$(docker inspect -f '{{.State.Running}}' eda-worker)" = true
-          docker logs eda-worker 2>&1 | grep -q 'Starting DefaultWorker with dispatcherd'
+          docker logs eda-worker 2>&1 | grep 'Starting DefaultWorker with dispatcherd' >/dev/null
+          test "$(docker inspect -f '{{.State.Running}}' eda-activation-worker)" = true
+          docker logs eda-activation-worker 2>&1 | grep 'Starting ActivationWorker with dispatcherd' >/dev/null
+          for i in $(seq 1 30); do
+            if docker exec eda-ws python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/_healthz', timeout=5).read()"; then break; fi
+            test "$(docker inspect -f '{{.State.Running}}' eda-ws)" = true || { docker logs eda-ws; exit 1; }
+            sleep 2
+          done
+          docker run -d --name eda-gateway --network eda-test -p 127.0.0.1:18088:8080 aax-gateway-test
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18088/healthz; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:18088/eda/_healthz
+          ws_code=$(curl -s -o /tmp/eda-ws-response -w '%{http_code}' \
+            -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+            -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+            http://127.0.0.1:18088/eda/ws/api/eda/ws/ansible-rulebook)
+          test "$ws_code" = 403
           docker restart eda-api
           for i in $(seq 1 60); do curl -fsS http://127.0.0.1:15000/_healthz && break; sleep 3; done
           curl -fsS http://127.0.0.1:15000/_healthz
       - name: Diagnostics
         if: failure()
-        run: docker logs eda-api
+        run: |
+          for name in eda-api eda-worker eda-activation-worker eda-ws eda-gateway; do
+            docker logs "$name" || true
+          done
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         if: github.ref == 'refs/heads/main'
         with:

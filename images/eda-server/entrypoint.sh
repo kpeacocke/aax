@@ -10,5 +10,11 @@ case "${1:-api}" in
     exec gunicorn -b 0.0.0.0:5000 -w 2 aap_eda.wsgi:application --access-logfile -
     ;;
   worker) exec aap-eda-manage dispatcherd --worker-class DefaultWorker ;;
+  activation-worker)
+    exec aap-eda-manage dispatcherd --worker-class ActivationWorker
+    ;;
+  ws)
+    exec /app/venv/bin/daphne -b 0.0.0.0 -p 8000 aap_eda.asgi:application
+    ;;
   *) exec "$@" ;;
 esac

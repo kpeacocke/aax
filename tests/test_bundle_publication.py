@@ -15,7 +15,17 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = yaml.safe_load((ROOT / ".github/workflows/publish-devel.yml").read_text())
 STEPS = WORKFLOW["jobs"]["build-and-publish"]["steps"]
-IMAGES = ["awx", "awx-ee", "receptor", "ansible-rulebook", "galaxy-ng", "gateway", "eda-controller"]
+IMAGES = [
+    "awx",
+    "awx-ee",
+    "receptor",
+    "ansible-rulebook",
+    "galaxy-ng",
+    "gateway",
+    "eda-controller",
+    "eda-podman",
+    "eda-decision-environment",
+]
 
 
 @pytest.mark.parametrize(
@@ -284,12 +294,12 @@ def test_publisher_never_skips_fresh_images(
         assert all(not command.endswith(":devel") for command in pushes)
         return
     assert result.returncode == 0, result.stderr
-    assert len(pushes) == (16 if mutable else 8)
-    assert all(command.endswith(":devel-commit-101-1") for command in pushes[:8])
-    assert len({command for command in pushes[:8]}) == 8
-    assert len(list((tmp_path / "bundle-reports").glob("*-manifest.json"))) == 8
+    assert len(pushes) == (20 if mutable else 10)
+    assert all(command.endswith(":devel-commit-101-1") for command in pushes[:10])
+    assert len({command for command in pushes[:10]}) == 10
+    assert len(list((tmp_path / "bundle-reports").glob("*-manifest.json"))) == 10
     if mutable:
-        assert all(command.endswith(":devel") for command in pushes[8:])
+        assert all(command.endswith(":devel") for command in pushes[10:])
 
 
 @pytest.mark.parametrize(

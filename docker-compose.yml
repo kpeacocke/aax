@@ -13,6 +13,23 @@ x-watchtower-monitor: &watchtower-monitor
   com.centurylinklabs.watchtower.enable: "true"
   com.centurylinklabs.watchtower.monitor-only: "true"
 
+x-eda-runtime-environment: &eda-runtime-environment
+  EDA_DB_HOST: eda-postgres
+  EDA_DB_PORT: "5432"
+  EDA_DB_NAME: ${EDA_DB_NAME:-eda}
+  EDA_DB_USER: ${EDA_DB_USER:-eda}
+  EDA_DB_PASSWORD: ${EDA_DB_PASSWORD:?EDA_DB_PASSWORD must be set (non-empty) in .env or environment}
+  EDA_REDIS_HOST: eda-redis
+  EDA_REDIS_PORT: "6379"
+  EDA_SECRET_KEY: ${EDA_SECRET_KEY:-${SECRET_KEY}}
+  EDA_ALLOWED_HOSTS: ${EDA_ALLOWED_HOSTS:-'["localhost","127.0.0.1","eda-controller","eda-ws","gateway","awx.ambitiouscake.com"]'}
+  EDA_RESOURCE_SERVER__URL: ${EDA_RESOURCE_SERVER_URL:-"@none None"}
+  EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT: "true"
+  EDA_CONTROLLER_URL: ${EDA_CONTROLLER_URL:-https://awx.ambitiouscake.com}
+  EDA_CONTROLLER_SSL_VERIFY: ${EDA_CONTROLLER_SSL_VERIFY:-true}
+  EDA_WEBSOCKET_BASE_URL: ${EDA_WEBSOCKET_BASE_URL:-wss://awx.ambitiouscake.com/eda/ws}
+  EDA_WEBSOCKET_SSL_VERIFY: ${EDA_WEBSOCKET_SSL_VERIFY:-yes}
+
 services:
   ee-base:
     <<: *service-defaults
@@ -873,13 +890,7 @@ services:
     cap_drop:
       - ALL
     environment:
-      EDA_DB_HOST: eda-postgres
-      EDA_DB_PORT: 5432
-      EDA_DB_NAME: ${EDA_DB_NAME:-eda}
-      EDA_DB_USER: ${EDA_DB_USER:-eda}
-      EDA_DB_PASSWORD: ${EDA_DB_PASSWORD:?EDA_DB_PASSWORD must be set (non-empty) in .env or environment}
-      EDA_REDIS_HOST: eda-redis
-      EDA_REDIS_PORT: 6379
+      <<: *eda-runtime-environment
       EDA_PORT: 5000
       EDA_HOST: 0.0.0.0
       EDA_LOG_LEVEL: ${EDA_LOG_LEVEL:-INFO}
@@ -903,8 +914,90 @@ services:
           "CMD",
           "python3",
           "-c",
-          'import os,socket,urllib.request; sock=socket.socket(); sock.settimeout(2); sock.connect((os.getenv(''EDA_DB_HOST'',''eda-postgres''), int(os.getenv(''EDA_DB_PORT'',''5432'')))); sock.close(); sock=socket.socket(); sock.settimeout(2); sock.connect((os.getenv(''EDA_REDIS_HOST'',''eda-redis''), int(os.getenv(''EDA_REDIS_PORT'',''6379'')))); sock.close(); urllib.request.urlopen(f"http://127.0.0.1:{os.getenv(''EDA_PORT'',''5000'')}/health", timeout=3).read()',
+          'import os,socket,urllib.request; sock=socket.socket(); sock.settimeout(2); sock.connect((os.getenv(''EDA_DB_HOST'',''eda-postgres''), int(os.getenv(''EDA_DB_PORT'',''5432'')))); sock.close(); sock=socket.socket(); sock.settimeout(2); sock.connect((os.getenv(''EDA_REDIS_HOST'',''eda-redis''), int(os.getenv(''EDA_REDIS_PORT'',''6379'')))); sock.close(); urllib.request.urlopen(f"http://127.0.0.1:{os.getenv(''EDA_PORT'',''5000'')}/_healthz", timeout=3).read()',
         ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
+  eda-worker:
+    <<: *service-defaults
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${AAX_VERSION:-latest}
+    pull_policy: missing
+    container_name: eda-worker
+    profiles: [eda]
+    command: [worker]
+    environment: *eda-runtime-environment
+    depends_on:
+      eda-controller:
+        condition: service_healthy
+    volumes:
+      - eda_projects:/home/eda/projects
+      - eda_logs:/var/log/eda
+    networks: [awx-network, eda-network]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+  eda-activation-worker:
+    <<: *service-defaults
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${AAX_VERSION:-latest}
+    pull_policy: missing
+    container_name: eda-activation-worker
+    profiles: [eda]
+    command: [activation-worker]
+    environment:
+      <<: *eda-runtime-environment
+      EDA_PODMAN_SOCKET_URL: ${EDA_PODMAN_SOCKET_URL:-tcp://eda-podman:8888}
+      EDA_PODMAN_MEM_LIMIT: ${EDA_PODMAN_MEM_LIMIT:-512m}
+    depends_on:
+      eda-controller:
+        condition: service_healthy
+      eda-podman:
+        condition: service_healthy
+    volumes:
+      - eda_projects:/home/eda/projects
+      - eda_logs:/var/log/eda
+    networks: [awx-network, eda-network, eda-podman-network]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+  eda-ws:
+    <<: *service-defaults
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${AAX_VERSION:-latest}
+    pull_policy: missing
+    container_name: eda-ws
+    profiles: [eda]
+    command: [ws]
+    environment:
+      <<: *eda-runtime-environment
+      EDA_WORKER_KIND: websocket
+    depends_on:
+      eda-controller:
+        condition: service_healthy
+    networks: [eda-network]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/_healthz', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
+  eda-podman:
+    <<: *service-defaults
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-podman:${AAX_VERSION:-latest}
+    pull_policy: missing
+    container_name: eda-podman
+    profiles: [eda]
+    privileged: true
+    dns: ["${EDA_PODMAN_DNS:-1.1.1.1}"]
+    volumes:
+      - eda_podman_storage:/var/lib/containers/storage
+    networks: [eda-podman-network]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8888/_ping"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -924,6 +1017,10 @@ networks:
       com.aax.description: "Network for Private Automation Hub services"
   eda-network:
     driver: bridge
+  eda-podman-network:
+    driver: bridge
+    labels:
+      com.aax.description: "Private network between EDA activation worker and Podman API"
 
 volumes:
   workspace:
@@ -966,6 +1063,10 @@ volumes:
   hub_assets:
     labels:
       com.aax.description: "Static assets for Galaxy NG UI"
+  eda_podman_storage:
+    name: ${EDA_PODMAN_STORAGE_VOLUME:-aax_eda_container_storage}
+    labels:
+      com.aax.description: "Persistent container storage for EDA activations"
   eda_postgres_data:
     labels:
       com.aax.description: "PostgreSQL database for Event Driven Automation"

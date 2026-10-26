@@ -28,6 +28,13 @@ def _required_compose_env() -> dict[str, str]:
             "GALAXY_SECRET_KEY": "test-galaxy-secret-key",  # pragma: allowlist secret
             "PULP_SECRET_KEY": "test-pulp-secret-key",  # pragma: allowlist secret
             "EDA_DB_PASSWORD": "test-eda-db-password",  # pragma: allowlist secret
+            "EDA_CONTROLLER_URL": "https://awx.ambitiouscake.com",
+            "EDA_CONTROLLER_SSL_VERIFY": "true",
+            "EDA_WEBSOCKET_BASE_URL": "wss://awx.ambitiouscake.com/eda/ws",
+            "EDA_WEBSOCKET_SSL_VERIFY": "yes",
+            "EDA_PODMAN_SOCKET_URL": "tcp://eda-podman:8888",
+            "EDA_PODMAN_MEM_LIMIT": "512m",
+            "EDA_PODMAN_DNS": "1.1.1.1",
         }
     )
     return env
@@ -134,6 +141,10 @@ class TestDockerCompose:
             "pulp-content",
             "pulp-worker",
             "eda-controller",
+            "eda-worker",
+            "eda-activation-worker",
+            "eda-ws",
+            "eda-podman",
         ]
         for service in expected_services:
             assert service in services, f"Service {service} not found in compose config"
