@@ -173,7 +173,13 @@ class TestEEBuilderImage:
             text=True
         )
         assert result.returncode == 0, f"ansible-builder not found: {result.stderr}"
-        assert "3.1.1" in result.stdout
+        requirements = (REPO_ROOT / "images/ee-builder/requirements.txt").read_text(encoding="utf-8")
+        expected_version = next(
+            line.split("==", 1)[1]
+            for line in requirements.splitlines()
+            if line.startswith("ansible-builder==")
+        )
+        assert result.stdout.strip() == expected_version
 
     def test_inherits_from_base(self):
         """Test that ee-builder inherits ansible from ee-base."""
