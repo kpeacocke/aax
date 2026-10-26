@@ -1,0 +1,45 @@
+diff --git a/pyproject.toml b/pyproject.toml
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -5,4 +5,4 @@
+ [project]
+ name = "aap-eda"
+-version = "0.2.0"
++version = "0.2.0+aax.4"
+ description = ""
+@@ -37,3 +37,3 @@
+ django = ">=5.2,<5.3"
+-djangorestframework = "3.15.*"
++djangorestframework = ">=3.18.2,<3.19"
+ drf-spectacular = ">=0.28,<0.30"
+@@ -44,3 +44,3 @@
+ pydantic = ">=1.8.1,<1.11"
+-cryptography = ">=46.0.7,<47"
++cryptography = ">=50.0.2,<51"
+ pyopenssl = ">=26.0.0"
+@@ -52,3 +52,3 @@
+ podman = "5.4.*"
+-django-ansible-base = { git = "https://github.com/ansible/django-ansible-base.git", branch = "devel", extras = [
++django-ansible-base = { version = ">=2026.10.21.1.dev2", extras = [
+     "channel-auth",
+@@ -72,3 +72,3 @@
+ pyjwt = { version = ">=2.13.0,<3", extras = ["crypto"] }
+-ecdsa = "0.18.*"
++ecdsa = ">=0.19.2,<0.20"
+ validators = "^0.34.0"
+@@ -92,3 +92,2 @@
+-# limit setuptools to avoid the pkg_resources removal
+-setuptools = "<82"
++setuptools = ">=84.2.1"
+ 
+diff --git a/src/aap_eda/core/utils/crypto/fernet.py b/src/aap_eda/core/utils/crypto/fernet.py
+--- a/src/aap_eda/core/utils/crypto/fernet.py
++++ b/src/aap_eda/core/utils/crypto/fernet.py
+@@ -19,2 +19,3 @@
+ from cryptography.hazmat.primitives import hashes
++from cryptography.hazmat.primitives.ciphers import algorithms
+ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+@@ -63,2 +64,3 @@
+         self._signing_key = key[:32]
+         self._encryption_key = key[32:]
++        self._aes = algorithms.AES(self._encryption_key)

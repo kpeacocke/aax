@@ -13,7 +13,13 @@ def _read(relative_path: str) -> str:
 
 def _compose_env_var_names(compose_text: str) -> set[str]:
     """Return all ${VAR...} interpolation names used in compose."""
-    return set(re.findall(r"\$\{([A-Z0-9_]+)(?::[-?][^}]*)?\}", compose_text))
+    return set(re.findall(r"\$\{([A-Z0-9_]+)(?::[-?][^}]*)?\}", compose_text.replace("$$", "")))
+
+
+def test_compose_interpolation_excludes_escaped_container_variables() -> None:
+    assert _compose_env_var_names("${HOST} $${CONTAINER:-false} $$${OTHER_HOST}") == {
+        "HOST", "OTHER_HOST",
+    }
 
 
 def _env_example_var_names(env_example_text: str) -> set[str]:
@@ -73,8 +79,8 @@ def test_release_workflow_has_secret_scan_gate() -> None:
         assert token in content
 
 
-def test_release_gate_blocks_only_fixable_critical_vulnerabilities() -> None:
-    """Unfixed upstream findings remain reported but must not deadlock releases."""
+def test_release_gate_blocks_fixable_high_and_critical_vulnerabilities() -> None:
+    """Unfixed findings remain reported; fixable high/critical findings block release."""
     content = _read(".github/workflows/release.yml")
     report_match = re.search(
         r"      - name: Run Trivy vulnerability scanner\n.*?(?=\n      - name:)",
@@ -82,7 +88,7 @@ def test_release_gate_blocks_only_fixable_critical_vulnerabilities() -> None:
         flags=re.DOTALL,
     )
     gate_match = re.search(
-        r"      - name: Gate on fixable critical vulnerabilities\n.*?(?=\n      - name:)",
+        r"      - name: Gate on fixable high and critical vulnerabilities\n.*?(?=\n      - name:)",
         content,
         flags=re.DOTALL,
     )
@@ -94,7 +100,7 @@ def test_release_gate_blocks_only_fixable_critical_vulnerabilities() -> None:
     assert "format: sarif" in report_step
     assert "ignore-unfixed: true" not in report_step
     assert "format: table" in gate_step
-    assert "severity: CRITICAL" in gate_step
+    assert "severity: HIGH,CRITICAL" in gate_step
     assert "ignore-unfixed: true" in gate_step
     assert "exit-code: 1" in gate_step
 
@@ -212,10 +218,14 @@ def test_devel_publish_workflow_publishes_immutable_bundle() -> None:
     required = [
         "packages: write",
         "docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
-        "devel-${{ github.sha }}",
+        "devel-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}",
         "SETUPTOOLS_SCM_PRETEND_VERSION=",
-        "leaving it unchanged",
-        "continue",
+        "Record exact build sources",
+        "git -C",
+        "rev-parse HEAD",
+        "Scan exact bundle images",
+        "Gate on fixable high and critical bundle vulnerabilities",
+        "bundle-reports/sources.json",
         "[awx]=awx:devel",
         "[awx-ee]=awx-ee:devel",
         "[receptor]=receptor:devel",
@@ -352,13 +362,12 @@ def test_compose_root_user_is_limited_to_known_services() -> None:
     }
 
 
-def test_docker_socket_mount_is_restricted_to_ee_builder() -> None:
-    """Docker socket mount should be isolated to ee-builder in compose."""
-    content = _read("docker-compose.yml")
-    socket_services = _compose_services_with_exact_setting(
-        content, "- /var/run/docker.sock:/var/run/docker.sock"
-    )
-    assert socket_services == {"ee-builder"}
+def test_default_builders_have_no_host_docker_socket() -> None:
+    for relative_path in ["docker-compose.yml", "k8s/ee-builder-deployment.yaml"]:
+        assert "/var/run/docker.sock" not in _read(relative_path)
+    builder = _read("k8s/ee-builder-deployment.yaml")
+    assert "automountServiceAccountToken: false" in builder
+    assert "hostPath:" not in builder
 
 
 def test_hub_and_pulp_compose_secrets_are_required() -> None:

@@ -1,0 +1,15 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow only known non-secret detector fixtures"
+condition = "AND"
+paths = [
+  '''^\.secrets\.baseline$''',
+  '''^\.github/workflows/eda-runtime\.yml$''',
+]
+regexTarget = "line"
+regexes = [
+  '''^\s*"hashed_secret": "[0-9a-f]{40}",?\s*$''',
+  '''Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==''',
+]

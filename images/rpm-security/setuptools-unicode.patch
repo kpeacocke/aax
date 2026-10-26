@@ -1,0 +1,57 @@
+Backport CVE-2026-59890 from setuptools 83 to the EL9 compatibility package.
+Upstream: https://github.com/pypa/setuptools/commit/dd9f436a36486b4cb8a4c70a2321548b0be09b8f
+
+diff --git a/setuptools/command/egg_info.py b/setuptools/command/egg_info.py
+--- a/setuptools/command/egg_info.py
++++ b/setuptools/command/egg_info.py
+@@ -34,7 +34,18 @@
+ PY_MAJOR = '{}.{}'.format(*sys.version_info)
+ 
+ 
++class _NormalizedMatcher:
++    def __init__(self, pattern):
++        self._pattern = pattern
++
++    def match(self, path):
++        return self._pattern.match(unicode_utils.normalize(path))
++
++    def search(self, path):
++        return self._pattern.search(unicode_utils.normalize(path))
++
++
+ def translate_pattern(glob):  # noqa: C901  # is too complex (14)  # FIXME
+     """
+     Translate a file path glob like '*.txt' in to a regular expression.
+     This differs from fnmatch.translate which allows wildcards to match
+@@ -41,7 +52,8 @@
+     directory separators. It also knows about '**/' which matches any number of
+     directories.
+     """
++    glob = unicode_utils.normalize(glob)
+     pat = ''
+ 
+     # This will split on '/' within [character classes]. This is deliberate.
+     chunks = glob.split(os.path.sep)
+@@ -112,7 +124,7 @@
+             pat += sep
+ 
+     pat += r'\Z'
+-    return re.compile(pat, flags=re.MULTILINE | re.DOTALL)
++    return _NormalizedMatcher(re.compile(pat, flags=re.MULTILINE | re.DOTALL))
+ 
+ 
+ class InfoCommon:
+diff --git a/setuptools/unicode_utils.py b/setuptools/unicode_utils.py
+--- a/setuptools/unicode_utils.py
++++ b/setuptools/unicode_utils.py
+@@ -2,6 +2,10 @@
+ import sys
+ 
+ 
++def normalize(text):
++    return unicodedata.normalize('NFC', text) if isinstance(text, str) else text
++
++
+ # HFS Plus uses decomposed UTF-8
+ def decompose(path):
+     if isinstance(path, str):

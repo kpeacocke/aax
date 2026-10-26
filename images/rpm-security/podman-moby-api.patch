@@ -1,0 +1,2979 @@
+Backport for Podman 5.8.8:
+  56e555bfc213d908dc5f7a7c55265eb49a075c20 api/compat: switch to moby/moby
+  8c4edb6121872d9dadc855f5b327d62dccfd8ec8 libpod: include names-generator.go
+
+Adapt the upstream v6 module references to v5. Retain the v5 storage info field
+and reload entry point using storage 1.63's supported configuration APIs.
+
+diff --git a/cmd/podman-testing/store_supported.go b/cmd/podman-testing/store_supported.go
+index 0dd6ddd..79b7b7e 100644
+--- a/cmd/podman-testing/store_supported.go
++++ b/cmd/podman-testing/store_supported.go
+@@ -20,9 +20,8 @@ func init() {
+ 	if defaultStoreOptions, err := storage.DefaultStoreOptions(); err == nil {
+ 		globalStorageOptions = defaultStoreOptions
+ 	}
+-	if storageConf, ok := os.LookupEnv("CONTAINERS_STORAGE_CONF"); ok {
+-		options := globalStorageOptions
+-		if types.ReloadConfigurationFileIfNeeded(storageConf, &options) == nil {
++	if _, ok := os.LookupEnv("CONTAINERS_STORAGE_CONF"); ok {
++		if options, err := types.LoadStoreOptions(types.LoadOptions{}); err == nil {
+ 			globalStorageOptions = options
+ 		}
+ 	}
+diff --git a/libpod/info.go b/libpod/info.go
+index b775ff3..52da00c 100644
+--- a/libpod/info.go
++++ b/libpod/info.go
+@@ -22,7 +22,6 @@ import (
+ 	"github.com/sirupsen/logrus"
+ 	"go.podman.io/common/pkg/version"
+ 	"go.podman.io/image/v5/pkg/sysregistriesv2"
+-	"go.podman.io/storage"
+ 	"go.podman.io/storage/pkg/system"
+ )
+ 
+@@ -213,7 +212,7 @@ func (r *Runtime) getContainerStoreInfo() (define.ContainerStore, error) {
+ // top-level "store" info
+ func (r *Runtime) storeInfo() (*define.StoreInfo, error) {
+ 	// let's say storage driver in use, number of images, number of containers
+-	configFile, err := storage.DefaultConfigFile()
++	configFile, err := storageConfigFile()
+ 	if err != nil {
+ 		return nil, err
+ 	}
+diff --git a/libpod/namesgenerator/names-generator.go b/libpod/namesgenerator/names-generator.go
+new file mode 100644
+index 0000000..83ca1ab
+--- /dev/null
++++ b/libpod/namesgenerator/names-generator.go
+@@ -0,0 +1,865 @@
++// This file has been copied from
++// https://github.com/moby/moby/tree/a52171f5eeb6e553e7c4744abf6b722962b2aca4/internal/namesgenerator.
++// It is licensed under the Apache License 2.0.
++// See https://github.com/moby/moby/blob/a52171f5eeb6e553e7c4744abf6b722962b2aca4/LICENSE.
++//
++// Package namesgenerator generates random names.
++//
++// This package is officially "frozen" - no new additions will be accepted.
++//
++// For a long time, this package provided a lot of joy within the project, but
++// at some point the conflicts of opinion became greater than the added joy.
++//
++// At some future time, this may be replaced with something that sparks less
++// controversy, but for now it will remain as-is.
++//
++// See also https://github.com/moby/moby/pull/43210#issuecomment-1029934277
++package namesgenerator
++
++import (
++	"math/rand"
++	"strconv"
++)
++
++var (
++	left = [...]string{
++		"admiring",
++		"adoring",
++		"affectionate",
++		"agitated",
++		"amazing",
++		"angry",
++		"awesome",
++		"beautiful",
++		"blissful",
++		"bold",
++		"boring",
++		"brave",
++		"busy",
++		"charming",
++		"clever",
++		"compassionate",
++		"competent",
++		"condescending",
++		"confident",
++		"cool",
++		"cranky",
++		"crazy",
++		"dazzling",
++		"determined",
++		"distracted",
++		"dreamy",
++		"eager",
++		"ecstatic",
++		"elastic",
++		"elated",
++		"elegant",
++		"eloquent",
++		"epic",
++		"exciting",
++		"fervent",
++		"festive",
++		"flamboyant",
++		"focused",
++		"friendly",
++		"frosty",
++		"funny",
++		"gallant",
++		"gifted",
++		"goofy",
++		"gracious",
++		"great",
++		"happy",
++		"hardcore",
++		"heuristic",
++		"hopeful",
++		"hungry",
++		"infallible",
++		"inspiring",
++		"intelligent",
++		"interesting",
++		"jolly",
++		"jovial",
++		"keen",
++		"kind",
++		"laughing",
++		"loving",
++		"lucid",
++		"magical",
++		"modest",
++		"musing",
++		"mystifying",
++		"naughty",
++		"nervous",
++		"nice",
++		"nifty",
++		"nostalgic",
++		"objective",
++		"optimistic",
++		"peaceful",
++		"pedantic",
++		"pensive",
++		"practical",
++		"priceless",
++		"quirky",
++		"quizzical",
++		"recursing",
++		"relaxed",
++		"reverent",
++		"romantic",
++		"sad",
++		"serene",
++		"sharp",
++		"silly",
++		"sleepy",
++		"stoic",
++		"strange",
++		"stupefied",
++		"suspicious",
++		"sweet",
++		"tender",
++		"thirsty",
++		"trusting",
++		"unruffled",
++		"upbeat",
++		"vibrant",
++		"vigilant",
++		"vigorous",
++		"wizardly",
++		"wonderful",
++		"xenodochial",
++		"youthful",
++		"zealous",
++		"zen",
++	}
++
++	// Docker, starting from 0.7.x, generates names from notable scientists and hackers.
++	// Please, for any amazing man that you add to the list, consider adding an equally amazing woman to it, and vice versa.
++	right = [...]string{
++		// Maria Gaetana Agnesi - Italian mathematician, philosopher, theologian and humanitarian. She was the first woman to write a mathematics handbook and the first woman appointed as a Mathematics Professor at a University. https://en.wikipedia.org/wiki/Maria_Gaetana_Agnesi
++		"agnesi",
++
++		// Muhammad ibn Jābir al-Ḥarrānī al-Battānī was a founding father of astronomy. https://en.wikipedia.org/wiki/Mu%E1%B8%A5ammad_ibn_J%C4%81bir_al-%E1%B8%A4arr%C4%81n%C4%AB_al-Batt%C4%81n%C4%AB
++		"albattani",
++
++		// Frances E. Allen, became the first female IBM Fellow in 1989. In 2006, she became the first female recipient of the ACM's Turing Award. https://en.wikipedia.org/wiki/Frances_E._Allen
++		"allen",
++
++		// June Almeida - Scottish virologist who took the first pictures of the rubella virus - https://en.wikipedia.org/wiki/June_Almeida
++		"almeida",
++
++		// Kathleen Antonelli, American computer programmer and one of the six original programmers of the ENIAC - https://en.wikipedia.org/wiki/Kathleen_Antonelli
++		"antonelli",
++
++		// Archimedes was a physicist, engineer and mathematician who invented too many things to list them here. https://en.wikipedia.org/wiki/Archimedes
++		"archimedes",
++
++		// Maria Ardinghelli - Italian translator, mathematician and physicist - https://en.wikipedia.org/wiki/Maria_Ardinghelli
++		"ardinghelli",
++
++		// Aryabhata - Ancient Indian mathematician-astronomer during 476-550 CE https://en.wikipedia.org/wiki/Aryabhata
++		"aryabhata",
++
++		// Wanda Austin - Wanda Austin is the President and CEO of The Aerospace Corporation, a leading architect for the US security space programs. https://en.wikipedia.org/wiki/Wanda_Austin
++		"austin",
++
++		// Charles Babbage invented the concept of a programmable computer. https://en.wikipedia.org/wiki/Charles_Babbage.
++		"babbage",
++
++		// Stefan Banach - Polish mathematician, was one of the founders of modern functional analysis. https://en.wikipedia.org/wiki/Stefan_Banach
++		"banach",
++
++		// Buckaroo Banzai and his mentor Dr. Hikita perfected the "oscillation overthruster", a device that allows one to pass through solid matter. - https://en.wikipedia.org/wiki/The_Adventures_of_Buckaroo_Banzai_Across_the_8th_Dimension
++		"banzai",
++
++		// John Bardeen co-invented the transistor - https://en.wikipedia.org/wiki/John_Bardeen
++		"bardeen",
++
++		// Jean Bartik, born Betty Jean Jennings, was one of the original programmers for the ENIAC computer. https://en.wikipedia.org/wiki/Jean_Bartik
++		"bartik",
++
++		// Laura Bassi, the world's first female professor https://en.wikipedia.org/wiki/Laura_Bassi
++		"bassi",
++
++		// Hugh Beaver, British engineer, founder of the Guinness Book of World Records https://en.wikipedia.org/wiki/Hugh_Beaver
++		"beaver",
++
++		// Alexander Graham Bell - an eminent Scottish-born scientist, inventor, engineer and innovator who is credited with inventing the first practical telephone - https://en.wikipedia.org/wiki/Alexander_Graham_Bell
++		"bell",
++
++		// Karl Friedrich Benz - a German automobile engineer. Inventor of the first practical motorcar. https://en.wikipedia.org/wiki/Karl_Benz
++		"benz",
++
++		// Homi J Bhabha - was an Indian nuclear physicist, founding director, and professor of physics at the Tata Institute of Fundamental Research. Colloquially known as "father of Indian nuclear programme"- https://en.wikipedia.org/wiki/Homi_J._Bhabha
++		"bhabha",
++
++		// Bhaskara II - Ancient Indian mathematician-astronomer whose work on calculus predates Newton and Leibniz by over half a millennium - https://en.wikipedia.org/wiki/Bh%C4%81skara_II#Calculus
++		"bhaskara",
++
++		// Sue Black - British computer scientist and campaigner. She has been instrumental in saving Bletchley Park, the site of World War II codebreaking - https://en.wikipedia.org/wiki/Sue_Black_(computer_scientist)
++		"black",
++
++		// Elizabeth Helen Blackburn - Australian-American Nobel laureate; best known for co-discovering telomerase. https://en.wikipedia.org/wiki/Elizabeth_Blackburn
++		"blackburn",
++
++		// Elizabeth Blackwell - American doctor and first American woman to receive a medical degree - https://en.wikipedia.org/wiki/Elizabeth_Blackwell
++		"blackwell",
++
++		// Niels Bohr is the father of quantum theory. https://en.wikipedia.org/wiki/Niels_Bohr.
++		"bohr",
++
++		// Kathleen Booth, she's credited with writing the first assembly language. https://en.wikipedia.org/wiki/Kathleen_Booth
++		"booth",
++
++		// Anita Borg - Anita Borg was the founding director of the Institute for Women and Technology (IWT). https://en.wikipedia.org/wiki/Anita_Borg
++		"borg",
++
++		// Satyendra Nath Bose - He provided the foundation for Bose–Einstein statistics and the theory of the Bose–Einstein condensate. - https://en.wikipedia.org/wiki/Satyendra_Nath_Bose
++		"bose",
++
++		// Katherine Louise Bouman is an imaging scientist and Assistant Professor of Computer Science at the California Institute of Technology. She researches computational methods for imaging, and developed an algorithm that made possible the picture first visualization of a black hole using the Event Horizon Telescope. - https://en.wikipedia.org/wiki/Katie_Bouman
++		"bouman",
++
++		// Evelyn Boyd Granville - She was one of the first African-American woman to receive a Ph.D. in mathematics; she earned it in 1949 from Yale University. https://en.wikipedia.org/wiki/Evelyn_Boyd_Granville
++		"boyd",
++
++		// Brahmagupta - Ancient Indian mathematician during 598-670 CE who gave rules to compute with zero - https://en.wikipedia.org/wiki/Brahmagupta#Zero
++		"brahmagupta",
++
++		// Walter Houser Brattain co-invented the transistor - https://en.wikipedia.org/wiki/Walter_Houser_Brattain
++		"brattain",
++
++		// Emmett Brown invented time travel. https://en.wikipedia.org/wiki/Emmett_Brown (thanks Brian Goff)
++		"brown",
++
++		// Linda Brown Buck - American biologist and Nobel laureate best known for her genetic and molecular analyses of the mechanisms of smell. https://en.wikipedia.org/wiki/Linda_B._Buck
++		"buck",
++
++		// Dame Susan Jocelyn Bell Burnell - Northern Irish astrophysicist who discovered radio pulsars and was the first to analyse them. https://en.wikipedia.org/wiki/Jocelyn_Bell_Burnell
++		"burnell",
++
++		// Annie Jump Cannon - pioneering female astronomer who classified hundreds of thousands of stars and created the system we use to understand stars today. https://en.wikipedia.org/wiki/Annie_Jump_Cannon
++		"cannon",
++
++		// Rachel Carson - American marine biologist and conservationist, her book Silent Spring and other writings are credited with advancing the global environmental movement. https://en.wikipedia.org/wiki/Rachel_Carson
++		"carson",
++
++		// Dame Mary Lucy Cartwright - British mathematician who was one of the first to study what is now known as chaos theory. Also known for Cartwright's theorem which finds applications in signal processing. https://en.wikipedia.org/wiki/Mary_Cartwright
++		"cartwright",
++
++		// George Washington Carver - American agricultural scientist and inventor. He was the most prominent black scientist of the early 20th century. https://en.wikipedia.org/wiki/George_Washington_Carver
++		"carver",
++
++		// Vinton Gray Cerf - American Internet pioneer, recognised as one of "the fathers of the Internet". With Robert Elliot Kahn, he designed TCP and IP, the primary data communication protocols of the Internet and other computer networks. https://en.wikipedia.org/wiki/Vint_Cerf
++		"cerf",
++
++		// Subrahmanyan Chandrasekhar - Astrophysicist known for his mathematical theory on different stages and evolution in structures of the stars. He has won nobel prize for physics - https://en.wikipedia.org/wiki/Subrahmanyan_Chandrasekhar
++		"chandrasekhar",
++
++		// Sergey Alexeyevich Chaplygin (Russian: Серге́й Алексе́евич Чаплы́гин; April 5, 1869 – October 8, 1942) was a Russian and Soviet physicist, mathematician, and mechanical engineer. He is known for mathematical formulas such as Chaplygin's equation and for a hypothetical substance in cosmology called Chaplygin gas, named after him. https://en.wikipedia.org/wiki/Sergey_Chaplygin
++		"chaplygin",
++
++		// Émilie du Châtelet - French natural philosopher, mathematician, physicist, and author during the early 1730s, known for her translation of and commentary on Isaac Newton's book Principia containing basic laws of physics. https://en.wikipedia.org/wiki/%C3%89milie_du_Ch%C3%A2telet
++		"chatelet",
++
++		// Asima Chatterjee was an Indian organic chemist noted for her research on vinca alkaloids, development of drugs for treatment of epilepsy and malaria - https://en.wikipedia.org/wiki/Asima_Chatterjee
++		"chatterjee",
++
++		// David Lee Chaum - American computer scientist and cryptographer. Known for his seminal contributions in the field of anonymous communication. https://en.wikipedia.org/wiki/David_Chaum
++		"chaum",
++
++		// Pafnuty Chebyshev - Russian mathematician. He is known for his works on probability, statistics, mechanics, analytical geometry and number theory https://en.wikipedia.org/wiki/Pafnuty_Chebyshev
++		"chebyshev",
++
++		// Joan Clarke - Bletchley Park code breaker during the Second World War who pioneered techniques that remained top secret for decades. Also an accomplished numismatist https://en.wikipedia.org/wiki/Joan_Clarke
++		"clarke",
++
++		// Bram Cohen - American computer programmer and author of the BitTorrent peer-to-peer protocol. https://en.wikipedia.org/wiki/Bram_Cohen
++		"cohen",
++
++		// Jane Colden - American botanist widely considered the first female American botanist - https://en.wikipedia.org/wiki/Jane_Colden
++		"colden",
++
++		// Gerty Theresa Cori - American biochemist who became the third woman—and first American woman—to win a Nobel Prize in science, and the first woman to be awarded the Nobel Prize in Physiology or Medicine. Cori was born in Prague. https://en.wikipedia.org/wiki/Gerty_Cori
++		"cori",
++
++		// Seymour Roger Cray was an American electrical engineer and supercomputer architect who designed a series of computers that were the fastest in the world for decades. https://en.wikipedia.org/wiki/Seymour_Cray
++		"cray",
++
++		// Marie Curie discovered radioactivity. https://en.wikipedia.org/wiki/Marie_Curie.
++		"curie",
++
++		// This entry reflects a husband and wife team who worked together:
++		// Joan Curran was a Welsh scientist who developed radar and invented chaff, a radar countermeasure. https://en.wikipedia.org/wiki/Joan_Curran
++		// Samuel Curran was an Irish physicist who worked alongside his wife during WWII and invented the proximity fuse. https://en.wikipedia.org/wiki/Samuel_Curran
++		"curran",
++
++		// Charles Darwin established the principles of natural evolution. https://en.wikipedia.org/wiki/Charles_Darwin.
++		"darwin",
++
++		// Leonardo Da Vinci invented too many things to list here. https://en.wikipedia.org/wiki/Leonardo_da_Vinci.
++		"davinci",
++
++		// A. K. (Alexander Keewatin) Dewdney, Canadian mathematician, computer scientist, author and filmmaker. Contributor to Scientific American's "Computer Recreations" from 1984 to 1991. Author of Core War (program), The Planiverse, The Armchair Universe, The Magic Machine, The New Turing Omnibus, and more. https://en.wikipedia.org/wiki/Alexander_Dewdney
++		"dewdney",
++
++		// Satish Dhawan - Indian mathematician and aerospace engineer, known for leading the successful and indigenous development of the Indian space programme. https://en.wikipedia.org/wiki/Satish_Dhawan
++		"dhawan",
++
++		// Bailey Whitfield Diffie - American cryptographer and one of the pioneers of public-key cryptography. https://en.wikipedia.org/wiki/Whitfield_Diffie
++		"diffie",
++
++		// Edsger Wybe Dijkstra was a Dutch computer scientist and mathematical scientist. https://en.wikipedia.org/wiki/Edsger_W._Dijkstra.
++		"dijkstra",
++
++		// Paul Adrien Maurice Dirac - English theoretical physicist who made fundamental contributions to the early development of both quantum mechanics and quantum electrodynamics. https://en.wikipedia.org/wiki/Paul_Dirac
++		"dirac",
++
++		// Agnes Meyer Driscoll - American cryptanalyst during World Wars I and II who successfully cryptanalysed a number of Japanese ciphers. She was also the co-developer of one of the cipher machines of the US Navy, the CM. https://en.wikipedia.org/wiki/Agnes_Meyer_Driscoll
++		"driscoll",
++
++		// Donna Dubinsky - played an integral role in the development of personal digital assistants (PDAs) serving as CEO of Palm, Inc. and co-founding Handspring. https://en.wikipedia.org/wiki/Donna_Dubinsky
++		"dubinsky",
++
++		// Annie Easley - She was a leading member of the team which developed software for the Centaur rocket stage and one of the first African-Americans in her field. https://en.wikipedia.org/wiki/Annie_Easley
++		"easley",
++
++		// Thomas Alva Edison, prolific inventor https://en.wikipedia.org/wiki/Thomas_Edison
++		"edison",
++
++		// Albert Einstein invented the general theory of relativity. https://en.wikipedia.org/wiki/Albert_Einstein
++		"einstein",
++
++		// Alexandra Asanovna Elbakyan (Russian: Алекса́ндра Аса́новна Элбакя́н) is a Kazakhstani graduate student, computer programmer, internet pirate in hiding, and the creator of the site Sci-Hub. Nature has listed her in 2016 in the top ten people that mattered in science, and Ars Technica has compared her to Aaron Swartz. - https://en.wikipedia.org/wiki/Alexandra_Elbakyan
++		"elbakyan",
++
++		// Taher A. ElGamal - Egyptian cryptographer best known for the ElGamal discrete log cryptosystem and the ElGamal digital signature scheme. https://en.wikipedia.org/wiki/Taher_Elgamal
++		"elgamal",
++
++		// Gertrude Elion - American biochemist, pharmacologist and the 1988 recipient of the Nobel Prize in Medicine - https://en.wikipedia.org/wiki/Gertrude_Elion
++		"elion",
++
++		// James Henry Ellis - British engineer and cryptographer employed by the GCHQ. Best known for conceiving for the first time, the idea of public-key cryptography. https://en.wikipedia.org/wiki/James_H._Ellis
++		"ellis",
++
++		// Douglas Engelbart gave the mother of all demos: https://en.wikipedia.org/wiki/Douglas_Engelbart
++		"engelbart",
++
++		// Euclid invented geometry. https://en.wikipedia.org/wiki/Euclid
++		"euclid",
++
++		// Leonhard Euler invented large parts of modern mathematics. https://de.wikipedia.org/wiki/Leonhard_Euler
++		"euler",
++
++		// Michael Faraday - British scientist who contributed to the study of electromagnetism and electrochemistry. https://en.wikipedia.org/wiki/Michael_Faraday
++		"faraday",
++
++		// Horst Feistel - German-born American cryptographer who was one of the earliest non-government researchers to study the design and theory of block ciphers. Co-developer of DES and Lucifer. Feistel networks, a symmetric structure used in the construction of block ciphers are named after him. https://en.wikipedia.org/wiki/Horst_Feistel
++		"feistel",
++
++		// Pierre de Fermat pioneered several aspects of modern mathematics. https://en.wikipedia.org/wiki/Pierre_de_Fermat
++		"fermat",
++
++		// Enrico Fermi invented the first nuclear reactor. https://en.wikipedia.org/wiki/Enrico_Fermi.
++		"fermi",
++
++		// Richard Feynman was a key contributor to quantum mechanics and particle physics. https://en.wikipedia.org/wiki/Richard_Feynman
++		"feynman",
++
++		// Benjamin Franklin is famous for his experiments in electricity and the invention of the lightning rod.
++		"franklin",
++
++		// Yuri Alekseyevich Gagarin - Soviet pilot and cosmonaut, best known as the first human to journey into outer space. https://en.wikipedia.org/wiki/Yuri_Gagarin
++		"gagarin",
++
++		// Galileo was a founding father of modern astronomy, and faced politics and obscurantism to establish scientific truth.  https://en.wikipedia.org/wiki/Galileo_Galilei
++		"galileo",
++
++		// Évariste Galois - French mathematician whose work laid the foundations of Galois theory and group theory, two major branches of abstract algebra, and the subfield of Galois connections, all while still in his late teens. https://en.wikipedia.org/wiki/%C3%89variste_Galois
++		"galois",
++
++		// Kadambini Ganguly - Indian physician, known for being the first South Asian female physician, trained in western medicine, to graduate in South Asia. https://en.wikipedia.org/wiki/Kadambini_Ganguly
++		"ganguly",
++
++		// William Henry "Bill" Gates III is an American business magnate, philanthropist, investor, computer programmer, and inventor. https://en.wikipedia.org/wiki/Bill_Gates
++		"gates",
++
++		// Johann Carl Friedrich Gauss - German mathematician who made significant contributions to many fields, including number theory, algebra, statistics, analysis, differential geometry, geodesy, geophysics, mechanics, electrostatics, magnetic fields, astronomy, matrix theory, and optics. https://en.wikipedia.org/wiki/Carl_Friedrich_Gauss
++		"gauss",
++
++		// Marie-Sophie Germain - French mathematician, physicist and philosopher. Known for her work on elasticity theory, number theory and philosophy. https://en.wikipedia.org/wiki/Sophie_Germain
++		"germain",
++
++		// Adele Goldberg, was one of the designers and developers of the Smalltalk language. https://en.wikipedia.org/wiki/Adele_Goldberg_(computer_scientist)
++		"goldberg",
++
++		// Adele Goldstine, born Adele Katz, wrote the complete technical description for the first electronic digital computer, ENIAC. https://en.wikipedia.org/wiki/Adele_Goldstine
++		"goldstine",
++
++		// Shafi Goldwasser is a computer scientist known for creating theoretical foundations of modern cryptography. Winner of 2012 ACM Turing Award. https://en.wikipedia.org/wiki/Shafi_Goldwasser
++		"goldwasser",
++
++		// James Golick, all around gangster.
++		"golick",
++
++		// Jane Goodall - British primatologist, ethologist, and anthropologist who is considered to be the world's foremost expert on chimpanzees - https://en.wikipedia.org/wiki/Jane_Goodall
++		"goodall",
++
++		// Stephen Jay Gould was an American paleontologist, evolutionary biologist, and historian of science. He is most famous for the theory of punctuated equilibrium - https://en.wikipedia.org/wiki/Stephen_Jay_Gould
++		"gould",
++
++		// Carolyn Widney Greider - American molecular biologist and joint winner of the 2009 Nobel Prize for Physiology or Medicine for the discovery of telomerase. https://en.wikipedia.org/wiki/Carol_W._Greider
++		"greider",
++
++		// Alexander Grothendieck - German-born French mathematician who became a leading figure in the creation of modern algebraic geometry. https://en.wikipedia.org/wiki/Alexander_Grothendieck
++		"grothendieck",
++
++		// Lois Haibt - American computer scientist, part of the team at IBM that developed FORTRAN - https://en.wikipedia.org/wiki/Lois_Haibt
++		"haibt",
++
++		// Margaret Hamilton - Director of the Software Engineering Division of the MIT Instrumentation Laboratory, which developed on-board flight software for the Apollo space program. https://en.wikipedia.org/wiki/Margaret_Hamilton_(scientist)
++		"hamilton",
++
++		// Caroline Harriet Haslett - English electrical engineer, electricity industry administrator and champion of women's rights. Co-author of British Standard 1363 that specifies AC power plugs and sockets used across the United Kingdom (which is widely considered as one of the safest designs). https://en.wikipedia.org/wiki/Caroline_Haslett
++		"haslett",
++
++		// Stephen Hawking pioneered the field of cosmology by combining general relativity and quantum mechanics. https://en.wikipedia.org/wiki/Stephen_Hawking
++		"hawking",
++
++		// Werner Heisenberg was a founding father of quantum mechanics. https://en.wikipedia.org/wiki/Werner_Heisenberg
++		"heisenberg",
++
++		// Martin Edward Hellman - American cryptologist, best known for his invention of public-key cryptography in co-operation with Whitfield Diffie and Ralph Merkle. https://en.wikipedia.org/wiki/Martin_Hellman
++		"hellman",
++
++		// Grete Hermann was a German philosopher noted for her philosophical work on the foundations of quantum mechanics. https://en.wikipedia.org/wiki/Grete_Hermann
++		"hermann",
++
++		// Caroline Lucretia Herschel - German astronomer and discoverer of several comets. https://en.wikipedia.org/wiki/Caroline_Herschel
++		"herschel",
++
++		// Heinrich Rudolf Hertz - German physicist who first conclusively proved the existence of the electromagnetic waves. https://en.wikipedia.org/wiki/Heinrich_Hertz
++		"hertz",
++
++		// Jaroslav Heyrovský was the inventor of the polarographic method, father of the electroanalytical method, and recipient of the Nobel Prize in 1959. His main field of work was polarography. https://en.wikipedia.org/wiki/Jaroslav_Heyrovsk%C3%BD
++		"heyrovsky",
++
++		// Dorothy Hodgkin was a British biochemist, credited with the development of protein crystallography. She was awarded the Nobel Prize in Chemistry in 1964. https://en.wikipedia.org/wiki/Dorothy_Hodgkin
++		"hodgkin",
++
++		// Douglas R. Hofstadter is an American professor of cognitive science and author of the Pulitzer Prize and American Book Award-winning work Goedel, Escher, Bach: An Eternal Golden Braid in 1979. A mind-bending work which coined Hofstadter's Law: "It always takes longer than you expect, even when you take into account Hofstadter's Law." https://en.wikipedia.org/wiki/Douglas_Hofstadter
++		"hofstadter",
++
++		// Erna Schneider Hoover revolutionized modern communication by inventing a computerized telephone switching method. https://en.wikipedia.org/wiki/Erna_Schneider_Hoover
++		"hoover",
++
++		// Grace Hopper developed the first compiler for a computer programming language and  is credited with popularizing the term "debugging" for fixing computer glitches. https://en.wikipedia.org/wiki/Grace_Hopper
++		"hopper",
++
++		// Frances Hugle, she was an American scientist, engineer, and inventor who contributed to the understanding of semiconductors, integrated circuitry, and the unique electrical principles of microscopic materials. https://en.wikipedia.org/wiki/Frances_Hugle
++		"hugle",
++
++		// Hypatia - Greek Alexandrine Neoplatonist philosopher in Egypt who was one of the earliest mothers of mathematics - https://en.wikipedia.org/wiki/Hypatia
++		"hypatia",
++
++		// Teruko Ishizaka - Japanese scientist and immunologist who co-discovered the antibody class Immunoglobulin E. https://en.wikipedia.org/wiki/Teruko_Ishizaka
++		"ishizaka",
++
++		// Mary Jackson, American mathematician and aerospace engineer who earned the highest title within NASA's engineering department - https://en.wikipedia.org/wiki/Mary_Jackson_(engineer)
++		"jackson",
++
++		// Yeong-Sil Jang was a Korean scientist and astronomer during the Joseon Dynasty; he invented the first metal printing press and water gauge. https://en.wikipedia.org/wiki/Jang_Yeong-sil
++		"jang",
++
++		// Mae Carol Jemison -  is an American engineer, physician, and former NASA astronaut. She became the first black woman to travel in space when she served as a mission specialist aboard the Space Shuttle Endeavour - https://en.wikipedia.org/wiki/Mae_Jemison
++		"jemison",
++
++		// Betty Jennings - one of the original programmers of the ENIAC. https://en.wikipedia.org/wiki/ENIAC - https://en.wikipedia.org/wiki/Jean_Bartik
++		"jennings",
++
++		// Mary Lou Jepsen, was the founder and chief technology officer of One Laptop Per Child (OLPC), and the founder of Pixel Qi. https://en.wikipedia.org/wiki/Mary_Lou_Jepsen
++		"jepsen",
++
++		// Katherine Coleman Goble Johnson - American physicist and mathematician contributed to the NASA. https://en.wikipedia.org/wiki/Katherine_Johnson
++		"johnson",
++
++		// Irène Joliot-Curie - French scientist who was awarded the Nobel Prize for Chemistry in 1935. Daughter of Marie and Pierre Curie. https://en.wikipedia.org/wiki/Ir%C3%A8ne_Joliot-Curie
++		"joliot",
++
++		// Karen Spärck Jones came up with the concept of inverse document frequency, which is used in most search engines today. https://en.wikipedia.org/wiki/Karen_Sp%C3%A4rck_Jones
++		"jones",
++
++		// A. P. J. Abdul Kalam - is an Indian scientist aka Missile Man of India for his work on the development of ballistic missile and launch vehicle technology - https://en.wikipedia.org/wiki/A._P._J._Abdul_Kalam
++		"kalam",
++
++		// Sergey Petrovich Kapitsa (Russian: Серге́й Петро́вич Капи́ца; 14 February 1928 – 14 August 2012) was a Russian physicist and demographer. He was best known as host of the popular and long-running Russian scientific TV show, Evident, but Incredible. His father was the Nobel laureate Soviet-era physicist Pyotr Kapitsa, and his brother was the geographer and Antarctic explorer Andrey Kapitsa. - https://en.wikipedia.org/wiki/Sergey_Kapitsa
++		"kapitsa",
++
++		// Susan Kare, created the icons and many of the interface elements for the original Apple Macintosh in the 1980s, and was an original employee of NeXT, working as the Creative Director. https://en.wikipedia.org/wiki/Susan_Kare
++		"kare",
++
++		// Mstislav Keldysh - a Soviet scientist in the field of mathematics and mechanics, academician of the USSR Academy of Sciences (1946), President of the USSR Academy of Sciences (1961–1975), three times Hero of Socialist Labor (1956, 1961, 1971), fellow of the Royal Society of Edinburgh (1968). https://en.wikipedia.org/wiki/Mstislav_Keldysh
++		"keldysh",
++
++		// Mary Kenneth Keller, Sister Mary Kenneth Keller became the first American woman to earn a PhD in Computer Science in 1965. https://en.wikipedia.org/wiki/Mary_Kenneth_Keller
++		"keller",
++
++		// Johannes Kepler, German astronomer known for his three laws of planetary motion - https://en.wikipedia.org/wiki/Johannes_Kepler
++		"kepler",
++
++		// Omar Khayyam - Persian mathematician, astronomer and poet. Known for his work on the classification and solution of cubic equations, for his contribution to the understanding of Euclid's fifth postulate and for computing the length of a year very accurately. https://en.wikipedia.org/wiki/Omar_Khayyam
++		"khayyam",
++
++		// Har Gobind Khorana - Indian-American biochemist who shared the 1968 Nobel Prize for Physiology - https://en.wikipedia.org/wiki/Har_Gobind_Khorana
++		"khorana",
++
++		// Jack Kilby invented silicon integrated circuits and gave Silicon Valley its name. - https://en.wikipedia.org/wiki/Jack_Kilby
++		"kilby",
++
++		// Maria Kirch - German astronomer and first woman to discover a comet - https://en.wikipedia.org/wiki/Maria_Margarethe_Kirch
++		"kirch",
++
++		// Donald Knuth - American computer scientist, author of "The Art of Computer Programming" and creator of the TeX typesetting system. https://en.wikipedia.org/wiki/Donald_Knuth
++		"knuth",
++
++		// Sophie Kowalevski - Russian mathematician responsible for important original contributions to analysis, differential equations and mechanics - https://en.wikipedia.org/wiki/Sofia_Kovalevskaya
++		"kowalevski",
++
++		// Marie-Jeanne de Lalande - French astronomer, mathematician and cataloguer of stars - https://en.wikipedia.org/wiki/Marie-Jeanne_de_Lalande
++		"lalande",
++
++		// Hedy Lamarr - Actress and inventor. The principles of her work are now incorporated into modern Wi-Fi, CDMA and Bluetooth technology. https://en.wikipedia.org/wiki/Hedy_Lamarr
++		"lamarr",
++
++		// Leslie B. Lamport - American computer scientist. Lamport is best known for his seminal work in distributed systems and was the winner of the 2013 Turing Award. https://en.wikipedia.org/wiki/Leslie_Lamport
++		"lamport",
++
++		// Mary Leakey - British paleoanthropologist who discovered the first fossilized Proconsul skull - https://en.wikipedia.org/wiki/Mary_Leakey
++		"leakey",
++
++		// Henrietta Swan Leavitt - she was an American astronomer who discovered the relation between the luminosity and the period of Cepheid variable stars. https://en.wikipedia.org/wiki/Henrietta_Swan_Leavitt
++		"leavitt",
++
++		// Esther Miriam Zimmer Lederberg - American microbiologist and a pioneer of bacterial genetics. https://en.wikipedia.org/wiki/Esther_Lederberg
++		"lederberg",
++
++		// Inge Lehmann - Danish seismologist and geophysicist. Known for discovering in 1936 that the Earth has a solid inner core inside a molten outer core. https://en.wikipedia.org/wiki/Inge_Lehmann
++		"lehmann",
++
++		// Daniel Lewin - Mathematician, Akamai co-founder, soldier, 9/11 victim-- Developed optimization techniques for routing traffic on the internet. Died attempting to stop the 9-11 hijackers. https://en.wikipedia.org/wiki/Daniel_Lewin
++		"lewin",
++
++		// Ruth Lichterman - one of the original programmers of the ENIAC. https://en.wikipedia.org/wiki/ENIAC - https://en.wikipedia.org/wiki/Ruth_Teitelbaum
++		"lichterman",
++
++		// Barbara Liskov - co-developed the Liskov substitution principle. Liskov was also the winner of the Turing Prize in 2008. - https://en.wikipedia.org/wiki/Barbara_Liskov
++		"liskov",
++
++		// Ada Lovelace invented the first algorithm. https://en.wikipedia.org/wiki/Ada_Lovelace (thanks James Turnbull)
++		"lovelace",
++
++		// Auguste and Louis Lumière - the first filmmakers in history - https://en.wikipedia.org/wiki/Auguste_and_Louis_Lumi%C3%A8re
++		"lumiere",
++
++		// Mahavira - Ancient Indian mathematician during 9th century AD who discovered basic algebraic identities - https://en.wikipedia.org/wiki/Mah%C4%81v%C4%ABra_(mathematician)
++		"mahavira",
++
++		// Lynn Margulis (b. Lynn Petra Alexander) - an American evolutionary theorist and biologist, science author, educator, and popularizer, and was the primary modern proponent for the significance of symbiosis in evolution. - https://en.wikipedia.org/wiki/Lynn_Margulis
++		"margulis",
++
++		// Yukihiro Matsumoto - Japanese computer scientist and software programmer best known as the chief designer of the Ruby programming language. https://en.wikipedia.org/wiki/Yukihiro_Matsumoto
++		"matsumoto",
++
++		// James Clerk Maxwell - Scottish physicist, best known for his formulation of electromagnetic theory. https://en.wikipedia.org/wiki/James_Clerk_Maxwell
++		"maxwell",
++
++		// Maria Mayer - American theoretical physicist and Nobel laureate in Physics for proposing the nuclear shell model of the atomic nucleus - https://en.wikipedia.org/wiki/Maria_Mayer
++		"mayer",
++
++		// John McCarthy invented LISP: https://en.wikipedia.org/wiki/John_McCarthy_(computer_scientist)
++		"mccarthy",
++
++		// Barbara McClintock - a distinguished American cytogeneticist, 1983 Nobel Laureate in Physiology or Medicine for discovering transposons. https://en.wikipedia.org/wiki/Barbara_McClintock
++		"mcclintock",
++
++		// Anne Laura Dorinthea McLaren - British developmental biologist whose work helped lead to human in-vitro fertilisation. https://en.wikipedia.org/wiki/Anne_McLaren
++		"mclaren",
++
++		// Malcolm McLean invented the modern shipping container: https://en.wikipedia.org/wiki/Malcom_McLean
++		"mclean",
++
++		// Kay McNulty - one of the original programmers of the ENIAC. https://en.wikipedia.org/wiki/ENIAC - https://en.wikipedia.org/wiki/Kathleen_Antonelli
++		"mcnulty",
++
++		// Lise Meitner - Austrian/Swedish physicist who was involved in the discovery of nuclear fission. The element meitnerium is named after her - https://en.wikipedia.org/wiki/Lise_Meitner
++		"meitner",
++
++		// Gregor Johann Mendel - Czech scientist and founder of genetics. https://en.wikipedia.org/wiki/Gregor_Mendel
++		"mendel",
++
++		// Dmitri Mendeleev - a chemist and inventor. He formulated the Periodic Law, created a farsighted version of the periodic table of elements, and used it to correct the properties of some already discovered elements and also to predict the properties of eight elements yet to be discovered. https://en.wikipedia.org/wiki/Dmitri_Mendeleev
++		"mendeleev",
++
++		// Carla Meninsky, was the game designer and programmer for Atari 2600 games Dodge 'Em and Warlords. https://en.wikipedia.org/wiki/Carla_Meninsky
++		"meninsky",
++
++		// Ralph C. Merkle - American computer scientist, known for devising Merkle's puzzles - one of the very first schemes for public-key cryptography. Also, inventor of Merkle trees and co-inventor of the Merkle-Damgård construction for building collision-resistant cryptographic hash functions and the Merkle-Hellman knapsack cryptosystem. https://en.wikipedia.org/wiki/Ralph_Merkle
++		"merkle",
++
++		// Johanna Mestorf - German prehistoric archaeologist and first female museum director in Germany - https://en.wikipedia.org/wiki/Johanna_Mestorf
++		"mestorf",
++
++		// Maryam Mirzakhani - an Iranian mathematician and the first woman to win the Fields Medal. https://en.wikipedia.org/wiki/Maryam_Mirzakhani
++		"mirzakhani",
++
++		// Rita Levi-Montalcini - Won Nobel Prize in Physiology or Medicine jointly with colleague Stanley Cohen for the discovery of nerve growth factor (https://en.wikipedia.org/wiki/Rita_Levi-Montalcini)
++		"montalcini",
++
++		// Gordon Earle Moore - American engineer, Silicon Valley founding father, author of Moore's law. https://en.wikipedia.org/wiki/Gordon_Moore
++		"moore",
++
++		// Samuel Morse - contributed to the invention of a single-wire telegraph system based on European telegraphs and was a co-developer of the Morse code - https://en.wikipedia.org/wiki/Samuel_Morse
++		"morse",
++
++		// May-Britt Moser - Nobel prize winner neuroscientist who contributed to the discovery of grid cells in the brain. https://en.wikipedia.org/wiki/May-Britt_Moser
++		"moser",
++
++		// Ian Murdock - founder of the Debian project - https://en.wikipedia.org/wiki/Ian_Murdock
++		"murdock",
++
++		// John Napier of Merchiston - Scottish landowner known as an astronomer, mathematician and physicist. Best known for his discovery of logarithms. https://en.wikipedia.org/wiki/John_Napier
++		"napier",
++
++		// John Forbes Nash, Jr. - American mathematician who made fundamental contributions to game theory, differential geometry, and the study of partial differential equations. https://en.wikipedia.org/wiki/John_Forbes_Nash_Jr.
++		"nash",
++
++		// John von Neumann - todays computer architectures are based on the von Neumann architecture. https://en.wikipedia.org/wiki/Von_Neumann_architecture
++		"neumann",
++
++		// Isaac Newton invented classic mechanics and modern optics. https://en.wikipedia.org/wiki/Isaac_Newton
++		"newton",
++
++		// Florence Nightingale, more prominently known as a nurse, was also the first female member of the Royal Statistical Society and a pioneer in statistical graphics https://en.wikipedia.org/wiki/Florence_Nightingale#Statistics_and_sanitary_reform
++		"nightingale",
++
++		// Alfred Nobel - a Swedish chemist, engineer, innovator, and armaments manufacturer (inventor of dynamite) - https://en.wikipedia.org/wiki/Alfred_Nobel
++		"nobel",
++
++		// Emmy Noether, German mathematician. Noether's Theorem is named after her. https://en.wikipedia.org/wiki/Emmy_Noether
++		"noether",
++
++		// Poppy Northcutt. Poppy Northcutt was the first woman to work as part of NASA’s Mission Control. http://www.businessinsider.com/poppy-northcutt-helped-apollo-astronauts-2014-12?op=1
++		"northcutt",
++
++		// Robert Noyce invented silicon integrated circuits and gave Silicon Valley its name. - https://en.wikipedia.org/wiki/Robert_Noyce
++		"noyce",
++
++		// Panini - Ancient Indian linguist and grammarian from 4th century CE who worked on the world's first formal system - https://en.wikipedia.org/wiki/P%C4%81%E1%B9%87ini#Comparison_with_modern_formal_systems
++		"panini",
++
++		// Ambroise Pare invented modern surgery. https://en.wikipedia.org/wiki/Ambroise_Par%C3%A9
++		"pare",
++
++		// Blaise Pascal, French mathematician, physicist, and inventor - https://en.wikipedia.org/wiki/Blaise_Pascal
++		"pascal",
++
++		// Louis Pasteur discovered vaccination, fermentation and pasteurization. https://en.wikipedia.org/wiki/Louis_Pasteur.
++		"pasteur",
++
++		// Cecilia Payne-Gaposchkin was an astronomer and astrophysicist who, in 1925, proposed in her Ph.D. thesis an explanation for the composition of stars in terms of the relative abundances of hydrogen and helium. https://en.wikipedia.org/wiki/Cecilia_Payne-Gaposchkin
++		"payne",
++
++		// Radia Perlman is a software designer and network engineer and most famous for her invention of the spanning-tree protocol (STP). https://en.wikipedia.org/wiki/Radia_Perlman
++		"perlman",
++
++		// Rob Pike was a key contributor to Unix, Plan 9, the X graphic system, utf-8, and the Go programming language. https://en.wikipedia.org/wiki/Rob_Pike
++		"pike",
++
++		// Henri Poincaré made fundamental contributions in several fields of mathematics. https://en.wikipedia.org/wiki/Henri_Poincar%C3%A9
++		"poincare",
++
++		// Laura Poitras is a director and producer whose work, made possible by open source crypto tools, advances the causes of truth and freedom of information by reporting disclosures by whistleblowers such as Edward Snowden. https://en.wikipedia.org/wiki/Laura_Poitras
++		"poitras",
++
++		// Tat’yana Avenirovna Proskuriakova (Russian: Татья́на Авени́ровна Проскуряко́ва) (January 23 [O.S. January 10] 1909 – August 30, 1985) was a Russian-American Mayanist scholar and archaeologist who contributed significantly to the deciphering of Maya hieroglyphs, the writing system of the pre-Columbian Maya civilization of Mesoamerica. https://en.wikipedia.org/wiki/Tatiana_Proskouriakoff
++		"proskuriakova",
++
++		// Claudius Ptolemy - a Greco-Egyptian writer of Alexandria, known as a mathematician, astronomer, geographer, astrologer, and poet of a single epigram in the Greek Anthology - https://en.wikipedia.org/wiki/Ptolemy
++		"ptolemy",
++
++		// C. V. Raman - Indian physicist who won the Nobel Prize in 1930 for proposing the Raman effect. - https://en.wikipedia.org/wiki/C._V._Raman
++		"raman",
++
++		// Srinivasa Ramanujan - Indian mathematician and autodidact who made extraordinary contributions to mathematical analysis, number theory, infinite series, and continued fractions. - https://en.wikipedia.org/wiki/Srinivasa_Ramanujan
++		"ramanujan",
++
++		// Ida Rhodes - American pioneer in computer programming, designed the first computer used for Social Security. https://en.wikipedia.org/wiki/Ida_Rhodes
++		"rhodes",
++
++		// Sally Kristen Ride was an American physicist and astronaut. She was the first American woman in space, and the youngest American astronaut. https://en.wikipedia.org/wiki/Sally_Ride
++		"ride",
++
++		// Dennis Ritchie - co-creator of UNIX and the C programming language. - https://en.wikipedia.org/wiki/Dennis_Ritchie
++		"ritchie",
++
++		// Julia Hall Bowman Robinson - American mathematician renowned for her contributions to the fields of computability theory and computational complexity theory. https://en.wikipedia.org/wiki/Julia_Robinson
++		"robinson",
++
++		// Wilhelm Conrad Röntgen - German physicist who was awarded the first Nobel Prize in Physics in 1901 for the discovery of X-rays (Röntgen rays). https://en.wikipedia.org/wiki/Wilhelm_R%C3%B6ntgen
++		"roentgen",
++
++		// Rosalind Franklin - British biophysicist and X-ray crystallographer whose research was critical to the understanding of DNA - https://en.wikipedia.org/wiki/Rosalind_Franklin
++		"rosalind",
++
++		// Vera Rubin - American astronomer who pioneered work on galaxy rotation rates. https://en.wikipedia.org/wiki/Vera_Rubin
++		"rubin",
++
++		// Meghnad Saha - Indian astrophysicist best known for his development of the Saha equation, used to describe chemical and physical conditions in stars - https://en.wikipedia.org/wiki/Meghnad_Saha
++		"saha",
++
++		// Jean E. Sammet developed FORMAC, the first widely used computer language for symbolic manipulation of mathematical formulas. https://en.wikipedia.org/wiki/Jean_E._Sammet
++		"sammet",
++
++		// Mildred Sanderson - American mathematician best known for Sanderson's theorem concerning modular invariants. https://en.wikipedia.org/wiki/Mildred_Sanderson
++		"sanderson",
++
++		// Satoshi Nakamoto is the name used by the unknown person or group of people who developed bitcoin, authored the bitcoin white paper, and created and deployed bitcoin's original reference implementation. https://en.wikipedia.org/wiki/Satoshi_Nakamoto
++		"satoshi",
++
++		// Adi Shamir - Israeli cryptographer whose numerous inventions and contributions to cryptography include the Ferge Fiat Shamir identification scheme, the Rivest Shamir Adleman (RSA) public-key cryptosystem, the Shamir's secret sharing scheme, the breaking of the Merkle-Hellman cryptosystem, the TWINKLE and TWIRL factoring devices and the discovery of differential cryptanalysis (with Eli Biham). https://en.wikipedia.org/wiki/Adi_Shamir
++		"shamir",
++
++		// Claude Shannon - The father of information theory and founder of digital circuit design theory. (https://en.wikipedia.org/wiki/Claude_Shannon)
++		"shannon",
++
++		// Carol Shaw - Originally an Atari employee, Carol Shaw is said to be the first female video game designer. https://en.wikipedia.org/wiki/Carol_Shaw_(video_game_designer)
++		"shaw",
++
++		// Dame Stephanie "Steve" Shirley - Founded a software company in 1962 employing women working from home. https://en.wikipedia.org/wiki/Steve_Shirley
++		"shirley",
++
++		// William Shockley co-invented the transistor - https://en.wikipedia.org/wiki/William_Shockley
++		"shockley",
++
++		// Lina Solomonovna Stern (or Shtern; Russian: Лина Соломоновна Штерн; 26 August 1878 – 7 March 1968) was a Soviet biochemist, physiologist and humanist whose medical discoveries saved thousands of lives at the fronts of World War II. She is best known for her pioneering work on blood–brain barrier, which she described as hemato-encephalic barrier in 1921. https://en.wikipedia.org/wiki/Lina_Stern
++		"shtern",
++
++		// Françoise Barré-Sinoussi - French virologist and Nobel Prize Laureate in Physiology or Medicine; her work was fundamental in identifying HIV as the cause of AIDS. https://en.wikipedia.org/wiki/Fran%C3%A7oise_Barr%C3%A9-Sinoussi
++		"sinoussi",
++
++		// Betty Snyder - one of the original programmers of the ENIAC. https://en.wikipedia.org/wiki/ENIAC - https://en.wikipedia.org/wiki/Betty_Holberton
++		"snyder",
++
++		// Cynthia Solomon - Pioneer in the fields of artificial intelligence, computer science and educational computing. Known for creation of Logo, an educational programming language.  https://en.wikipedia.org/wiki/Cynthia_Solomon
++		"solomon",
++
++		// Frances Spence - one of the original programmers of the ENIAC. https://en.wikipedia.org/wiki/ENIAC - https://en.wikipedia.org/wiki/Frances_Spence
++		"spence",
++
++		// Michael Stonebraker is a database research pioneer and architect of Ingres, Postgres, VoltDB and SciDB. Winner of 2014 ACM Turing Award. https://en.wikipedia.org/wiki/Michael_Stonebraker
++		"stonebraker",
++
++		// Ivan Edward Sutherland - American computer scientist and Internet pioneer, widely regarded as the father of computer graphics. https://en.wikipedia.org/wiki/Ivan_Sutherland
++		"sutherland",
++
++		// Janese Swanson (with others) developed the first of the Carmen Sandiego games. She went on to found Girl Tech. https://en.wikipedia.org/wiki/Janese_Swanson
++		"swanson",
++
++		// Aaron Swartz was influential in creating RSS, Markdown, Creative Commons, Reddit, and much of the internet as we know it today. He was devoted to freedom of information on the web. https://en.wikiquote.org/wiki/Aaron_Swartz
++		"swartz",
++
++		// Bertha Swirles was a theoretical physicist who made a number of contributions to early quantum theory. https://en.wikipedia.org/wiki/Bertha_Swirles
++		"swirles",
++
++		// Helen Brooke Taussig - American cardiologist and founder of the field of paediatric cardiology. https://en.wikipedia.org/wiki/Helen_B._Taussig
++		"taussig",
++
++		// Nikola Tesla invented the AC electric system and every gadget ever used by a James Bond villain. https://en.wikipedia.org/wiki/Nikola_Tesla
++		"tesla",
++
++		// Marie Tharp - American geologist and oceanic cartographer who co-created the first scientific map of the Atlantic Ocean floor. Her work led to the acceptance of the theories of plate tectonics and continental drift. https://en.wikipedia.org/wiki/Marie_Tharp
++		"tharp",
++
++		// Ken Thompson - co-creator of UNIX and the C programming language - https://en.wikipedia.org/wiki/Ken_Thompson
++		"thompson",
++
++		// Linus Torvalds invented Linux and Git. https://en.wikipedia.org/wiki/Linus_Torvalds
++		"torvalds",
++
++		// Youyou Tu - Chinese pharmaceutical chemist and educator known for discovering artemisinin and dihydroartemisinin, used to treat malaria, which has saved millions of lives. Joint winner of the 2015 Nobel Prize in Physiology or Medicine. https://en.wikipedia.org/wiki/Tu_Youyou
++		"tu",
++
++		// Alan Turing was a founding father of computer science. https://en.wikipedia.org/wiki/Alan_Turing.
++		"turing",
++
++		// Varahamihira - Ancient Indian mathematician who discovered trigonometric formulae during 505-587 CE - https://en.wikipedia.org/wiki/Var%C4%81hamihira#Contributions
++		"varahamihira",
++
++		// Dorothy Vaughan was a NASA mathematician and computer programmer on the SCOUT launch vehicle program that put America's first satellites into space - https://en.wikipedia.org/wiki/Dorothy_Vaughan
++		"vaughan",
++
++		// Cédric Villani - French mathematician, won Fields Medal, Fermat Prize and Poincaré Prize for his work in differential geometry and statistical mechanics. https://en.wikipedia.org/wiki/C%C3%A9dric_Villani
++		"villani",
++
++		// Sir Mokshagundam Visvesvaraya - is a notable Indian engineer.  He is a recipient of the Indian Republic's highest honour, the Bharat Ratna, in 1955. On his birthday, 15 September is celebrated as Engineer's Day in India in his memory - https://en.wikipedia.org/wiki/Visvesvaraya
++		"visvesvaraya",
++
++		// Christiane Nüsslein-Volhard - German biologist, won Nobel Prize in Physiology or Medicine in 1995 for research on the genetic control of embryonic development. https://en.wikipedia.org/wiki/Christiane_N%C3%BCsslein-Volhard
++		"volhard",
++
++		// Marlyn Wescoff - one of the original programmers of the ENIAC. https://en.wikipedia.org/wiki/ENIAC - https://en.wikipedia.org/wiki/Marlyn_Meltzer
++		"wescoff",
++
++		// Sylvia B. Wilbur - British computer scientist who helped develop the ARPANET, was one of the first to exchange email in the UK and a leading researcher in computer-supported collaborative work. https://en.wikipedia.org/wiki/Sylvia_Wilbur
++		"wilbur",
++
++		// Andrew Wiles - Notable British mathematician who proved the enigmatic Fermat's Last Theorem - https://en.wikipedia.org/wiki/Andrew_Wiles
++		"wiles",
++
++		// Roberta Williams, did pioneering work in graphical adventure games for personal computers, particularly the King's Quest series. https://en.wikipedia.org/wiki/Roberta_Williams
++		"williams",
++
++		// Malcolm John Williamson - British mathematician and cryptographer employed by the GCHQ. Developed in 1974 what is now known as Diffie-Hellman key exchange (Diffie and Hellman first published the scheme in 1976). https://en.wikipedia.org/wiki/Malcolm_J._Williamson
++		"williamson",
++
++		// Sophie Wilson designed the first Acorn Micro-Computer and the instruction set for ARM processors. https://en.wikipedia.org/wiki/Sophie_Wilson
++		"wilson",
++
++		// Jeannette Wing - co-developed the Liskov substitution principle. - https://en.wikipedia.org/wiki/Jeannette_Wing
++		"wing",
++
++		// Steve Wozniak invented the Apple I and Apple II. https://en.wikipedia.org/wiki/Steve_Wozniak
++		"wozniak",
++
++		// The Wright brothers, Orville and Wilbur - credited with inventing and building the world's first successful airplane and making the first controlled, powered and sustained heavier-than-air human flight - https://en.wikipedia.org/wiki/Wright_brothers
++		"wright",
++
++		// Chien-Shiung Wu - Chinese-American experimental physicist who made significant contributions to nuclear physics. https://en.wikipedia.org/wiki/Chien-Shiung_Wu
++		"wu",
++
++		// Rosalyn Sussman Yalow - Rosalyn Sussman Yalow was an American medical physicist, and a co-winner of the 1977 Nobel Prize in Physiology or Medicine for development of the radioimmunoassay technique. https://en.wikipedia.org/wiki/Rosalyn_Sussman_Yalow
++		"yalow",
++
++		// Ada Yonath - an Israeli crystallographer, the first woman from the Middle East to win a Nobel prize in the sciences. https://en.wikipedia.org/wiki/Ada_Yonath
++		"yonath",
++
++		// Nikolay Yegorovich Zhukovsky (Russian: Никола́й Его́рович Жуко́вский, January 17 1847 – March 17, 1921) was a Russian scientist, mathematician and engineer, and a founding father of modern aero- and hydrodynamics. Whereas contemporary scientists scoffed at the idea of human flight, Zhukovsky was the first to undertake the study of airflow. He is often called the Father of Russian Aviation. https://en.wikipedia.org/wiki/Nikolay_Yegorovich_Zhukovsky
++		"zhukovsky",
++	}
++)
++
++// GetRandomName generates a random name from the list of adjectives and surnames in this package
++// formatted as "adjective_surname". For example 'focused_turing'. If retry is non-zero, a random
++// integer between 0 and 10 will be added to the end of the name, e.g `focused_turing3`
++func GetRandomName(retry int) string {
++begin:
++	name := left[rand.Intn(len(left))] + "_" + right[rand.Intn(len(right))] //nolint:gosec // G404: Use of weak random number generator (math/rand instead of crypto/rand)
++	if name == "boring_wozniak" /* Steve Wozniak is not boring */ {
++		goto begin
++	}
++
++	if retry > 0 {
++		name += strconv.Itoa(rand.Intn(10)) //nolint:gosec // G404: Use of weak random number generator (math/rand instead of crypto/rand)
++	}
++	return name
++}
+diff --git a/libpod/namesgenerator/names-generator_test.go b/libpod/namesgenerator/names-generator_test.go
+new file mode 100644
+index 0000000..e1258bc
+--- /dev/null
++++ b/libpod/namesgenerator/names-generator_test.go
+@@ -0,0 +1,40 @@
++// This file has been copied from
++// https://github.com/moby/moby/tree/a52171f5eeb6e553e7c4744abf6b722962b2aca4/internal/namesgenerator.
++// It is licensed under the Apache License 2.0.
++// See https://github.com/moby/moby/blob/a52171f5eeb6e553e7c4744abf6b722962b2aca4/LICENSE.
++
++package namesgenerator
++
++import (
++	"strings"
++	"testing"
++)
++
++func TestNameFormat(t *testing.T) {
++	name := GetRandomName(0)
++	if !strings.Contains(name, "_") {
++		t.Fatalf("Generated name does not contain an underscore")
++	}
++	if strings.ContainsAny(name, "0123456789") {
++		t.Fatalf("Generated name contains numbers!")
++	}
++}
++
++func TestNameRetries(t *testing.T) {
++	name := GetRandomName(1)
++	if !strings.Contains(name, "_") {
++		t.Fatalf("Generated name does not contain an underscore")
++	}
++	if !strings.ContainsAny(name, "0123456789") {
++		t.Fatalf("Generated name doesn't contain a number")
++	}
++}
++
++func BenchmarkGetRandomName(b *testing.B) {
++	b.ReportAllocs()
++	var out string
++	for b.Loop() {
++		out = GetRandomName(5)
++	}
++	b.Log("Last result:", out)
++}
+diff --git a/libpod/reset.go b/libpod/reset.go
+index addb40c..f7dcd6e 100644
+--- a/libpod/reset.go
++++ b/libpod/reset.go
+@@ -16,9 +16,7 @@ import (
+ 	"go.podman.io/common/libimage"
+ 	"go.podman.io/common/libnetwork/types"
+ 	blobinfocache "go.podman.io/image/v5/pkg/blobinfocache"
+-	"go.podman.io/storage"
+ 	"go.podman.io/storage/pkg/lockfile"
+-	stypes "go.podman.io/storage/types"
+ )
+ 
+ // removeAllDirs removes all Podman storage directories. It is intended to be
+@@ -266,9 +264,9 @@ func (r *Runtime) Reset(ctx context.Context) error {
+ 		prevError = err
+ 	}
+ 
+-	if storageConfPath, err := storage.DefaultConfigFile(); err == nil {
++	if storageConfPath, err := storageConfigFile(); err == nil {
+ 		switch storageConfPath {
+-		case stypes.SystemConfigFile:
++		case "/usr/share/containers/storage.conf":
+ 			break
+ 		default:
+ 			if _, err = os.Stat(storageConfPath); err == nil {
+diff --git a/libpod/runtime.go b/libpod/runtime.go
+index 178a6c2..b51f34a 100644
+--- a/libpod/runtime.go
++++ b/libpod/runtime.go
+@@ -27,7 +27,7 @@ import (
+ 	"github.com/containers/podman/v5/pkg/rootless"
+ 	"github.com/containers/podman/v5/pkg/systemd"
+ 	"github.com/containers/podman/v5/pkg/util"
+-	"github.com/docker/docker/pkg/namesgenerator"
++	"github.com/containers/podman/v5/libpod/namesgenerator"
+ 	"github.com/hashicorp/go-multierror"
+ 	jsoniter "github.com/json-iterator/go"
+ 	spec "github.com/opencontainers/runtime-spec/specs-go"
+@@ -44,6 +44,7 @@ import (
+ 	is "go.podman.io/image/v5/storage"
+ 	"go.podman.io/image/v5/types"
+ 	"go.podman.io/storage"
++	storageTypes "go.podman.io/storage/types"
+ 	"go.podman.io/storage/pkg/fileutils"
+ 	"go.podman.io/storage/pkg/lockfile"
+ 	"go.podman.io/storage/pkg/unshare"
+@@ -1150,11 +1151,11 @@ func (r *Runtime) reloadContainersConf() error {
+ 
+ // reloadStorageConf reloads the storage.conf
+ func (r *Runtime) reloadStorageConf() error {
+-	configFile, err := storage.DefaultConfigFile()
++	options, err := storageTypes.LoadStoreOptions(storageTypes.LoadOptions{})
+ 	if err != nil {
+ 		return err
+ 	}
+-	storage.ReloadConfigurationFile(configFile, &r.storageConfig)
++	r.storageConfig = options
+ 	logrus.Infof("Applied new storage configuration: %v", r.storageConfig)
+ 	return nil
+ }
+diff --git a/libpod/storage_config.go b/libpod/storage_config.go
+new file mode 100644
+index 0000000..760b5a7
+--- /dev/null
++++ b/libpod/storage_config.go
+@@ -0,0 +1,35 @@
++//go:build !remote
++
++package libpod
++
++import (
++	"errors"
++	"os"
++
++	"go.podman.io/storage/pkg/configfile"
++	"go.podman.io/storage/pkg/unshare"
++)
++
++// storageConfigFile preserves the v5 info field while storage supports layered files.
++func storageConfigFile() (string, error) {
++	paths, err := configfile.GetSearchPaths(&configfile.File{
++		Name:            "storage",
++		Extension:       "conf",
++		EnvironmentName: "CONTAINERS_STORAGE_CONF",
++		UserId:          unshare.GetRootlessUID(),
++	})
++	if err != nil {
++		return "", err
++	}
++	for _, path := range paths.MainFiles {
++		if _, err := os.Stat(path); err == nil {
++			return path, nil
++		} else if !errors.Is(err, os.ErrNotExist) {
++			return "", err
++		}
++	}
++	if len(paths.MainFiles) != 0 {
++		return paths.MainFiles[0], nil
++	}
++	return "", nil
++}
+diff --git a/libpod/storage_config_test.go b/libpod/storage_config_test.go
+new file mode 100644
+index 0000000..0af0ae0
+--- /dev/null
++++ b/libpod/storage_config_test.go
+@@ -0,0 +1,25 @@
++//go:build !remote
++
++package libpod
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func TestStorageConfigFileOverride(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "storage.conf")
++	t.Setenv("CONTAINERS_STORAGE_CONF", path)
++	for _, exists := range []bool{false, true} {
++		if exists {
++			if err := os.WriteFile(path, []byte("[storage]\n"), 0600); err != nil {
++				t.Fatal(err)
++			}
++		}
++		got, err := storageConfigFile()
++		if err != nil || got != path {
++			t.Fatalf("override exists=%v: got %q, %v; want %q", exists, got, err, path)
++		}
++	}
++}
+diff --git a/pkg/api/handlers/compat/auth.go b/pkg/api/handlers/compat/auth.go
+index c0a0ee9..aaf8681 100644
+--- a/pkg/api/handlers/compat/auth.go
++++ b/pkg/api/handlers/compat/auth.go
+@@ -14,7 +14,7 @@ import (
+ 	"github.com/containers/podman/v5/pkg/api/handlers/utils"
+ 	api "github.com/containers/podman/v5/pkg/api/types"
+ 	"github.com/containers/podman/v5/pkg/domain/entities"
+-	"github.com/docker/docker/api/types/registry"
++	"github.com/moby/moby/api/types/registry"
+ 	"go.podman.io/common/pkg/auth"
+ 	DockerClient "go.podman.io/image/v5/docker"
+ 	"go.podman.io/image/v5/types"
+diff --git a/pkg/api/handlers/compat/containers.go b/pkg/api/handlers/compat/containers.go
+index 7ffbf32..ba1c3c8 100644
+--- a/pkg/api/handlers/compat/containers.go
++++ b/pkg/api/handlers/compat/containers.go
+@@ -7,6 +7,7 @@ import (
+ 	"errors"
+ 	"fmt"
+ 	"net/http"
++	"net/netip"
+ 	"sort"
+ 	"strconv"
+ 	"strings"
+@@ -25,12 +26,11 @@ import (
+ 	"github.com/containers/podman/v5/pkg/signal"
+ 	"github.com/containers/podman/v5/pkg/specgenutil"
+ 	"github.com/containers/podman/v5/pkg/util"
+-	dockerBackend "github.com/docker/docker/api/types/backend"
+-	"github.com/docker/docker/api/types/container"
+-	"github.com/docker/docker/api/types/network"
+-	"github.com/docker/docker/api/types/storage"
+ 	"github.com/docker/go-connections/nat"
+ 	"github.com/docker/go-units"
++	"github.com/moby/moby/api/types/container"
++	"github.com/moby/moby/api/types/network"
++	"github.com/moby/moby/api/types/storage"
+ 	spec "github.com/opencontainers/runtime-spec/specs-go"
+ 	"github.com/sirupsen/logrus"
+ )
+@@ -283,6 +283,15 @@ func WaitContainer(w http.ResponseWriter, r *http.Request) {
+ 	utils.WaitContainerDocker(w, r)
+ }
+ 
++func convertSecondaryIPPrefixLen(input *define.InspectNetworkSettings, output *handlers.LegacyNetworkSettings) {
++	for index, ip := range input.SecondaryIPAddresses {
++		output.SecondaryIPAddresses[index].PrefixLen = ip.PrefixLength
++	}
++	for index, ip := range input.SecondaryIPv6Addresses {
++		output.SecondaryIPv6Addresses[index].PrefixLen = ip.PrefixLength
++	}
++}
++
+ func LibpodToContainer(l *libpod.Container, sz bool) (*handlers.Container, error) {
+ 	imageID, imageName := l.Image()
+ 
+@@ -348,7 +357,7 @@ func LibpodToContainer(l *libpod.Container, sz bool) (*handlers.Container, error
+ 		return nil, err
+ 	}
+ 
+-	ports := []container.Port{}
++	ports := []container.PortSummary{}
+ 	for portKey, bindings := range inspect.NetworkSettings.Ports {
+ 		portNum, proto, ok := strings.Cut(portKey, "/")
+ 		if !ok {
+@@ -362,7 +371,7 @@ func LibpodToContainer(l *libpod.Container, sz bool) (*handlers.Container, error
+ 
+ 		if len(bindings) == 0 {
+ 			// Exposed but not published
+-			ports = append(ports, container.Port{
++			ports = append(ports, container.PortSummary{
+ 				PrivatePort: uint16(containerPort),
+ 				Type:        proto,
+ 			})
+@@ -372,9 +381,16 @@ func LibpodToContainer(l *libpod.Container, sz bool) (*handlers.Container, error
+ 				if err != nil {
+ 					return nil, fmt.Errorf("invalid HostPort: %v", err)
+ 				}
++				addr := netip.Addr{}
++				if b.HostIP != "" {
++					addr, err = netip.ParseAddr(b.HostIP)
++					if err != nil {
++						return nil, fmt.Errorf("invalid HostIP: %v", err)
++					}
++				}
+ 
+-				ports = append(ports, container.Port{
+-					IP:          b.HostIP,
++				ports = append(ports, container.PortSummary{
++					IP:          addr,
+ 					PrivatePort: uint16(containerPort),
+ 					PublicPort:  uint16(hostPortInt),
+ 					Type:        proto,
+@@ -402,7 +418,7 @@ func LibpodToContainer(l *libpod.Container, sz bool) (*handlers.Container, error
+ 	}
+ 
+ 	return &handlers.Container{
+-		Container: container.Summary{
++		Summary: container.Summary{
+ 			ID:         l.ID(),
+ 			Names:      []string{fmt.Sprintf("/%s", l.Name())},
+ 			Image:      imageName,
+@@ -413,7 +429,7 @@ func LibpodToContainer(l *libpod.Container, sz bool) (*handlers.Container, error
+ 			SizeRw:     sizeRW,
+ 			SizeRootFs: sizeRootFs,
+ 			Labels:     l.Labels(),
+-			State:      stateStr,
++			State:      container.ContainerState(stateStr),
+ 			Status:     status,
+ 			// FIXME: this seems broken, the field is never shown in the API output.
+ 			HostConfig: struct {
+@@ -426,20 +442,11 @@ func LibpodToContainer(l *libpod.Container, sz bool) (*handlers.Container, error
+ 			NetworkSettings: &networkSettings,
+ 			Mounts:          mounts,
+ 		},
+-		ContainerCreateConfig: dockerBackend.ContainerCreateConfig{},
++		ContainerCreateConfig: handlers.ContainerCreateConfig{},
+ 	}, nil
+ }
+ 
+-func convertSecondaryIPPrefixLen(input *define.InspectNetworkSettings, output *container.NetworkSettings) {
+-	for index, ip := range input.SecondaryIPAddresses {
+-		output.SecondaryIPAddresses[index].PrefixLen = ip.PrefixLength
+-	}
+-	for index, ip := range input.SecondaryIPv6Addresses {
+-		output.SecondaryIPv6Addresses[index].PrefixLen = ip.PrefixLength
+-	}
+-}
+-
+-func LibpodToContainerJSON(l *libpod.Container, sz bool) (*container.InspectResponse, error) {
++func LibpodToContainerJSON(l *libpod.Container, sz bool) (*handlers.LegacyImageInspect, error) {
+ 	imageID, imageName := l.Image()
+ 	inspect, err := l.Inspect(sz)
+ 	if err != nil {
+@@ -465,7 +472,7 @@ func LibpodToContainerJSON(l *libpod.Container, sz bool) (*container.InspectResp
+ 	}
+ 
+ 	// map our statuses to Docker's statuses
+-	switch state.Status {
++	switch string(state.Status) {
+ 	case define.ContainerStateConfigured.String(), define.ContainerStateCreated.String():
+ 		state.Status = "created"
+ 	case define.ContainerStateRunning.String(), define.ContainerStateStopping.String():
+@@ -483,7 +490,7 @@ func LibpodToContainerJSON(l *libpod.Container, sz bool) (*container.InspectResp
+ 	if l.HasHealthCheck() && state.Status != "created" {
+ 		state.Health = &container.Health{}
+ 		if inspect.State.Health != nil {
+-			state.Health.Status = inspect.State.Health.Status
++			state.Health.Status = container.HealthStatus(inspect.State.Health.Status)
+ 			state.Health.FailingStreak = inspect.State.Health.FailingStreak
+ 			log := inspect.State.Health.Log
+ 
+@@ -537,29 +544,31 @@ func LibpodToContainerJSON(l *libpod.Container, sz bool) (*container.InspectResp
+ 		Data: inspect.GraphDriver.Data,
+ 	}
+ 
+-	cb := container.ContainerJSONBase{
+-		ID:              l.ID(),
+-		Created:         l.CreatedTime().UTC().Format(time.RFC3339Nano), // Docker uses UTC
+-		Path:            inspect.Path,
+-		Args:            inspect.Args,
+-		State:           &state,
+-		Image:           "sha256:" + imageID,
+-		ResolvConfPath:  inspect.ResolvConfPath,
+-		HostnamePath:    inspect.HostnamePath,
+-		HostsPath:       inspect.HostsPath,
+-		LogPath:         l.LogPath(),
+-		Name:            fmt.Sprintf("/%s", l.Name()),
+-		RestartCount:    int(inspect.RestartCount),
+-		Driver:          inspect.Driver,
+-		Platform:        "linux",
+-		MountLabel:      inspect.MountLabel,
+-		ProcessLabel:    inspect.ProcessLabel,
+-		AppArmorProfile: inspect.AppArmorProfile,
+-		ExecIDs:         inspect.ExecIDs,
+-		HostConfig:      &hc,
+-		GraphDriver:     graphDriver,
+-		SizeRw:          inspect.SizeRw,
+-		SizeRootFs:      &inspect.SizeRootFs,
++	cb := handlers.LegacyImageInspect{
++		InspectResponse: container.InspectResponse{
++			ID:              l.ID(),
++			Created:         l.CreatedTime().UTC().Format(time.RFC3339Nano), // Docker uses UTC
++			Path:            inspect.Path,
++			Args:            inspect.Args,
++			State:           &state,
++			Image:           "sha256:" + imageID,
++			ResolvConfPath:  inspect.ResolvConfPath,
++			HostnamePath:    inspect.HostnamePath,
++			HostsPath:       inspect.HostsPath,
++			LogPath:         l.LogPath(),
++			Name:            fmt.Sprintf("/%s", l.Name()),
++			RestartCount:    int(inspect.RestartCount),
++			Driver:          inspect.Driver,
++			Platform:        "linux",
++			MountLabel:      inspect.MountLabel,
++			ProcessLabel:    inspect.ProcessLabel,
++			AppArmorProfile: inspect.AppArmorProfile,
++			ExecIDs:         inspect.ExecIDs,
++			HostConfig:      &hc,
++			GraphDriver:     &graphDriver,
++			SizeRw:          inspect.SizeRw,
++			SizeRootFs:      &inspect.SizeRootFs,
++		},
+ 	}
+ 
+ 	// set Path and Args
+@@ -583,42 +592,47 @@ func LibpodToContainerJSON(l *libpod.Container, sz bool) (*container.InspectResp
+ 		}
+ 	}
+ 
+-	// Apparently the compiler can't convert a map[string]struct{} into a nat.PortSet
+-	// (Despite a nat.PortSet being that exact struct with some types added)
+-	var exposedPorts nat.PortSet
++	// Convert to moby PortSet.
++	var exposedPorts network.PortSet
+ 	if len(inspect.Config.ExposedPorts) > 0 {
+-		exposedPorts = make(nat.PortSet)
++		exposedPorts = make(network.PortSet, len(inspect.Config.ExposedPorts))
+ 		for p := range inspect.Config.ExposedPorts {
+-			exposedPorts[nat.Port(p)] = struct{}{}
++			mp, err := network.ParsePort(p)
++			if err != nil {
++				return nil, fmt.Errorf("invalid exposed port %q: %w", p, err)
++			}
++			exposedPorts[mp] = struct{}{}
+ 		}
+ 	}
+ 
+-	config := container.Config{
+-		Hostname:        l.Hostname(),
+-		Domainname:      inspect.Config.DomainName,
+-		User:            l.User(),
+-		AttachStdin:     inspect.Config.AttachStdin,
+-		AttachStdout:    inspect.Config.AttachStdout,
+-		AttachStderr:    inspect.Config.AttachStderr,
+-		ExposedPorts:    exposedPorts,
+-		Tty:             inspect.Config.Tty,
+-		OpenStdin:       inspect.Config.OpenStdin,
+-		StdinOnce:       inspect.Config.StdinOnce,
+-		Env:             inspect.Config.Env,
+-		Cmd:             l.Command(),
+-		Healthcheck:     healthcheck,
+-		ArgsEscaped:     false,
+-		Image:           imageName,
+-		Volumes:         nil,
+-		WorkingDir:      l.WorkingDir(),
+-		Entrypoint:      l.Entrypoint(),
+-		NetworkDisabled: false,
+-		MacAddress:      "",
+-		OnBuild:         nil,
+-		Labels:          l.Labels(),
+-		StopSignal:      strconv.Itoa(int(l.StopSignal())),
+-		StopTimeout:     &stopTimeout,
+-		Shell:           nil,
++	config := handlers.ContainerConfig{
++		Config: container.Config{
++			Hostname:        l.Hostname(),
++			Domainname:      inspect.Config.DomainName,
++			User:            l.User(),
++			AttachStdin:     inspect.Config.AttachStdin,
++			AttachStdout:    inspect.Config.AttachStdout,
++			AttachStderr:    inspect.Config.AttachStderr,
++			ExposedPorts:    exposedPorts,
++			Tty:             inspect.Config.Tty,
++			OpenStdin:       inspect.Config.OpenStdin,
++			StdinOnce:       inspect.Config.StdinOnce,
++			Env:             inspect.Config.Env,
++			Cmd:             l.Command(),
++			Healthcheck:     healthcheck,
++			ArgsEscaped:     false,
++			Image:           imageName,
++			Volumes:         nil,
++			WorkingDir:      l.WorkingDir(),
++			Entrypoint:      l.Entrypoint(),
++			NetworkDisabled: false,
++			OnBuild:         nil,
++			Labels:          l.Labels(),
++			StopSignal:      strconv.Itoa(int(l.StopSignal())),
++			StopTimeout:     &stopTimeout,
++			Shell:           nil,
++		},
++		MacAddress: "",
+ 	}
+ 
+ 	m, err := json.Marshal(inspect.Mounts)
+@@ -644,7 +658,7 @@ func LibpodToContainerJSON(l *libpod.Container, sz bool) (*container.InspectResp
+ 		return nil, err
+ 	}
+ 
+-	networkSettings := container.NetworkSettings{}
++	networkSettings := handlers.LegacyNetworkSettings{}
+ 	if err := json.Unmarshal(n, &networkSettings); err != nil {
+ 		return nil, err
+ 	}
+@@ -656,13 +670,10 @@ func LibpodToContainerJSON(l *libpod.Container, sz bool) (*container.InspectResp
+ 		networkSettings.Networks = map[string]*network.EndpointSettings{}
+ 	}
+ 
+-	c := container.InspectResponse{
+-		ContainerJSONBase: &cb,
+-		Mounts:            mounts,
+-		Config:            &config,
+-		NetworkSettings:   &networkSettings,
+-	}
+-	return &c, nil
++	cb.Mounts = mounts
++	cb.Config = &config
++	cb.NetworkSettings = &networkSettings
++	return &cb, nil
+ }
+ 
+ func formatCapabilities(slice []string) {
+diff --git a/pkg/api/handlers/compat/containers_create.go b/pkg/api/handlers/compat/containers_create.go
+index 9ad525b..11fdbd9 100644
+--- a/pkg/api/handlers/compat/containers_create.go
++++ b/pkg/api/handlers/compat/containers_create.go
+@@ -24,7 +24,7 @@ import (
+ 	"github.com/containers/podman/v5/pkg/rootless"
+ 	"github.com/containers/podman/v5/pkg/specgen"
+ 	"github.com/containers/podman/v5/pkg/specgenutil"
+-	"github.com/docker/docker/api/types/mount"
++	"github.com/moby/moby/api/types/mount"
+ 	"go.podman.io/common/libimage"
+ 	"go.podman.io/common/libnetwork/types"
+ 	"go.podman.io/common/pkg/cgroups"
+@@ -220,7 +220,7 @@ func cliOpts(cc handlers.CreateContainerConfig, rtc *config.Config) (*entities.C
+ 	// expose ports
+ 	expose := make([]string, 0, len(cc.Config.ExposedPorts))
+ 	for p := range cc.Config.ExposedPorts {
+-		expose = append(expose, fmt.Sprintf("%s/%s", p.Port(), p.Proto()))
++		expose = append(expose, fmt.Sprintf("%d/%s", p.Num(), p.Proto()))
+ 	}
+ 
+ 	// mounts type=tmpfs/bind,source=...,target=...=,opt=val
+@@ -266,7 +266,7 @@ func cliOpts(cc handlers.CreateContainerConfig, rtc *config.Config) (*entities.C
+ 	// dns
+ 	dns := make([]net.IP, 0, len(cc.HostConfig.DNS))
+ 	for _, d := range cc.HostConfig.DNS {
+-		dns = append(dns, net.ParseIP(d))
++		dns = append(dns, net.IP(d.AsSlice()))
+ 	}
+ 
+ 	// publish
+@@ -280,12 +280,16 @@ func cliOpts(cc handlers.CreateContainerConfig, rtc *config.Config) (*entities.C
+ 			if err != nil {
+ 				return nil, nil, err
+ 			}
++			hostIP := ""
++			if pb.HostIP.IsValid() {
++				hostIP = pb.HostIP.String()
++			}
+ 			tmpPort := types.PortMapping{
+-				HostIP:        pb.HostIP,
+-				ContainerPort: uint16(port.Int()),
++				HostIP:        hostIP,
++				ContainerPort: port.Num(),
+ 				HostPort:      uint16(hostport),
+ 				Range:         0,
+-				Protocol:      port.Proto(),
++				Protocol:      string(port.Proto()),
+ 			}
+ 			specPorts = append(specPorts, tmpPort)
+ 		}
+@@ -330,7 +334,7 @@ func cliOpts(cc handlers.CreateContainerConfig, rtc *config.Config) (*entities.C
+ 	// This field is deprecated since API v1.44 where
+ 	// EndpointSettings.MacAddress is used instead (and has precedence
+ 	// below).  Let's still use it for backwards compat.
+-	containerMacAddress := cc.MacAddress //nolint:staticcheck
++	containerMacAddress := cc.MacAddress
+ 
+ 	// network names
+ 	switch {
+@@ -343,39 +347,27 @@ func cliOpts(cc handlers.CreateContainerConfig, rtc *config.Config) (*entities.C
+ 				netOpts.Aliases = endpoint.Aliases
+ 
+ 				// if IP address is provided
+-				if len(endpoint.IPAddress) > 0 {
+-					staticIP := net.ParseIP(endpoint.IPAddress)
+-					if staticIP == nil {
+-						return nil, nil, fmt.Errorf("failed to parse the ip address %q", endpoint.IPAddress)
+-					}
++				if endpoint.IPAddress.IsValid() {
++					staticIP := net.IP(endpoint.IPAddress.AsSlice())
+ 					netOpts.StaticIPs = append(netOpts.StaticIPs, staticIP)
+ 				}
+ 
+ 				if endpoint.IPAMConfig != nil {
+ 					// if IPAMConfig.IPv4Address is provided
+-					if len(endpoint.IPAMConfig.IPv4Address) > 0 {
+-						staticIP := net.ParseIP(endpoint.IPAMConfig.IPv4Address)
+-						if staticIP == nil {
+-							return nil, nil, fmt.Errorf("failed to parse the ipv4 address %q", endpoint.IPAMConfig.IPv4Address)
+-						}
++					if endpoint.IPAMConfig.IPv4Address.IsValid() {
++						staticIP := net.IP(endpoint.IPAMConfig.IPv4Address.AsSlice())
+ 						netOpts.StaticIPs = append(netOpts.StaticIPs, staticIP)
+ 					}
++
+ 					// if IPAMConfig.IPv6Address is provided
+-					if len(endpoint.IPAMConfig.IPv6Address) > 0 {
+-						staticIP := net.ParseIP(endpoint.IPAMConfig.IPv6Address)
+-						if staticIP == nil {
+-							return nil, nil, fmt.Errorf("failed to parse the ipv6 address %q", endpoint.IPAMConfig.IPv6Address)
+-						}
++					if endpoint.IPAMConfig.IPv6Address.IsValid() {
++						staticIP := net.IP(endpoint.IPAMConfig.IPv6Address.AsSlice())
+ 						netOpts.StaticIPs = append(netOpts.StaticIPs, staticIP)
+ 					}
+ 				}
+ 				// If MAC address is provided
+-				if len(endpoint.MacAddress) > 0 {
+-					staticMac, err := net.ParseMAC(endpoint.MacAddress)
+-					if err != nil {
+-						return nil, nil, fmt.Errorf("failed to parse the mac address %q", endpoint.MacAddress)
+-					}
+-					netOpts.StaticMAC = types.HardwareAddr(staticMac)
++				if len(endpoint.MacAddress) != 0 {
++					netOpts.StaticMAC = types.HardwareAddr(net.HardwareAddr(endpoint.MacAddress))
+ 				} else if len(containerMacAddress) > 0 {
+ 					// docker-compose only sets one mac address for the container on the container config
+ 					// If there are more than one network attached it will end up on the first one,
+diff --git a/pkg/api/handlers/compat/containers_stats_freebsd.go b/pkg/api/handlers/compat/containers_stats_freebsd.go
+index 2dd1b81..62b2ce2 100644
+--- a/pkg/api/handlers/compat/containers_stats_freebsd.go
++++ b/pkg/api/handlers/compat/containers_stats_freebsd.go
+@@ -7,7 +7,7 @@ import (
+ 
+ 	"github.com/containers/podman/v5/libpod"
+ 	"github.com/containers/podman/v5/libpod/define"
+-	"github.com/docker/docker/api/types/container"
++	"github.com/moby/moby/api/types/container"
+ )
+ 
+ func getPreCPUStats(stats *define.ContainerStats) CPUStats {
+diff --git a/pkg/api/handlers/compat/containers_stats_linux.go b/pkg/api/handlers/compat/containers_stats_linux.go
+index 14dbeb2..41bb269 100644
+--- a/pkg/api/handlers/compat/containers_stats_linux.go
++++ b/pkg/api/handlers/compat/containers_stats_linux.go
+@@ -8,7 +8,7 @@ import (
+ 
+ 	"github.com/containers/podman/v5/libpod"
+ 	"github.com/containers/podman/v5/libpod/define"
+-	"github.com/docker/docker/api/types/container"
++	"github.com/moby/moby/api/types/container"
+ 	runccgroups "github.com/opencontainers/cgroups"
+ 	"github.com/sirupsen/logrus"
+ 	"go.podman.io/common/pkg/cgroups"
+diff --git a/pkg/api/handlers/compat/events.go b/pkg/api/handlers/compat/events.go
+index ec6362f..3751776 100644
+--- a/pkg/api/handlers/compat/events.go
++++ b/pkg/api/handlers/compat/events.go
+@@ -9,6 +9,7 @@ import (
+ 	"github.com/containers/podman/v5/libpod"
+ 	"github.com/containers/podman/v5/libpod/events"
+ 	"github.com/containers/podman/v5/pkg/api/handlers/utils"
++	"github.com/containers/podman/v5/pkg/api/handlers/utils/apiutil"
+ 	api "github.com/containers/podman/v5/pkg/api/types"
+ 	"github.com/containers/podman/v5/pkg/domain/entities"
+ 	"github.com/containers/podman/v5/pkg/util"
+@@ -110,6 +111,13 @@ func GetEvents(w http.ResponseWriter, r *http.Request) {
+ 				e.Actor.Attributes["exitCode"] = e.Actor.Attributes["containerExitCode"]
+ 			}
+ 
++			// Remove fields which are not set in 1.52 and newer.
++			if _, err := apiutil.SupportedVersion(r, ">=1.52.0"); err == nil && !apiutil.IsLibpodRequest(r) {
++				e.Status = "" //nolint:staticcheck
++				e.ID = ""     //nolint:staticcheck
++				e.From = ""   //nolint:staticcheck
++			}
++
+ 			if err := coder.Encode(e); err != nil {
+ 				logrus.Errorf("Unable to write json: %q", err)
+ 			}
+diff --git a/pkg/api/handlers/compat/images.go b/pkg/api/handlers/compat/images.go
+index b800714..a5345fb 100644
+--- a/pkg/api/handlers/compat/images.go
++++ b/pkg/api/handlers/compat/images.go
+@@ -21,10 +21,10 @@ import (
+ 	"github.com/containers/podman/v5/pkg/domain/entities"
+ 	"github.com/containers/podman/v5/pkg/domain/infra/abi"
+ 	"github.com/containers/podman/v5/pkg/util"
+-	dockerContainer "github.com/docker/docker/api/types/container"
+-	dockerImage "github.com/docker/docker/api/types/image"
+-	dockerStorage "github.com/docker/docker/api/types/storage"
+ 	dockerSpec "github.com/moby/docker-image-spec/specs-go/v1"
++	dockerContainer "github.com/moby/moby/api/types/container"
++	dockerImage "github.com/moby/moby/api/types/image"
++	dockerStorage "github.com/moby/moby/api/types/storage"
+ 	"github.com/opencontainers/go-digest"
+ 	imageSpec "github.com/opencontainers/image-spec/specs-go/v1"
+ 	"github.com/sirupsen/logrus"
+@@ -319,7 +319,7 @@ func CreateImageFromImage(w http.ResponseWriter, r *http.Request) {
+ 		}
+ 	}
+ 
+-	utils.CompatPull(r.Context(), w, runtime, possiblyNormalizedName, config.PullPolicyAlways, pullOptions)
++	utils.CompatPull(r, w, runtime, possiblyNormalizedName, config.PullPolicyAlways, pullOptions)
+ }
+ 
+ func GetImage(w http.ResponseWriter, r *http.Request) {
+@@ -390,35 +390,38 @@ func imageDataToImageInspect(ctx context.Context, l *libimage.Image, r *http.Req
+ 	cc.Volumes = info.Config.Volumes
+ 
+ 	dockerImageInspect := dockerImage.InspectResponse{
+-		Architecture:  info.Architecture,
+-		Author:        info.Author,
+-		Comment:       info.Comment,
+-		Config:        &config,
+-		Created:       l.Created().Format(time.RFC3339Nano),
+-		DockerVersion: info.Version,
+-		GraphDriver:   graphDriver,
+-		ID:            "sha256:" + l.ID(),
+-		Metadata:      dockerImage.Metadata{},
+-		Os:            info.Os,
+-		OsVersion:     info.Version,
+-		Parent:        info.Parent,
+-		RepoDigests:   info.RepoDigests,
+-		RepoTags:      info.RepoTags,
+-		RootFS:        rootfs,
+-		Size:          info.Size,
+-		Variant:       "",
++		Architecture: info.Architecture,
++		Author:       info.Author,
++		Comment:      info.Comment,
++		Config:       &config,
++		Created:      l.Created().Format(time.RFC3339Nano),
++		GraphDriver:  &graphDriver,
++		ID:           "sha256:" + l.ID(),
++		Metadata:     dockerImage.Metadata{},
++		Os:           info.Os,
++		OsVersion:    info.Version,
++		RepoDigests:  info.RepoDigests,
++		RepoTags:     info.RepoTags,
++		RootFS:       rootfs,
++		Size:         info.Size,
++		Variant:      "",
++	}
++
++	imageInspect := handlers.ImageInspect{
++		InspectResponse: dockerImageInspect,
++		DockerVersion:   info.Version,
++		Parent:          info.Parent,
+ 	}
+ 
+ 	if _, err := apiutil.SupportedVersion(r, "<1.44.0"); err == nil {
+-		//nolint:staticcheck // Deprecated field
+-		dockerImageInspect.VirtualSize = info.VirtualSize
++		imageInspect.VirtualSize = info.VirtualSize
+ 	}
+ 
+ 	if _, err := apiutil.SupportedVersion(r, "<1.45.0"); err == nil {
+-		dockerImageInspect.ContainerConfig = cc //nolint:staticcheck // Deprecated field
++		imageInspect.ContainerConfig = cc
+ 	}
+ 
+-	return &handlers.ImageInspect{InspectResponse: dockerImageInspect}, nil
++	return &imageInspect, nil
+ }
+ 
+ func GetImages(w http.ResponseWriter, r *http.Request) {
+diff --git a/pkg/api/handlers/compat/images_prune.go b/pkg/api/handlers/compat/images_prune.go
+index 282fa1b..3f6468f 100644
+--- a/pkg/api/handlers/compat/images_prune.go
++++ b/pkg/api/handlers/compat/images_prune.go
+@@ -15,7 +15,7 @@ import (
+ 	"github.com/containers/podman/v5/pkg/domain/entities"
+ 	"github.com/containers/podman/v5/pkg/domain/infra/abi"
+ 	"github.com/containers/podman/v5/pkg/util"
+-	dockerImage "github.com/docker/docker/api/types/image"
++	dockerImage "github.com/moby/moby/api/types/image"
+ )
+ 
+ func PruneImages(w http.ResponseWriter, r *http.Request) {
+diff --git a/pkg/api/handlers/compat/images_push.go b/pkg/api/handlers/compat/images_push.go
+index b7ff0dd..1bded45 100644
+--- a/pkg/api/handlers/compat/images_push.go
++++ b/pkg/api/handlers/compat/images_push.go
+@@ -10,12 +10,14 @@ import (
+ 	"strings"
+ 
+ 	"github.com/containers/podman/v5/libpod"
++	handlers "github.com/containers/podman/v5/pkg/api/handlers"
+ 	"github.com/containers/podman/v5/pkg/api/handlers/utils"
++	"github.com/containers/podman/v5/pkg/api/handlers/utils/apiutil"
+ 	api "github.com/containers/podman/v5/pkg/api/types"
+ 	"github.com/containers/podman/v5/pkg/auth"
+ 	"github.com/containers/podman/v5/pkg/domain/entities"
+ 	"github.com/containers/podman/v5/pkg/domain/infra/abi"
+-	"github.com/docker/docker/pkg/jsonmessage"
++	"github.com/moby/moby/api/types/jsonstream"
+ 	"github.com/sirupsen/logrus"
+ 	"go.podman.io/image/v5/types"
+ 	"go.podman.io/storage"
+@@ -130,7 +132,7 @@ func PushImage(w http.ResponseWriter, r *http.Request) {
+ 	referenceWritten := false
+ 	writeReference := func() {
+ 		if !referenceWritten {
+-			var report jsonmessage.JSONMessage
++			var report jsonstream.Message
+ 			report.Status = fmt.Sprintf("The push refers to repository [%s]", imageName)
+ 			if err := enc.Encode(report); err != nil {
+ 				logrus.Warnf("Failed to json encode error %q", err.Error())
+@@ -150,7 +152,7 @@ func PushImage(w http.ResponseWriter, r *http.Request) {
+ 
+ loop: // break out of for/select infinite loop
+ 	for {
+-		var report jsonmessage.JSONMessage
++		var report handlers.LegacyJSONMessage
+ 
+ 		select {
+ 		case e := <-options.Progress:
+@@ -161,12 +163,20 @@ loop: // break out of for/select infinite loop
+ 				report.Status = "Preparing"
+ 			case types.ProgressEventRead:
+ 				report.Status = "Pushing"
+-				report.Progress = &jsonmessage.JSONProgress{
++				report.Progress = &jsonstream.Progress{
+ 					Current: int64(e.Offset),
+ 					Total:   e.Artifact.Size,
+ 				}
+-				//nolint:staticcheck // Deprecated field, but because consumers might still read it keep it.
+-				report.ProgressMessage = report.Progress.String()
++				if _, err := apiutil.SupportedVersion(r, "<1.52.0"); err == nil {
++					b, err := json.Marshal(&jsonstream.Message{
++						Status:   report.Status,
++						Progress: report.Progress,
++						ID:       report.ID,
++					})
++					if err == nil {
++						report.ProgressMessage = string(b)
++					}
++				}
+ 			case types.ProgressEventSkipped:
+ 				report.Status = "Layer already exists"
+ 			case types.ProgressEventDone:
+@@ -188,11 +198,13 @@ loop: // break out of for/select infinite loop
+ 					writeStatusCode(http.StatusInternalServerError)
+ 					msg = err.Error()
+ 				}
+-				report.Error = &jsonmessage.JSONError{
++				report.Error = &jsonstream.Error{
+ 					Message: msg,
+ 				}
+ 				//nolint:staticcheck // Deprecated field, but because consumers might still read it keep it.
+-				report.ErrorMessage = msg
++				if _, err := apiutil.SupportedVersion(r, "<1.52.0"); err == nil {
++					report.ErrorMessage = msg
++				}
+ 				if err := enc.Encode(report); err != nil {
+ 					logrus.Warnf("Failed to json encode error %q", err.Error())
+ 				}
+diff --git a/pkg/api/handlers/compat/info.go b/pkg/api/handlers/compat/info.go
+index cb3fa79..aa51b04 100644
+--- a/pkg/api/handlers/compat/info.go
++++ b/pkg/api/handlers/compat/info.go
+@@ -5,6 +5,7 @@ package compat
+ import (
+ 	"fmt"
+ 	"net/http"
++	"net/netip"
+ 	"os"
+ 	goRuntime "runtime"
+ 	"strings"
+@@ -16,10 +17,10 @@ import (
+ 	"github.com/containers/podman/v5/pkg/api/handlers/utils"
+ 	api "github.com/containers/podman/v5/pkg/api/types"
+ 	"github.com/containers/podman/v5/pkg/rootless"
+-	"github.com/docker/docker/api/types/registry"
+-	"github.com/docker/docker/api/types/swarm"
+-	dockerSystem "github.com/docker/docker/api/types/system"
+ 	"github.com/google/uuid"
++	"github.com/moby/moby/api/types/registry"
++	"github.com/moby/moby/api/types/swarm"
++	dockerSystem "github.com/moby/moby/api/types/system"
+ 	"github.com/opencontainers/selinux/go-selinux"
+ 	log "github.com/sirupsen/logrus"
+ 	"go.podman.io/common/pkg/config"
+@@ -83,7 +84,6 @@ func GetInfo(w http.ResponseWriter, r *http.Request) {
+ 			InitBinary:          "",
+ 			InitCommit:          dockerSystem.Commit{},
+ 			Isolation:           "",
+-			KernelMemoryTCP:     false,
+ 			KernelVersion:       infoData.Host.Kernel,
+ 			Labels:              nil,
+ 			LiveRestoreEnabled:  false,
+@@ -155,11 +155,9 @@ func getServiceConfig(runtime *libpod.Runtime) *registry.ServiceConfig {
+ 	}
+ 
+ 	return &registry.ServiceConfig{
+-		AllowNondistributableArtifactsCIDRs:     make([]*registry.NetIPNet, 0),
+-		AllowNondistributableArtifactsHostnames: make([]string, 0),
+-		InsecureRegistryCIDRs:                   make([]*registry.NetIPNet, 0),
+-		IndexConfigs:                            indexConfs,
+-		Mirrors:                                 make([]string, 0),
++		InsecureRegistryCIDRs: make([]netip.Prefix, 0),
++		IndexConfigs:          indexConfs,
++		Mirrors:               make([]string, 0),
+ 	}
+ }
+ 
+@@ -249,8 +247,13 @@ func getDefaultAddressPools(configInfo *config.Config) []dockerSystem.NetworkAdd
+ 			continue
+ 		}
+ 
++		pfx, err := netip.ParsePrefix(pool.Base.String())
++		if err != nil {
++			continue
++		}
++
+ 		pools = append(pools, dockerSystem.NetworkAddressPool{
+-			Base: pool.Base.String(),
++			Base: pfx,
+ 			Size: pool.Size,
+ 		})
+ 	}
+diff --git a/pkg/api/handlers/compat/networks.go b/pkg/api/handlers/compat/networks.go
+index c835ffd..83d2e59 100644
+--- a/pkg/api/handlers/compat/networks.go
++++ b/pkg/api/handlers/compat/networks.go
+@@ -9,6 +9,7 @@ import (
+ 	"maps"
+ 	"net"
+ 	"net/http"
++	"net/netip"
+ 
+ 	"github.com/containers/podman/v5/libpod"
+ 	"github.com/containers/podman/v5/libpod/define"
+@@ -20,7 +21,7 @@ import (
+ 	nettypes "go.podman.io/common/libnetwork/types"
+ 	netutil "go.podman.io/common/libnetwork/util"
+ 
+-	dockerNetwork "github.com/docker/docker/api/types/network"
++	dockerNetwork "github.com/moby/moby/api/types/network"
+ 	"github.com/sirupsen/logrus"
+ )
+ 
+@@ -64,17 +65,21 @@ func InspectNetwork(w http.ResponseWriter, r *http.Request) {
+ 		utils.InternalServerError(w, err)
+ 		return
+ 	}
+-	report := convertLibpodNetworktoDockerNetwork(runtime, statuses, &net, changed)
++	report, err := convertLibpodNetworktoDockerNetwork(runtime, statuses, &net, changed)
++	if err != nil {
++		utils.InternalServerError(w, err)
++		return
++	}
+ 	utils.WriteResponse(w, http.StatusOK, report)
+ }
+ 
+-func convertLibpodNetworktoDockerNetwork(runtime *libpod.Runtime, statuses []abi.ContainerNetStatus, network *nettypes.Network, changeDefaultName bool) *dockerNetwork.Inspect {
++func convertLibpodNetworktoDockerNetwork(runtime *libpod.Runtime, statuses []abi.ContainerNetStatus, network *nettypes.Network, changeDefaultName bool) (*dockerNetwork.Inspect, error) {
+ 	containerEndpoints := make(map[string]dockerNetwork.EndpointResource, len(statuses))
+ 	for _, st := range statuses {
+ 		if netData, ok := st.Status[network.Name]; ok {
+ 			ipv4Address := ""
+ 			ipv6Address := ""
+-			macAddr := ""
++			macAddr := nettypes.HardwareAddr{}
+ 			for _, dev := range netData.Interfaces {
+ 				for _, subnet := range dev.Subnets {
+ 					// Note the docker API really wants the full CIDR subnet not just a single ip.
+@@ -85,23 +90,46 @@ func convertLibpodNetworktoDockerNetwork(runtime *libpod.Runtime, statuses []abi
+ 						ipv6Address = subnet.IPNet.String()
+ 					}
+ 				}
+-				macAddr = dev.MacAddress.String()
++				macAddr = dev.MacAddress
+ 				break
+ 			}
++			var err error
++			var ipv4_pfx netip.Prefix
++			if ipv4Address != "" {
++				ipv4_pfx, err = netip.ParsePrefix(ipv4Address)
++				if err != nil {
++					return nil, fmt.Errorf("invalid IPv4Address %q: %w", ipv4Address, err)
++				}
++			}
++			var ipv6_pfx netip.Prefix
++			if ipv6Address != "" {
++				ipv6_pfx, err = netip.ParsePrefix(ipv6Address)
++				if err != nil {
++					return nil, fmt.Errorf("invalid IPv6Address %q: %w", ipv6Address, err)
++				}
++			}
+ 			containerEndpoint := dockerNetwork.EndpointResource{
+ 				Name:        st.Name,
+-				MacAddress:  macAddr,
+-				IPv4Address: ipv4Address,
+-				IPv6Address: ipv6Address,
++				MacAddress:  dockerNetwork.HardwareAddr(net.HardwareAddr(macAddr)),
++				IPv4Address: ipv4_pfx,
++				IPv6Address: ipv6_pfx,
+ 			}
+ 			containerEndpoints[st.ID] = containerEndpoint
+ 		}
+ 	}
+ 	ipamConfigs := make([]dockerNetwork.IPAMConfig, 0, len(network.Subnets))
+ 	for _, sub := range network.Subnets {
++		subnet, err := netip.ParsePrefix(sub.Subnet.String())
++		if err != nil {
++			return nil, err
++		}
++		gateway, ok := netip.AddrFromSlice(sub.Gateway)
++		if !ok {
++			return nil, fmt.Errorf("invalid gateway IP %v", sub.Gateway)
++		}
+ 		ipamConfig := dockerNetwork.IPAMConfig{
+-			Subnet:  sub.Subnet.String(),
+-			Gateway: sub.Gateway.String(),
++			Subnet:  subnet,
++			Gateway: gateway,
+ 			// TODO add range
+ 		}
+ 		ipamConfigs = append(ipamConfigs, ipamConfig)
+@@ -128,25 +156,28 @@ func convertLibpodNetworktoDockerNetwork(runtime *libpod.Runtime, statuses []abi
+ 	delete(options, nettypes.IsolateOption)
+ 
+ 	report := dockerNetwork.Inspect{
+-		Name:       name,
+-		ID:         network.ID,
+-		Driver:     network.Driver,
+-		Created:    network.Created,
+-		Internal:   network.Internal,
+-		EnableIPv6: network.IPv6Enabled,
+-		Labels:     network.Labels,
+-		Options:    options,
+-		IPAM:       ipam,
+-		Scope:      "local",
+-		Attachable: false,
+-		Ingress:    false,
+-		ConfigFrom: dockerNetwork.ConfigReference{},
+-		ConfigOnly: false,
++		Network: dockerNetwork.Network{
++			Name:       name,
++			ID:         network.ID,
++			Driver:     network.Driver,
++			Created:    network.Created,
++			Scope:      "local",
++			EnableIPv4: true, // set appropriately for your network (see note below)
++			EnableIPv6: network.IPv6Enabled,
++			IPAM:       ipam,
++			Internal:   network.Internal,
++			Attachable: false,
++			Ingress:    false,
++			ConfigFrom: dockerNetwork.ConfigReference{},
++			ConfigOnly: false,
++			Options:    options,
++			Labels:     network.Labels,
++			Peers:      nil,
++		},
+ 		Containers: containerEndpoints,
+-		Peers:      nil,
+ 		Services:   nil,
+ 	}
+-	return &report
++	return &report, nil
+ }
+ 
+ func ListNetworks(w http.ResponseWriter, r *http.Request) {
+@@ -174,8 +205,14 @@ func ListNetworks(w http.ResponseWriter, r *http.Request) {
+ 	}
+ 	reports := make([]*dockerNetwork.Summary, 0, len(nets))
+ 	for _, net := range nets {
+-		report := convertLibpodNetworktoDockerNetwork(runtime, statuses, &net, true)
+-		reports = append(reports, report)
++		report, err := convertLibpodNetworktoDockerNetwork(runtime, statuses, &net, true)
++		if err != nil {
++			utils.InternalServerError(w, err)
++			return
++		}
++		reports = append(reports, &dockerNetwork.Summary{
++			Network: report.Network,
++		})
+ 	}
+ 	utils.WriteResponse(w, http.StatusOK, reports)
+ }
+@@ -241,25 +278,22 @@ func CreateNetwork(w http.ResponseWriter, r *http.Request) {
+ 	if networkCreate.IPAM != nil && len(networkCreate.IPAM.Config) > 0 {
+ 		for _, conf := range networkCreate.IPAM.Config {
+ 			s := nettypes.Subnet{}
+-			if len(conf.Subnet) > 0 {
+-				var err error
+-				subnet, err := nettypes.ParseCIDR(conf.Subnet)
+-				if err != nil {
+-					utils.InternalServerError(w, fmt.Errorf("failed to parse subnet: %w", err))
+-					return
++			if conf.Subnet.IsValid() {
++				pfx := conf.Subnet.Masked()
++				addr := pfx.Addr()
++
++				s.Subnet = nettypes.IPNet{
++					IPNet: net.IPNet{
++						IP:   net.IP(addr.AsSlice()),
++						Mask: net.CIDRMask(pfx.Bits(), addr.BitLen()),
++					},
+ 				}
+-				s.Subnet = subnet
+ 			}
+-			if len(conf.Gateway) > 0 {
+-				gw := net.ParseIP(conf.Gateway)
+-				if gw == nil {
+-					utils.InternalServerError(w, fmt.Errorf("failed to parse gateway ip %s", conf.Gateway))
+-					return
+-				}
+-				s.Gateway = gw
++			if conf.Gateway.IsValid() {
++				s.Gateway = net.IP(conf.Gateway.AsSlice())
+ 			}
+-			if len(conf.IPRange) > 0 {
+-				_, net, err := net.ParseCIDR(conf.IPRange)
++			if conf.IPRange.IsValid() {
++				_, net, err := net.ParseCIDR(conf.IPRange.String())
+ 				if err != nil {
+ 					utils.InternalServerError(w, fmt.Errorf("failed to parse ip range: %w", err))
+ 					return
+@@ -360,7 +394,7 @@ func RemoveNetwork(w http.ResponseWriter, r *http.Request) {
+ func Connect(w http.ResponseWriter, r *http.Request) {
+ 	runtime := r.Context().Value(api.RuntimeKey).(*libpod.Runtime)
+ 
+-	var netConnect dockerNetwork.ConnectOptions
++	var netConnect dockerNetwork.ConnectRequest
+ 	if err := json.NewDecoder(r.Body).Decode(&netConnect); err != nil {
+ 		utils.Error(w, http.StatusInternalServerError, fmt.Errorf("Decode(): %w", err))
+ 		return
+@@ -375,47 +409,36 @@ func Connect(w http.ResponseWriter, r *http.Request) {
+ 		}
+ 
+ 		// if IP address is provided
+-		if len(netConnect.EndpointConfig.IPAddress) > 0 {
+-			staticIP := net.ParseIP(netConnect.EndpointConfig.IPAddress)
+-			if staticIP == nil {
+-				utils.Error(w, http.StatusInternalServerError,
+-					fmt.Errorf("failed to parse the ip address %q", netConnect.EndpointConfig.IPAddress))
+-				return
+-			}
++		if netConnect.EndpointConfig.IPAddress.IsValid() {
++			staticIP := net.IP(netConnect.EndpointConfig.IPAddress.AsSlice())
+ 			netOpts.StaticIPs = append(netOpts.StaticIPs, staticIP)
+ 		}
+ 
+ 		if netConnect.EndpointConfig.IPAMConfig != nil {
+-			// if IPAMConfig.IPv4Address is provided
+-			if len(netConnect.EndpointConfig.IPAMConfig.IPv4Address) > 0 {
+-				staticIP := net.ParseIP(netConnect.EndpointConfig.IPAMConfig.IPv4Address)
+-				if staticIP == nil {
+-					utils.Error(w, http.StatusInternalServerError,
+-						fmt.Errorf("failed to parse the ipv4 address %q", netConnect.EndpointConfig.IPAMConfig.IPv4Address))
+-					return
+-				}
+-				netOpts.StaticIPs = append(netOpts.StaticIPs, staticIP)
++			ipam := netConnect.EndpointConfig.IPAMConfig
++
++			// IPv4
++			if ipam.IPv4Address.IsValid() {
++				netOpts.StaticIPs = append(
++					netOpts.StaticIPs,
++					net.IP(ipam.IPv4Address.AsSlice()),
++				)
+ 			}
+-			// if IPAMConfig.IPv6Address is provided
+-			if len(netConnect.EndpointConfig.IPAMConfig.IPv6Address) > 0 {
+-				staticIP := net.ParseIP(netConnect.EndpointConfig.IPAMConfig.IPv6Address)
+-				if staticIP == nil {
+-					utils.Error(w, http.StatusInternalServerError,
+-						fmt.Errorf("failed to parse the ipv6 address %q", netConnect.EndpointConfig.IPAMConfig.IPv6Address))
+-					return
+-				}
+-				netOpts.StaticIPs = append(netOpts.StaticIPs, staticIP)
++
++			// IPv6
++			if ipam.IPv6Address.IsValid() {
++				netOpts.StaticIPs = append(
++					netOpts.StaticIPs,
++					net.IP(ipam.IPv6Address.AsSlice()),
++				)
+ 			}
+ 		}
++
+ 		// If MAC address is provided
+-		if len(netConnect.EndpointConfig.MacAddress) > 0 {
+-			staticMac, err := net.ParseMAC(netConnect.EndpointConfig.MacAddress)
+-			if err != nil {
+-				utils.Error(w, http.StatusInternalServerError,
+-					fmt.Errorf("failed to parse the mac address %q", netConnect.EndpointConfig.IPAMConfig.IPv6Address))
+-				return
+-			}
+-			netOpts.StaticMAC = nettypes.HardwareAddr(staticMac)
++		if len(netConnect.EndpointConfig.MacAddress) != 0 {
++			netOpts.StaticMAC = nettypes.HardwareAddr(
++				net.HardwareAddr(netConnect.EndpointConfig.MacAddress),
++			)
+ 		}
+ 	}
+ 	err := runtime.ConnectContainerToNetwork(netConnect.Container, name, netOpts)
+@@ -442,7 +465,7 @@ func Connect(w http.ResponseWriter, r *http.Request) {
+ func Disconnect(w http.ResponseWriter, r *http.Request) {
+ 	runtime := r.Context().Value(api.RuntimeKey).(*libpod.Runtime)
+ 
+-	var netDisconnect dockerNetwork.DisconnectOptions
++	var netDisconnect dockerNetwork.DisconnectRequest
+ 	if err := json.NewDecoder(r.Body).Decode(&netDisconnect); err != nil {
+ 		utils.Error(w, http.StatusInternalServerError, fmt.Errorf("Decode(): %w", err))
+ 		return
+diff --git a/pkg/api/handlers/compat/system.go b/pkg/api/handlers/compat/system.go
+index b839272..755d460 100644
+--- a/pkg/api/handlers/compat/system.go
++++ b/pkg/api/handlers/compat/system.go
+@@ -13,11 +13,11 @@ import (
+ 	api "github.com/containers/podman/v5/pkg/api/types"
+ 	"github.com/containers/podman/v5/pkg/domain/entities"
+ 	"github.com/containers/podman/v5/pkg/domain/infra/abi"
+-	docker "github.com/docker/docker/api/types"
+-	"github.com/docker/docker/api/types/build"
+-	"github.com/docker/docker/api/types/container"
+-	dockerImage "github.com/docker/docker/api/types/image"
+-	"github.com/docker/docker/api/types/volume"
++	"github.com/moby/moby/api/types/build"
++	dockerContainer "github.com/moby/moby/api/types/container"
++	"github.com/moby/moby/api/types/image"
++	dockerSystem "github.com/moby/moby/api/types/system"
++	"github.com/moby/moby/api/types/volume"
+ )
+ 
+ func GetDiskUsage(w http.ResponseWriter, r *http.Request) {
+@@ -30,30 +30,9 @@ func GetDiskUsage(w http.ResponseWriter, r *http.Request) {
+ 		return
+ 	}
+ 
+-	imgs := make([]*dockerImage.Summary, len(df.Images))
+-	for i, o := range df.Images {
+-		t := dockerImage.Summary{
+-			Containers:  int64(o.Containers),
+-			Created:     o.Created.Unix(),
+-			ID:          o.ImageID,
+-			Labels:      map[string]string{},
+-			ParentID:    "",
+-			RepoDigests: nil,
+-			RepoTags:    []string{o.Tag},
+-			SharedSize:  o.SharedSize,
+-			Size:        o.Size,
+-		}
+-
+-		if _, err := apiutil.SupportedVersion(r, "<1.44.0"); err == nil {
+-			t.VirtualSize = o.Size - o.UniqueSize //nolint:staticcheck // Deprecated field
+-		}
+-
+-		imgs[i] = &t
+-	}
+-
+-	ctnrs := make([]*container.Summary, len(df.Containers))
++	ctnrs := make([]dockerContainer.Summary, len(df.Containers))
+ 	for i, o := range df.Containers {
+-		t := container.Summary{
++		t := dockerContainer.Summary{
+ 			ID:         o.ContainerID,
+ 			Names:      []string{o.Names},
+ 			Image:      o.Image,
+@@ -64,7 +43,7 @@ func GetDiskUsage(w http.ResponseWriter, r *http.Request) {
+ 			SizeRw:     o.RWSize,
+ 			SizeRootFs: o.Size,
+ 			Labels:     map[string]string{},
+-			State:      o.Status,
++			State:      dockerContainer.ContainerState(o.Status),
+ 			Status:     o.Status,
+ 			HostConfig: struct {
+ 				NetworkMode string            `json:",omitempty"`
+@@ -73,10 +52,10 @@ func GetDiskUsage(w http.ResponseWriter, r *http.Request) {
+ 			NetworkSettings: nil,
+ 			Mounts:          nil,
+ 		}
+-		ctnrs[i] = &t
++		ctnrs[i] = t
+ 	}
+ 
+-	vols := make([]*volume.Volume, len(df.Volumes))
++	vols := make([]volume.Volume, len(df.Volumes))
+ 	for i, o := range df.Volumes {
+ 		t := volume.Volume{
+ 			CreatedAt:  "",
+@@ -92,17 +71,60 @@ func GetDiskUsage(w http.ResponseWriter, r *http.Request) {
+ 				Size:     o.Size,
+ 			},
+ 		}
+-		vols[i] = &t
++		vols[i] = t
++	}
++
++	imgs_base := make([]image.Summary, len(df.Images))
++	for i, o := range df.Images {
++		imgs_base[i] = image.Summary{
++			Containers:  int64(o.Containers),
++			Created:     o.Created.Unix(),
++			ID:          o.ImageID,
++			Labels:      map[string]string{},
++			ParentID:    "",
++			RepoDigests: nil,
++			RepoTags:    []string{o.Tag},
++			SharedSize:  o.SharedSize,
++			Size:        o.Size,
++		}
++	}
++
++	// Legacy response.
++	if _, err := apiutil.SupportedVersion(r, "<1.52.0"); err == nil {
++		legacy := make([]handlers.LegacyImageSummary, len(imgs_base))
++
++		needVirtual := false
++		if _, err := apiutil.SupportedVersion(r, "<1.44.0"); err == nil {
++			needVirtual = true
++		}
++
++		for i := range imgs_base {
++			legacy[i] = handlers.LegacyImageSummary{Summary: imgs_base[i]}
++			if needVirtual {
++				legacy[i].VirtualSize = df.Images[i].Size - df.Images[i].UniqueSize
++			}
++		}
++
++		utils.WriteResponse(w, http.StatusOK, handlers.LegacyDiskUsage{
++			LayersSize: df.ImagesSize,
++			Images:     legacy,
++			Containers: ctnrs,
++			Volumes:    vols,
++			BuildCache: []build.CacheRecord{},
++		})
++		return
+ 	}
+ 
+-	utils.WriteResponse(w, http.StatusOK, handlers.DiskUsage{DiskUsage: docker.DiskUsage{
+-		// BuilderSize was explicitly omitted since Docker deprecated its in ver 1.42
+-		// and suggests to use BuildCache.
+-		// https://docs.docker.com/reference/api/engine/version-history/#v142-api-changes
+-		LayersSize: df.ImagesSize,
+-		Images:     imgs,
+-		Containers: ctnrs,
+-		Volumes:    vols,
+-		BuildCache: []*build.CacheRecord{},
++	// Non-legacy response.
++	utils.WriteResponse(w, http.StatusOK, handlers.DiskUsage{DiskUsage: dockerSystem.DiskUsage{
++		ImageUsage: &image.DiskUsage{
++			TotalSize: df.ImagesSize,
++			Items:     imgs_base,
++		},
++		ContainerUsage: &dockerContainer.DiskUsage{Items: ctnrs},
++		VolumeUsage:    &volume.DiskUsage{Items: vols},
++		BuildCacheUsage: &build.DiskUsage{
++			Items: nil,
++		},
+ 	}})
+ }
+diff --git a/pkg/api/handlers/compat/types.go b/pkg/api/handlers/compat/types.go
+index 0eae5d6..d3c6809 100644
+--- a/pkg/api/handlers/compat/types.go
++++ b/pkg/api/handlers/compat/types.go
+@@ -5,7 +5,7 @@ package compat
+ import (
+ 	"time"
+ 
+-	"github.com/docker/docker/api/types/container"
++	"github.com/moby/moby/api/types/container"
+ )
+ 
+ // CPUStats aggregates and wraps all CPU related info of container
+diff --git a/pkg/api/handlers/compat/volumes.go b/pkg/api/handlers/compat/volumes.go
+index 46756a4..71dd5cf 100644
+--- a/pkg/api/handlers/compat/volumes.go
++++ b/pkg/api/handlers/compat/volumes.go
+@@ -19,7 +19,8 @@ import (
+ 	"github.com/containers/podman/v5/pkg/domain/filters"
+ 	"github.com/containers/podman/v5/pkg/domain/infra/abi/parse"
+ 	"github.com/containers/podman/v5/pkg/util"
+-	"github.com/docker/docker/api/types/volume"
++	"github.com/moby/moby/api/types/volume"
++	"github.com/moby/moby/client"
+ )
+ 
+ func ListVolumes(w http.ResponseWriter, r *http.Request) {
+@@ -77,8 +78,16 @@ func ListVolumes(w http.ResponseWriter, r *http.Request) {
+ 		}
+ 		volumeConfigs = append(volumeConfigs, &config)
+ 	}
++
++	volVals := make([]volume.Volume, 0, len(vols))
++	for _, v := range volumeConfigs {
++		if v != nil {
++			volVals = append(volVals, *v)
++		}
++	}
++
+ 	response := volume.ListResponse{
+-		Volumes:  volumeConfigs,
++		Volumes:  volVals,
+ 		Warnings: []string{},
+ 	}
+ 	utils.WriteResponse(w, http.StatusOK, response)
+@@ -98,7 +107,7 @@ func CreateVolume(w http.ResponseWriter, r *http.Request) {
+ 		return
+ 	}
+ 	// decode params from body
+-	input := volume.CreateOptions{}
++	input := client.VolumeCreateOptions{}
+ 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+ 		utils.Error(w, http.StatusInternalServerError, fmt.Errorf("Decode(): %w", err))
+ 		return
+diff --git a/pkg/api/handlers/libpod/images.go b/pkg/api/handlers/libpod/images.go
+index 2755883..edb82d8 100644
+--- a/pkg/api/handlers/libpod/images.go
++++ b/pkg/api/handlers/libpod/images.go
+@@ -31,8 +31,8 @@ import (
+ 	"github.com/containers/podman/v5/pkg/errorhandling"
+ 	"github.com/containers/podman/v5/pkg/util"
+ 	utils2 "github.com/containers/podman/v5/utils"
+-	"github.com/docker/docker/pkg/jsonmessage"
+ 	"github.com/gorilla/schema"
++	"github.com/moby/moby/api/types/jsonstream"
+ 	"github.com/sirupsen/logrus"
+ 	"go.podman.io/common/libimage"
+ 	"go.podman.io/common/pkg/ssh"
+@@ -620,7 +620,7 @@ func CommitContainer(w http.ResponseWriter, r *http.Request) {
+ 			flush()
+ 		case <-runCtx.Done():
+ 			if commitErr != nil {
+-				m.Error = &jsonmessage.JSONError{
++				m.Error = &jsonstream.Error{
+ 					Message: commitErr.Error(),
+ 				}
+ 			} else {
+diff --git a/pkg/api/handlers/libpod/images_pull.go b/pkg/api/handlers/libpod/images_pull.go
+index 32471a3..b5b2663 100644
+--- a/pkg/api/handlers/libpod/images_pull.go
++++ b/pkg/api/handlers/libpod/images_pull.go
+@@ -130,7 +130,7 @@ func ImagesPull(w http.ResponseWriter, r *http.Request) {
+ 	}
+ 
+ 	if query.CompatMode {
+-		utils.CompatPull(r.Context(), w, runtime, query.Reference, pullPolicy, pullOptions)
++		utils.CompatPull(r, w, runtime, query.Reference, pullPolicy, pullOptions)
+ 		return
+ 	}
+ 
+diff --git a/pkg/api/handlers/swagger/models.go b/pkg/api/handlers/swagger/models.go
+index 4438b94..a8a0cfc 100644
+--- a/pkg/api/handlers/swagger/models.go
++++ b/pkg/api/handlers/swagger/models.go
+@@ -5,8 +5,8 @@ package swagger
+ 
+ import (
+ 	"github.com/containers/podman/v5/pkg/domain/entities"
+-	"github.com/docker/docker/api/types/container"
+-	"github.com/docker/docker/api/types/network"
++	"github.com/moby/moby/api/types/container"
++	"github.com/moby/moby/api/types/network"
+ )
+ 
+ // Details for creating a volume
+@@ -38,11 +38,11 @@ type networkCreate network.CreateRequest
+ 
+ // Network connect
+ // swagger:model
+-type networkConnectRequest network.ConnectOptions
++type networkConnectRequest network.ConnectRequest
+ 
+ // Network disconnect
+ // swagger:model
+-type networkDisconnectRequest network.DisconnectOptions
++type networkDisconnectRequest network.DisconnectRequest
+ 
+ // Network connect
+ // swagger:model
+diff --git a/pkg/api/handlers/swagger/responses.go b/pkg/api/handlers/swagger/responses.go
+index 7013354..4e162e4 100644
+--- a/pkg/api/handlers/swagger/responses.go
++++ b/pkg/api/handlers/swagger/responses.go
+@@ -9,10 +9,10 @@ import (
+ 	"github.com/containers/podman/v5/pkg/domain/entities"
+ 	"github.com/containers/podman/v5/pkg/domain/entities/reports"
+ 	"github.com/containers/podman/v5/pkg/inspect"
+-	"github.com/docker/docker/api/types/container"
+-	dockerImage "github.com/docker/docker/api/types/image"
+-	"github.com/docker/docker/api/types/network"
+-	"github.com/docker/docker/api/types/volume"
++	"github.com/moby/moby/api/types/container"
++	dockerImage "github.com/moby/moby/api/types/image"
++	"github.com/moby/moby/api/types/network"
++	"github.com/moby/moby/api/types/volume"
+ 	"go.podman.io/common/libnetwork/types"
+ 	"go.podman.io/image/v5/manifest"
+ )
+diff --git a/pkg/api/handlers/types.go b/pkg/api/handlers/types.go
+index 97696b9..b335a0c 100644
+--- a/pkg/api/handlers/types.go
++++ b/pkg/api/handlers/types.go
+@@ -3,14 +3,16 @@ package handlers
+ import (
+ 	"github.com/containers/podman/v5/libpod/define"
+ 	"github.com/containers/podman/v5/pkg/domain/entities"
+-	docker "github.com/docker/docker/api/types"
+-	dockerBackend "github.com/docker/docker/api/types/backend"
+-	dockerContainer "github.com/docker/docker/api/types/container"
+-	dockerImage "github.com/docker/docker/api/types/image"
+-	dockerNetwork "github.com/docker/docker/api/types/network"
+-	"github.com/docker/docker/api/types/registry"
+-	"github.com/docker/docker/api/types/system"
+-	"github.com/docker/docker/api/types/volume"
++	build "github.com/moby/moby/api/types/build"
++	dockerContainer "github.com/moby/moby/api/types/container"
++	dockerImage "github.com/moby/moby/api/types/image"
++	"github.com/moby/moby/api/types/jsonstream"
++	"github.com/moby/moby/api/types/network"
++	"github.com/moby/moby/api/types/registry"
++	swarm "github.com/moby/moby/api/types/swarm"
++	dockerSystem "github.com/moby/moby/api/types/system"
++	"github.com/moby/moby/api/types/volume"
++	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+ 	"github.com/opencontainers/runtime-spec/specs-go"
+ )
+ 
+@@ -24,13 +26,17 @@ type ImageInspect struct {
+ 	// If a field in the outer struct has the same name as a field in the embedded struct,
+ 	// the outer struct's field will shadow or override the embedded one allowing for a clean way to
+ 	// hide fields from the swagger spec that still exist in the libraries struct.
+-	Container       string `json:"-"`
+-	ContainerConfig string `json:"-"`
+-	VirtualSize     string `json:"-"`
++	Container       string                  `json:"Container,omitempty"`
++	ContainerConfig *dockerContainer.Config `json:"ContainerConfig,omitempty"`
++	VirtualSize     int64                   `json:"VirtualSize,omitempty"`
++	Parent          string                  `json:"Parent"`
++	DockerVersion   string                  `json:"DockerVersion"`
++	Author          string                  `json:"Author"`
+ }
+ 
+ type ContainerConfig struct {
+ 	dockerContainer.Config
++	MacAddress string `json:"MacAddress,omitempty"`
+ }
+ 
+ type LibpodImagesPullReport struct {
+@@ -90,7 +96,7 @@ type UpdateEntities struct {
+ }
+ 
+ type Info struct {
+-	system.Info
++	dockerSystem.Info
+ 	BuildahVersion     string
+ 	CPURealtimePeriod  bool
+ 	CPURealtimeRuntime bool
+@@ -101,13 +107,71 @@ type Info struct {
+ 	Uptime             string
+ }
+ 
++// ContainerCreateConfig is the parameter set to ContainerCreate()
++type ContainerCreateConfig struct {
++	Name                        string
++	Config                      *dockerContainer.Config
++	HostConfig                  *dockerContainer.HostConfig
++	NetworkingConfig            *network.NetworkingConfig
++	Platform                    *ocispec.Platform
++	DefaultReadOnlyNonRecursive bool
++}
+ type Container struct {
+-	docker.Container
+-	dockerBackend.ContainerCreateConfig
++	dockerContainer.Summary
++	ContainerCreateConfig
++}
++
++// swagger:model LegacyImageSummary
++type LegacyImageSummary struct {
++	dockerImage.Summary
++	VirtualSize int64 `json:"VirtualSize,omitempty"`
++}
++
++type LegacyDiskUsage struct {
++	// Deprecated: kept to maintain backwards compatibility with API < v1.52, use [ImagesDiskUsage.TotalSize] instead.
++	LayersSize int64 `json:"LayersSize"`
++
++	// Deprecated: kept to maintain backwards compatibility with API < v1.52, use [ImagesDiskUsage.Items] instead.
++	Images []LegacyImageSummary `json:"Images,omitzero"`
++
++	// Deprecated: kept to maintain backwards compatibility with API < v1.52, use [ContainersDiskUsage.Items] instead.
++	Containers []dockerContainer.Summary `json:"Containers,omitzero"`
++
++	// Deprecated: kept to maintain backwards compatibility with API < v1.52, use [VolumesDiskUsage.Items] instead.
++	Volumes []volume.Volume `json:"Volumes,omitzero"`
++
++	// Deprecated: kept to maintain backwards compatibility with API < v1.52, use [BuildCacheDiskUsage.Items] instead.
++	BuildCache []build.CacheRecord `json:"BuildCache,omitzero"`
++}
++
++type LegacyJSONMessage struct {
++	jsonstream.Message
++	// ErrorMessage contains errors encountered during the operation.
++	//
++	// Deprecated: this field is deprecated since docker v0.6.0 / API v1.4. Use [Error.Message] instead.
++	ErrorMessage    string `json:"error,omitempty"` // deprecated
++	ProgressMessage string `json:"progress,omitempty"`
++}
++
++type LegacyAddress struct {
++	Addr      string
++	PrefixLen int
++}
++
++type LegacyNetworkSettings struct {
++	dockerContainer.NetworkSettings
++	SecondaryIPAddresses   []LegacyAddress `json:"SecondaryIPAddresses,omitempty"`
++	SecondaryIPv6Addresses []LegacyAddress `json:"SecondaryIPv6Addresses,omitempty"`
++}
++
++type LegacyImageInspect struct {
++	dockerContainer.InspectResponse
++	NetworkSettings *LegacyNetworkSettings
++	Config          *ContainerConfig
+ }
+ 
+ type DiskUsage struct {
+-	docker.DiskUsage
++	dockerSystem.DiskUsage
+ }
+ 
+ type VolumesPruneReport struct {
+@@ -119,23 +183,19 @@ type ImagesPruneReport struct {
+ }
+ 
+ type BuildCachePruneReport struct {
+-	docker.BuildCachePruneReport
++	build.CachePruneReport
+ }
+ 
+ type NetworkPruneReport struct {
+-	dockerNetwork.PruneReport
++	network.PruneReport
+ }
+ 
+ type ConfigCreateResponse struct {
+-	docker.ConfigCreateResponse
+-}
+-
+-type PushResult struct {
+-	docker.PushResult
++	swarm.ConfigCreateResponse
+ }
+ 
+ type BuildResult struct {
+-	docker.BuildResult
++	build.Result
+ }
+ 
+ type ContainerWaitOKBody struct {
+@@ -148,21 +208,22 @@ type ContainerWaitOKBody struct {
+ // CreateContainerConfig used when compatible endpoint creates a container
+ // swagger:model
+ type CreateContainerConfig struct {
+-	Name                   string                         // container name
+-	dockerContainer.Config                                // desired container configuration
+-	HostConfig             dockerContainer.HostConfig     // host dependent configuration for container
+-	NetworkingConfig       dockerNetwork.NetworkingConfig // network configuration for container
+-	EnvMerge               []string                       // preprocess env variables from image before injecting into containers
+-	UnsetEnv               []string                       // unset specified default environment variables
+-	UnsetEnvAll            bool                           // unset all default environment variables
++	Name                   string                     // container name
++	dockerContainer.Config                            // desired container configuration
++	HostConfig             dockerContainer.HostConfig // host dependent configuration for container
++	NetworkingConfig       network.NetworkingConfig   // network configuration for container
++	EnvMerge               []string                   // preprocess env variables from image before injecting into containers
++	UnsetEnv               []string                   // unset specified default environment variables
++	UnsetEnvAll            bool                       // unset all default environment variables
++	MacAddress             string
+ }
+ 
+ type ContainerTopOKBody struct {
+-	dockerContainer.ContainerTopOKBody
++	dockerContainer.TopResponse
+ }
+ 
+ type PodTopOKBody struct {
+-	dockerContainer.ContainerTopOKBody
++	dockerContainer.TopResponse
+ }
+ 
+ // HistoryResponse provides details on image layers
+@@ -176,7 +237,7 @@ type HistoryResponse struct {
+ }
+ 
+ type ExecCreateConfig struct {
+-	dockerContainer.ExecOptions
++	dockerContainer.ExecCreateRequest
+ }
+ 
+ type ExecStartConfig struct {
+diff --git a/pkg/api/handlers/utils/handler.go b/pkg/api/handlers/utils/handler.go
+index 810710d..85307c0 100644
+--- a/pkg/api/handlers/utils/handler.go
++++ b/pkg/api/handlers/utils/handler.go
+@@ -13,10 +13,10 @@ import (
+ 	"unsafe"
+ 
+ 	"github.com/blang/semver/v4"
+-	"github.com/docker/docker/pkg/jsonmessage"
+ 	"github.com/gorilla/mux"
+ 	"github.com/gorilla/schema"
+ 	jsoniter "github.com/json-iterator/go"
++	"github.com/moby/moby/api/types/jsonstream"
+ 	"github.com/sirupsen/logrus"
+ 	"go.podman.io/image/v5/types"
+ 
+@@ -269,7 +269,7 @@ func (b *ResponseSender) SendBuildStream(message string) {
+ func (b *ResponseSender) SendBuildError(message string) {
+ 	response := images.BuildResponse{
+ 		ErrorMessage: message,
+-		Error: &jsonmessage.JSONError{
++		Error: &jsonstream.Error{
+ 			Message: message,
+ 		},
+ 	}
+diff --git a/pkg/api/handlers/utils/images.go b/pkg/api/handlers/utils/images.go
+index 6f3c96c..eb0c954 100644
+--- a/pkg/api/handlers/utils/images.go
++++ b/pkg/api/handlers/utils/images.go
+@@ -3,17 +3,18 @@
+ package utils
+ 
+ import (
+-	"context"
+ 	"errors"
+ 	"fmt"
+ 	"net/http"
+ 	"strings"
+ 
+ 	"github.com/containers/podman/v5/libpod"
++	"github.com/containers/podman/v5/pkg/api/handlers"
++	"github.com/containers/podman/v5/pkg/api/handlers/utils/apiutil"
+ 	api "github.com/containers/podman/v5/pkg/api/types"
+ 	"github.com/containers/podman/v5/pkg/errorhandling"
+ 	"github.com/docker/distribution/registry/api/errcode"
+-	"github.com/docker/docker/pkg/jsonmessage"
++	"github.com/moby/moby/api/types/jsonstream"
+ 	"github.com/sirupsen/logrus"
+ 	"go.podman.io/common/libimage"
+ 	"go.podman.io/common/pkg/config"
+@@ -124,7 +125,8 @@ type pullResult struct {
+ 	err    error
+ }
+ 
+-func CompatPull(ctx context.Context, w http.ResponseWriter, runtime *libpod.Runtime, reference string, pullPolicy config.PullPolicy, pullOptions *libimage.PullOptions) {
++func CompatPull(r *http.Request, w http.ResponseWriter, runtime *libpod.Runtime, reference string, pullPolicy config.PullPolicy, pullOptions *libimage.PullOptions) {
++	ctx := r.Context()
+ 	progress := make(chan types.ProgressProperties)
+ 	pullOptions.Progress = progress
+ 
+@@ -156,8 +158,8 @@ func CompatPull(ctx context.Context, w http.ResponseWriter, runtime *libpod.Runt
+ 
+ loop: // break out of for/select infinite loop
+ 	for {
+-		report := jsonmessage.JSONMessage{}
+-		report.Progress = &jsonmessage.JSONProgress{}
++		report := handlers.LegacyJSONMessage{}
++		report.Progress = &jsonstream.Progress{}
+ 		select {
+ 		case e := <-progress:
+ 			writeStatusCode(http.StatusOK)
+@@ -169,8 +171,17 @@ loop: // break out of for/select infinite loop
+ 				report.Status = "Downloading"
+ 				report.Progress.Current = int64(e.Offset)
+ 				report.Progress.Total = e.Artifact.Size
+-				//nolint:staticcheck // Deprecated field, but because consumers might still read it keep it.
+-				report.ProgressMessage = report.Progress.String()
++				// Deprecated field, but because consumers might still read it keep it.
++				if _, err := apiutil.SupportedVersion(r, "<1.52.0"); err == nil {
++					b, err := json.Marshal(&jsonstream.Message{
++						Status:   report.Status,
++						Progress: report.Progress,
++						ID:       report.ID,
++					})
++					if err == nil {
++						report.ProgressMessage = string(b)
++					}
++				}
+ 			case types.ProgressEventSkipped:
+ 				report.Status = "Already exists"
+ 			case types.ProgressEventDone:
+@@ -191,11 +202,13 @@ loop: // break out of for/select infinite loop
+ 					writeStatusCode(http.StatusInternalServerError)
+ 				}
+ 				msg := err.Error()
+-				report.Error = &jsonmessage.JSONError{
++				report.Error = &jsonstream.Error{
+ 					Message: msg,
+ 				}
+ 				//nolint:staticcheck // Deprecated field, but because consumers might still read it keep it.
+-				report.ErrorMessage = msg
++				if _, err := apiutil.SupportedVersion(r, "<1.52.0"); err == nil {
++					report.ErrorMessage = msg
++				}
+ 			} else {
+ 				pulledImages := pullRes.images
+ 				if len(pulledImages) > 0 {
+@@ -204,11 +217,13 @@ loop: // break out of for/select infinite loop
+ 					report.ID = img[0:12]
+ 				} else {
+ 					msg := "internal error: no images pulled"
+-					report.Error = &jsonmessage.JSONError{
++					report.Error = &jsonstream.Error{
+ 						Message: msg,
+ 					}
+ 					//nolint:staticcheck // Deprecated field, but because consumers might still read it keep it.
+-					report.ErrorMessage = msg
++					if _, err := apiutil.SupportedVersion(r, "<1.52.0"); err == nil {
++						report.ErrorMessage = msg
++					}
+ 					writeStatusCode(http.StatusInternalServerError)
+ 				}
+ 			}
+@@ -217,7 +232,7 @@ loop: // break out of for/select infinite loop
+ 			// This is necessary for compatibility with the Docker API.
+ 			if err != nil && !progressSent {
+ 				msg := errorhandling.Cause(err).Error()
+-				message := jsonmessage.JSONError{
++				message := jsonstream.Error{
+ 					Message: msg,
+ 				}
+ 				if err := enc.Encode(message); err != nil {
+diff --git a/pkg/auth/auth.go b/pkg/auth/auth.go
+index 87c0424..8c55259 100644
+--- a/pkg/auth/auth.go
++++ b/pkg/auth/auth.go
+@@ -8,7 +8,7 @@ import (
+ 	"os"
+ 	"strings"
+ 
+-	dockerAPITypes "github.com/docker/docker/api/types/registry"
++	dockerAPITypes "github.com/moby/moby/api/types/registry"
+ 	"github.com/sirupsen/logrus"
+ 	imageAuth "go.podman.io/image/v5/pkg/docker/config"
+ 	"go.podman.io/image/v5/types"
+diff --git a/pkg/bindings/images/build.go b/pkg/bindings/images/build.go
+index fe057cc..fd925bc 100644
+--- a/pkg/bindings/images/build.go
++++ b/pkg/bindings/images/build.go
+@@ -26,11 +26,11 @@ import (
+ 	"github.com/containers/podman/v5/pkg/domain/entities/types"
+ 	"github.com/containers/podman/v5/pkg/specgen"
+ 	"github.com/containers/podman/v5/pkg/util"
+-	"github.com/docker/docker/pkg/jsonmessage"
+ 	"github.com/docker/go-units"
+ 	"github.com/hashicorp/go-multierror"
+ 	jsoniter "github.com/json-iterator/go"
+ 	gzip "github.com/klauspost/pgzip"
++	"github.com/moby/moby/api/types/jsonstream"
+ 	"github.com/sirupsen/logrus"
+ 	imageTypes "go.podman.io/image/v5/types"
+ 	"go.podman.io/storage/pkg/archive"
+@@ -47,8 +47,8 @@ type devino struct {
+ var iidRegex = regexp.Delayed(`^[0-9a-f]{12}`)
+ 
+ type BuildResponse struct {
+-	Stream string                 `json:"stream,omitempty"`
+-	Error  *jsonmessage.JSONError `json:"errorDetail,omitempty"`
++	Stream string            `json:"stream,omitempty"`
++	Error  *jsonstream.Error `json:"errorDetail,omitempty"`
+ 	// NOTE: `error` is being deprecated check https://github.com/moby/moby/blob/master/pkg/jsonmessage/jsonmessage.go#L148
+ 	ErrorMessage string          `json:"error,omitempty"` // deprecate this slowly
+ 	Aux          json.RawMessage `json:"aux,omitempty"`
+diff --git a/pkg/domain/entities/events.go b/pkg/domain/entities/events.go
+index d9c7625..a600c23 100644
+--- a/pkg/domain/entities/events.go
++++ b/pkg/domain/entities/events.go
+@@ -6,7 +6,7 @@ import (
+ 
+ 	libpodEvents "github.com/containers/podman/v5/libpod/events"
+ 	types "github.com/containers/podman/v5/pkg/domain/entities/types"
+-	dockerEvents "github.com/docker/docker/api/types/events"
++	dockerEvents "github.com/moby/moby/api/types/events"
+ )
+ 
+ type Event = types.Event
+@@ -78,10 +78,6 @@ func ConvertToEntitiesEvent(e libpodEvents.Event) *types.Event {
+ 		attributes["error"] = e.Error
+ 	}
+ 	message := dockerEvents.Message{
+-		// Compatibility with clients that still look for deprecated API elements
+-		Status: e.Status.String(),
+-		ID:     e.ID,
+-		From:   e.Image,
+ 		Type:   dockerEvents.Type(e.Type.String()),
+ 		Action: dockerEvents.Action(e.Status.String()),
+ 		Actor: dockerEvents.Actor{
+@@ -92,8 +88,12 @@ func ConvertToEntitiesEvent(e libpodEvents.Event) *types.Event {
+ 		Time:     e.Time.Unix(),
+ 		TimeNano: e.Time.UnixNano(),
+ 	}
++
+ 	return &types.Event{
+ 		Message:      message,
+ 		HealthStatus: e.HealthStatus,
++		Status:       e.Status.String(),
++		ID:           e.ID,
++		From:         e.Image,
+ 	}
+ }
+diff --git a/pkg/domain/entities/types/events.go b/pkg/domain/entities/types/events.go
+index a9e9dd6..f85b3f2 100644
+--- a/pkg/domain/entities/types/events.go
++++ b/pkg/domain/entities/types/events.go
+@@ -1,7 +1,7 @@
+ package types
+ 
+ import (
+-	dockerEvents "github.com/docker/docker/api/types/events"
++	dockerEvents "github.com/moby/moby/api/types/events"
+ )
+ 
+ // Event combines various event-related data such as time, event type, status
+@@ -11,4 +11,12 @@ type Event struct {
+ 	// point and fork such Docker types.
+ 	dockerEvents.Message
+ 	HealthStatus string `json:",omitempty"`
++	// Deprecated: use Action instead.
++	// Information from JSONMessage.
++	// With data only in container events.
++	Status string `json:"status,omitempty"`
++	// Deprecated: use Actor.ID instead.
++	ID string `json:"id,omitempty"`
++	// Deprecated: use Actor.Attributes["image"] instead.
++	From string `json:"from,omitempty"`
+ }
+diff --git a/pkg/machine/e2e/api_test.go b/pkg/machine/e2e/api_test.go
+index 6e081d7..dfb5ada 100644
+--- a/pkg/machine/e2e/api_test.go
++++ b/pkg/machine/e2e/api_test.go
+@@ -7,8 +7,8 @@ import (
+ 	"runtime"
+ 
+ 	"github.com/containers/podman/v5/pkg/machine"
+-	"github.com/docker/docker/client"
+ 	jsoniter "github.com/json-iterator/go"
++	"github.com/moby/moby/client"
+ 	. "github.com/onsi/ginkgo/v2"
+ 	. "github.com/onsi/gomega"
+ 	. "github.com/onsi/gomega/gexec"
+@@ -40,9 +40,9 @@ var _ = Describe("run podman API test calls", func() {
+ 		Expect(err).ToNot(HaveOccurred())
+ 		sockPath := inspectInfo[0].ConnectionInfo.PodmanSocket.GetPath()
+ 
+-		cli, err := client.NewClientWithOpts(client.WithHost("unix://" + sockPath))
++		cli, err := client.New(client.WithHost("unix://" + sockPath))
+ 		Expect(err).ToNot(HaveOccurred())
+-		_, err = cli.Ping(context.Background())
++		_, err = cli.Ping(context.Background(), client.PingOptions{})
+ 		Expect(err).ToNot(HaveOccurred())
+ 	})
+ 
+@@ -66,9 +66,9 @@ var _ = Describe("run podman API test calls", func() {
+ 		Expect(err).ToNot(HaveOccurred())
+ 		pipePath := inspectInfo[0].ConnectionInfo.PodmanPipe.GetPath()
+ 
+-		cli, err := client.NewClientWithOpts(client.WithHost(NamedPipeProto + filepath.ToSlash(pipePath)))
++		cli, err := client.New(client.WithHost(NamedPipeProto + filepath.ToSlash(pipePath)))
+ 		Expect(err).ToNot(HaveOccurred())
+-		_, err = cli.Ping(context.Background())
++		_, err = cli.Ping(context.Background(), client.PingOptions{})
+ 		Expect(err).ToNot(HaveOccurred())
+ 	})
+ 
+diff --git a/pkg/specgen/generate/kube/kube.go b/pkg/specgen/generate/kube/kube.go
+index ce6e538..c1d77bd 100644
+--- a/pkg/specgen/generate/kube/kube.go
++++ b/pkg/specgen/generate/kube/kube.go
+@@ -28,7 +28,6 @@ import (
+ 	"github.com/containers/podman/v5/pkg/specgen/generate"
+ 	systemdDefine "github.com/containers/podman/v5/pkg/systemd/define"
+ 	"github.com/containers/podman/v5/pkg/util"
+-	"github.com/docker/docker/pkg/meminfo"
+ 	"github.com/docker/go-units"
+ 	spec "github.com/opencontainers/runtime-spec/specs-go"
+ 	"github.com/sirupsen/logrus"
+@@ -39,6 +38,7 @@ import (
+ 	"go.podman.io/common/pkg/secrets"
+ 	"go.podman.io/image/v5/manifest"
+ 	itypes "go.podman.io/image/v5/types"
++	"go.podman.io/storage/pkg/system"
+ 	"sigs.k8s.io/yaml"
+ 	cdiparser "tags.cncf.io/container-device-interface/pkg/parser"
+ )
+@@ -1274,7 +1274,7 @@ func getContainerResources(container v1.Container) (v1.ResourceRequirements, err
+ 	requests := container.Resources.Requests
+ 
+ 	if limits == nil || limits.Memory().IsZero() {
+-		mi, err := meminfo.Read()
++		mi, err := system.ReadMemInfo()
+ 		if err != nil {
+ 			return result, err
+ 		}
+diff --git a/pkg/specgen/generate/kube/play_test.go b/pkg/specgen/generate/kube/play_test.go
+index 616bcb2..414d8e7 100644
+--- a/pkg/specgen/generate/kube/play_test.go
++++ b/pkg/specgen/generate/kube/play_test.go
+@@ -14,10 +14,10 @@ import (
+ 	v12 "github.com/containers/podman/v5/pkg/k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"github.com/containers/podman/v5/pkg/k8s.io/apimachinery/pkg/util/intstr"
+ 	"github.com/containers/podman/v5/pkg/specgen"
+-	"github.com/docker/docker/pkg/meminfo"
+ 	spec "github.com/opencontainers/runtime-spec/specs-go"
+ 	"github.com/stretchr/testify/assert"
+ 	"go.podman.io/common/pkg/secrets"
++	"go.podman.io/storage/pkg/system"
+ 	"sigs.k8s.io/yaml"
+ )
+ 
+@@ -447,7 +447,7 @@ func TestEnvVarValue(t *testing.T) {
+ 	secretsManager := createSecrets(t, d)
+ 	stringNumCPUs := strconv.Itoa(runtime.NumCPU())
+ 
+-	mi, err := meminfo.Read()
++	mi, err := system.ReadMemInfo()
+ 	assert.NoError(t, err)
+ 	stringMemTotal := strconv.FormatInt(mi.MemTotal, 10)
+ 
+diff --git a/pkg/trust/registries.go b/pkg/trust/registries.go
+index eff5c2f..d706c97 100644
+--- a/pkg/trust/registries.go
++++ b/pkg/trust/registries.go
+@@ -7,9 +7,9 @@ import (
+ 	"path/filepath"
+ 	"strings"
+ 
+-	"github.com/docker/docker/pkg/homedir"
+ 	"go.podman.io/image/v5/types"
+ 	"go.podman.io/storage/pkg/fileutils"
++	"go.podman.io/storage/pkg/homedir"
+ 	"sigs.k8s.io/yaml"
+ )
+ 
+diff --git a/test/apiv2/27-containersEvents.at b/test/apiv2/27-containersEvents.at
+index 1f7ac08..3890d68 100644
+--- a/test/apiv2/27-containersEvents.at
++++ b/test/apiv2/27-containersEvents.at
+@@ -32,6 +32,13 @@ t GET "events?stream=false&since=$START&type=remove"  200  \
+   'select(.status | contains("remove")).Action=remove' \
+   'select(.status | contains("remove")).Actor.Attributes.containerExitCode=1'
+ 
++# compat api does not contain .status for v1.52 and newer
++t GET "/v1.52/events?stream=false&since=$START" 200 \
++  'select(has("status"))|.status='
++
++t GET "/v1.52/events?stream=false&since=$START&type=remove" 200 \
++  'select(has("status"))|.status='
++
+ APIV2_TEST_EXPECT_TIMEOUT=1 t GET "events?stream=true" 999
+ like "$(<$WORKDIR/curl.headers.out)" ".*HTTP.* 200 OK.*" \
+      "Received headers from /events"
+diff --git a/test/apiv2/45-system.at b/test/apiv2/45-system.at
+index acb6420..560c039 100644
+--- a/test/apiv2/45-system.at
++++ b/test/apiv2/45-system.at
+@@ -8,6 +8,7 @@ t POST 'libpod/system/prune?volumes=true&all=true' params='' 200
+ 
+ ## podman system df
+ t GET system/df 200 '{"LayersSize":0,"Images":[],"Containers":[],"Volumes":[],"BuildCache":[]}'
++t GET /v1.52/system/df 200 '{"ImageUsage":{},"ContainerUsage":{},"VolumeUsage":{},"BuildCacheUsage":{}}'
+ t GET libpod/system/df 200 '{"ImagesSize":0,"Images":[],"Containers":[],"Volumes":[]}'
+ 
+ # Create volume. We expect df to report this volume next invocation of system/df
+diff --git a/test/python/docker/compat/test_containers.py b/test/python/docker/compat/test_containers.py
+index 138372f..57cd618 100644
+--- a/test/python/docker/compat/test_containers.py
++++ b/test/python/docker/compat/test_containers.py
+@@ -311,12 +311,12 @@ class TestContainers(common.DockerTestCase):
+ 
+     def test_container_inspect_compatibility(self):
+         """Test container inspect result compatibility with DOCKER_API.
+-        When upgrading module "github.com/docker/docker" this test might fail, if so please correct podman inspect
++        When upgrading module "github.com/moby/moby" this test might fail, if so please correct podman inspect
+         command result to stay compatible with docker.
+         """
+         ctr = self.docker.containers.create(image="alpine", detach=True)
+         try:
+-            spec = yaml.load(open("vendor/github.com/docker/docker/api/swagger.yaml").read(), Loader=yaml.Loader)
++            spec = yaml.load(open("vendor/github.com/moby/moby/api/swagger.yaml").read(), Loader=yaml.Loader)
+             ctr_inspect = json.loads(self.podman.run("inspect", ctr.id).stdout)[0]
+             schema = spec['paths']["/containers/{id}/json"]["get"]['responses'][200]['schema']
+             schema["definitions"] = spec["definitions"]

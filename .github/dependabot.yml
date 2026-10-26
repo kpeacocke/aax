@@ -5,7 +5,27 @@ version: 2
 updates:
   # Docker images in docker-compose files
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/"
+      - "/images/ee-base"
+      - "/images/ee-builder"
+      - "/images/dev-tools"
+      - "/images/gateway"
+      - "/images/awx"
+      - "/images/awx-ui-runtime"
+      - "/images/galaxy-ng"
+      - "/images/pulp"
+      - "/images/eda-controller"
+      - "/images/eda-server"
+      - "/images/awx-ee-runtime"
+      - "/images/dab-security"
+      - "/images/drools-runtime"
+      - "/images/galaxy-runtime"
+      - "/images/hub-security"
+      - "/images/receptor-runtime"
+      - "/images/rpm-security"
+      - "/images/runtime-security"
+      - "/images/ee-base/pip-security"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -26,9 +46,30 @@ updates:
       day: "monday"
       time: "09:00"
     open-pull-requests-limit: 3
+    groups:
+      codeql:
+        patterns:
+          - "github/codeql-action/*"
     labels:
       - "dependencies"
       - "github-actions"
     commit-message:
       prefix: "chore(ci)"
       include: "scope"
+
+  - package-ecosystem: "pip"
+    directories:
+      - "/images/ee-base"
+      - "/images/ee-builder"
+      - "/images/dev-tools"
+      - "/images/dab-security"
+      - "/images/runtime-security"
+      - "/images/ee-base/pip-security"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore(deps)"

@@ -167,6 +167,12 @@ Use Portainer Git repository stack mode with the single compose file.
 - GALAXY_SECRET_KEY=your-galaxy-secret-key
 - PULP_SECRET_KEY=your-pulp-secret-key
 
+To enable EDA, add `eda` to `COMPOSE_PROFILES`, set `EDA_DB_PASSWORD`, and
+configure `EDA_CONTROLLER_URL`, `EDA_WEBSOCKET_BASE_URL`, and
+`EDA_PODMAN_DNS` for your hostname/network. EDA activation services and their
+interactive bootstrap procedure are documented in
+[images/eda-server/README.md](images/eda-server/README.md).
+
 1. Synology reverse proxy hostnames (recommended):
 
 - ALLOWED_HOSTS=awx.example.com,hub.example.com,localhost,127.0.0.1
@@ -231,7 +237,7 @@ Operational notes:
 - Docs index: [docs/INDEX.md](docs/INDEX.md)
 - Controller stack details: [controller/CONTROLLER.md](controller/CONTROLLER.md)
 - Private hub details: [hub/HUB.md](hub/HUB.md)
-- EDA controller: [images/eda-controller/EDA.md](images/eda-controller/EDA.md)
+- EDA controller and activation runtime: [images/eda-server/README.md](images/eda-server/README.md)
 - Kubernetes deployment: [k8s/K8S.md](k8s/K8S.md)
 - HA guidance: [docs/HA-DEPLOYMENT.md](docs/HA-DEPLOYMENT.md)
 - Testing: [tests/TESTS.md](tests/TESTS.md)

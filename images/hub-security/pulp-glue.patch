@@ -1,0 +1,17 @@
+diff --git a/pyproject.toml b/pyproject.toml
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -5,4 +5,4 @@
+ [project]
+ name = "pulp-glue"
+-version = "0.39.5"
++version = "0.39.5+aax.2"
+ description = "Version agnostic glue library to talk to pulpcore's REST API."
+@@ -24,2 +24,2 @@
+-  "multidict>=6.0.5,<6.8",
++  "multidict>=6.9.1,<6.10",
+   "packaging>=22.0,<=26.2",
+@@ -28,2 +28,2 @@
+-  "requests>=2.24.0,<2.34",
++  "requests>=2.34.0,<2.35",
+ ]

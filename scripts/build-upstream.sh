@@ -30,6 +30,10 @@ clone_repo() {
   local dest="$UPSTREAM_DIR/$name"
 
   if [[ -d "$dest/.git" ]]; then
+    if [[ "$ref" =~ ^[0-9a-f]{40}$ && "$(git -C "$dest" rev-parse HEAD)" != "$ref" ]]; then
+      echo "[$name] existing checkout does not match requested commit $ref" >&2
+      exit 1
+    fi
     echo "[$name] already present at $dest"
     return
   fi
@@ -40,7 +44,16 @@ clone_repo() {
   fi
 
   echo "[$name] cloning $repo${branch_to_use:+ (branch: $branch_to_use)}"
-  if [[ -n "$branch_to_use" ]]; then
+  if [[ "$branch_to_use" =~ ^[0-9a-f]{40}$ ]]; then
+    git init "$dest"
+    git -C "$dest" remote add origin "$repo"
+    git -C "$dest" fetch --depth 1 origin "$branch_to_use"
+    git -C "$dest" checkout --detach FETCH_HEAD
+    [[ "$(git -C "$dest" rev-parse HEAD)" == "$branch_to_use" ]] || {
+      echo "[$name] fetched source does not match requested commit" >&2
+      exit 1
+    }
+  elif [[ -n "$branch_to_use" ]]; then
     git clone --depth 1 --branch "$branch_to_use" "$repo" "$dest"
   else
     git clone --depth 1 "$repo" "$dest"

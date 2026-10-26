@@ -13,7 +13,6 @@ To force a fresh stack, set ``AAX_FRESH_STACK=1``.
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import textwrap

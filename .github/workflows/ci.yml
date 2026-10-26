@@ -113,7 +113,7 @@ jobs:
       - name: Run repository policy tests
         run: |
           pip install PyYAML Jinja2 'ansible-core~=2.18.0'
-          pytest -q tests/test_repo_policy.py tests/test_docs_contract.py tests/test_home_automation.py tests/test_mdns_validation.py tests/test_runner_paths.py tests/test_maintenance_precedence.py
+          pytest -q tests/test_repo_policy.py tests/test_docs_contract.py tests/test_bundle_publication.py tests/test_hub_bootstrap.py tests/test_home_automation.py tests/test_mdns_validation.py tests/test_runner_paths.py tests/test_maintenance_precedence.py
 
   test-images:
     name: Test Docker Images
@@ -235,9 +235,8 @@ jobs:
           sbom: sbom-${{ matrix.image }}.spdx.json
           fail-build: true
           severity-cutoff: critical
-          # Debian sometimes classifies inherited findings as critical before a
-          # patched package exists. Keep those visible in Trivy/GitHub Security,
-          # but gate changes on critical findings we can actually remediate.
+          # Keep inherited findings visible. Publication separately gates
+          # fixable HIGH/CRITICAL issues without preventing remediation PRs.
           only-fixed: true
 
       - name: Upload Trivy results to GitHub Security
