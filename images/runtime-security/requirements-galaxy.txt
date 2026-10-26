@@ -1,12 +1,12 @@
 ansible-core==2.21.5
 certifi==2026.10.23
 cryptography==50.0.2
-msgpack==1.2.1
+msgpack==1.2.3
 pillow==13.0.0
 pulp-ansible==0.30.3
 urllib3==2.8.0
 setuptools==84.2.1
 pip==26.2.2
 black==26.10.1
-filelock==4.2.1
+filelock==4.2.4
 GitPython==3.2.1
