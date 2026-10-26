@@ -2,7 +2,7 @@ ARG BASE_IMAGE=galaxy-ng:python-patched
 ARG DAB_IMAGE=aax/dab-security:hub
 # hadolint ignore=DL3006
 FROM ${DAB_IMAGE} AS dab
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.15-slim-bookworm AS builder
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends patch && \
     rm -rf /var/lib/apt/lists/*
