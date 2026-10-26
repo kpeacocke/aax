@@ -96,10 +96,14 @@ their own vendor/release identifiers; installed RPM metadata is not rewritten.
 The system setuptools compatibility package receives a real Unicode exclusion
 backport, including a regression that inspects the resulting source archive.
 
-Native Go tools retain their pinned EL9 source versions and are compiled with Go
+Native Go tools use signed EL9 source RPM recipes and are compiled with Go
 1.27.3 plus pinned `golang-fips` patches, rather than disabling the existing
-strict-FIPS capability. Compiler crypto and strict-mode tests run during the
-build. This does not make AAX a certified FIPS product.
+strict-FIPS capability. Podman source is pinned to upstream 5.8.8 at an exact
+commit and its checked compatibility backport replaces retired Docker
+container-spec APIs with the maintained Moby API, removing the vulnerable
+legacy Docker module from Podman's source and vendor graph. Skopeo remains on
+its signed distribution source. Compiler crypto and strict-mode tests run
+during the build. This does not make AAX a certified FIPS product.
 The git-lfs, Podman and skopeo builds regenerate their vendored dependencies
 using reviewed security pins and module-aware compilation, so embedded dependency
 inventories remain visible to scanners. After applying the pins, the module graph
@@ -112,6 +116,17 @@ Podman's legacy EL9 recipe uses module-relative command targets and its v5 modul
 path for embedded build metadata; the upstream source archive URL is unchanged.
 The setuptools backport is applied with RPM's zero-fuzz patch policy and tested
 against the downstream source, including its existing vendor patches.
+Podman's backport includes the compatibility entry points needed by all
+shipped RPM binaries; a full unprivileged RPM build (`rpmbuild -ba`), normal
+`dnf install`, installed-binary smoke checks and focused Podman tests are
+required before the source layer is accepted. Current Podman and Skopeo source
+scans still report the unfixed legacy `github.com/docker/distribution` v2
+medium advisory and an unknown-severity `x/crypto/openpgp` advisory. The
+available distribution/v3 replacement requires broader Buildah and conformance
+test migration; ProtonMail OpenPGP rejects legacy V3 signatures Podman currently
+accepts. Candidate replacements failed compatibility checks and were not
+shipped. These are not ignored or represented as fixed; a later source/API
+migration must preserve the existing conformance coverage.
 Skopeo uses libtrust's standard Go crypto implementation with the maintained
 Go/FIPS toolchain, rather than the legacy `libtrust_openssl` build tag that calls
 the removed nonstandard `ecdsa.HashSign` API. The recipe overrides the EL9 Go RPM
@@ -141,6 +156,9 @@ build instead of leaving broken dependencies.
 
 Each image/scanner SARIF report has its own analysis identity, so GitHub can
 accept all Trivy and Grype results without duplicate-category upload failures.
+The artifact preserves both the original reports and the upload-ready SARIF.
+Both Trivy vulnerability databases use independent official registry fallbacks
+so an unavailable mirror need not invalidate an otherwise successful build.
 
 Runtime images upgrade only subpackages already installed, verify the resulting
 RPM versions and run the dependency check. The build retains corresponding

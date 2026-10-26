@@ -36,13 +36,39 @@ case "$package" in
         touch /build/rpmbuild/SOURCES/aax-go-vendor.tar.gz
         sed -i '/^Name:/i Source9997: aax-go-vendor.tar.gz\nSource9998: aax-go-dependencies.json\nSource9999: aax-go-vendor.sh\n' "$spec"
         sed -i '/^%build/i bash %{SOURCE9999} %{SOURCE9998} %{SOURCE9997}\n' "$spec"
+        # autosetup's synthetic Git commit is not upstream version provenance.
+        # Disable its pseudo-version; the RPM and tool's own version identify source.
+        # shellcheck disable=SC2016
+        sed -i '/^%build/a export GOFLAGS="${GOFLAGS:-} -buildvcs=false"\nexport GOWORK=off' "$spec"
         sed -i 's/GO111MODULE=off/GO111MODULE=on/g' "$spec"
         ;;
 esac
 if [[ "$package" == podman ]]; then
+    # Retain the signed distribution recipe, replacing Source0 with real upstream
+    # source. The replacement and its exact revision remain in the rebuilt SRPM.
+    version="$(jq -er '.podman.upstream.version' /aax/sources.json)"
+    revision="$(jq -er '.podman.upstream.revision' /aax/sources.json)"
+    upstream_url="$(jq -er '.podman.upstream.url' /aax/sources.json)"
+    upstream_checksum="$(jq -er '.podman.upstream.sha256' /aax/sources.json)"
+    source_name="podman-$version-${revision:0:7}.tar.gz"
+    curl --fail --location --retry 3 --connect-timeout 30 --max-time 1800 \
+        --output "/build/rpmbuild/SOURCES/$source_name" "$upstream_url"
+    echo "$upstream_checksum  /build/rpmbuild/SOURCES/$source_name" | sha256sum --check -
+    sed -i -E "s/^Version:.*/Version: $version/; s/^%global commit0 .*/%global commit0 $revision/" "$spec"
+    cp /aax/podman-runtime-spec.patch /build/rpmbuild/SOURCES/aax-podman-runtime-spec.patch
+    sed -i '/^Name:/i Patch9996: aax-podman-runtime-spec.patch' "$spec"
+    # Backport upstream 56e555bfc213 and 8c4edb612187 to the v5 API.
+    cp /aax/podman-moby-api.patch /build/rpmbuild/SOURCES/aax-podman-moby-api.patch
+    sed -i '/^Name:/i Patch9995: aax-podman-moby-api.patch' "$spec"
+    touch /build/rpmbuild/SOURCES/aax-dnsname-vendor.tar.gz
+    sed -i '/^Name:/i Source9994: aax-dnsname-vendor.tar.gz' "$spec"
+    sed -i '/^%build/i pushd dnsname-%{commit_dnsname}\nbash %{SOURCE9999} %{SOURCE9998} %{SOURCE9994}\npopd\n' "$spec"
     # The EL9 recipe's GOPATH-era import path omits Podman's /v5 module suffix.
     sed -i 's|%{import_path}/cmd/|./cmd/|g' "$spec"
     sed -i 's|%{import_path}/libpod/|%{import_path}/v5/libpod/|g' "$spec"
+    # Go's content-addressed build cache validates source/toolchain inputs for
+    # every shipped target; forcing all dependencies to rebuild defeats it.
+    sed -i 's/ -a -v / -v /g' "$spec"
 fi
 if [[ "$package" == skopeo ]]; then
     # Modern Go/FIPS uses standard crypto APIs, not the removed ecdsa.HashSign API.
@@ -52,7 +78,7 @@ if [[ "$package" == skopeo ]]; then
         exit 1
     }
     macro="${macro//\\/\\\\}"
-    temporary="$(mktemp)"
+    temporary="${spec}.aax"
     {
         printf '%%define gobuild(o:) \\\n%s\n\n' "${macro// libtrust_openssl/}"
         sed 's/ libtrust_openssl//g' "$spec"

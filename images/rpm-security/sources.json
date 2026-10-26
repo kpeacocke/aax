@@ -12,7 +12,7 @@
   "git-lfs": {
     "url": "https://mirror.stream.centos.org/9-stream/AppStream/source/tree/Packages/git-lfs-3.7.1-7.el9.src.rpm",
     "sha256": "d33f3c17be662970c8ccf6d2dc5a4f45af3d847686cc33851a832face5294a6d",
-    "release": "8.el9.aax.1"
+    "release": "8.el9.aax.2"
   },
   "gnupg2": {
     "url": "https://vault.almalinux.org/9.8/BaseOS/Source/Packages/gnupg2-2.3.3-5.el9_7.src.rpm",
@@ -77,7 +77,13 @@
   "podman": {
     "url": "https://mirror.stream.centos.org/9-stream/AppStream/source/tree/Packages/podman-5.8.5-2.el9.src.rpm",
     "sha256": "981409091c6d1ffd9d570191ede0ff6cee394a1bd538d1d2f01afac37ba55c7f",
-    "release": "3.el9.aax.1"
+    "release": "3.el9.aax.2",
+    "upstream": {
+      "version": "5.8.8",
+      "revision": "ee099ca84b6c99376cefa765c84bf2082628e336",
+      "url": "https://codeload.github.com/containers/podman/tar.gz/ee099ca84b6c99376cefa765c84bf2082628e336",
+      "sha256": "1008f3421bd45786430c11826d00bf579f52aefe8d072d5ac6a6d6ebcb42abaf"
+    }
   },
   "python3.12": {
     "url": "https://vault.almalinux.org/9.8/AppStream/Source/Packages/python3.12-3.12.15-1.el9_8.src.rpm",
@@ -97,7 +103,7 @@
   "skopeo": {
     "url": "https://vault.almalinux.org/9.8/AppStream/Source/Packages/skopeo-1.22.2-8.el9_8.src.rpm",
     "sha256": "f8693b717156da7cca7b486cc21a587cf0c87cd9636bb079344ed55990bc3222",
-    "release": "9.el9.aax.1"
+    "release": "9.el9.aax.2"
   },
   "sqlite": {
     "url": "https://vault.almalinux.org/9.8/BaseOS/Source/Packages/sqlite-3.34.1-11.el9_8.src.rpm",

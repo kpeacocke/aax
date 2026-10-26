@@ -1,0 +1,86 @@
+diff --git a/pkg/specgen/resources_linux.go b/pkg/specgen/resources_linux.go
+--- a/pkg/specgen/resources_linux.go
++++ b/pkg/specgen/resources_linux.go
+@@ -14,7 +14,7 @@
+ 					s.ResourceLimits = &spec.LinuxResources{}
+ 				}
+ 				s.ResourceLimits.Pids = &spec.LinuxPids{
+-					Limit: limit,
++					Limit: &limit,
+ 				}
+ 			}
+ 		}
+diff --git a/pkg/specgen/generate/validate_linux.go b/pkg/specgen/generate/validate_linux.go
+--- a/pkg/specgen/generate/validate_linux.go
++++ b/pkg/specgen/generate/validate_linux.go
+@@ -83,7 +83,7 @@
+ 	if s.ResourceLimits.Pids != nil {
+ 		// TODO: Should this be 0, or checking that ResourceLimits.Pids
+ 		// is set at all?
+-		if s.ResourceLimits.Pids.Limit >= 0 && !sysInfo.PidsLimit {
++		if s.ResourceLimits.Pids.Limit != nil && *s.ResourceLimits.Pids.Limit >= 0 && !sysInfo.PidsLimit {
+ 			warnings = append(warnings, "Your kernel does not support pids limit capabilities or the cgroup is not mounted. PIDs limit discarded.")
+ 			s.ResourceLimits.Pids = nil
+ 		}
+diff --git a/pkg/specgen/generate/kube/kube.go b/pkg/specgen/generate/kube/kube.go
+--- a/pkg/specgen/generate/kube/kube.go
++++ b/pkg/specgen/generate/kube/kube.go
+@@ -405,7 +405,7 @@
+ 			s.ResourceLimits = &spec.LinuxResources{}
+ 		}
+ 		s.ResourceLimits.Pids = &spec.LinuxPids{
+-			Limit: pidslimitAsInt,
++			Limit: &pidslimitAsInt,
+ 		}
+ 	}
+ 
+diff --git a/pkg/specgenutil/specgen.go b/pkg/specgenutil/specgen.go
+--- a/pkg/specgenutil/specgen.go
++++ b/pkg/specgenutil/specgen.go
+@@ -1295,7 +1295,7 @@
+ 	}
+ 	if c.PIDsLimit != nil {
+ 		pids := specs.LinuxPids{
+-			Limit: *c.PIDsLimit,
++			Limit: c.PIDsLimit,
+ 		}
+ 
+ 		s.ResourceLimits.Pids = &pids
+diff --git a/pkg/api/handlers/compat/containers.go b/pkg/api/handlers/compat/containers.go
+--- a/pkg/api/handlers/compat/containers.go
++++ b/pkg/api/handlers/compat/containers.go
+@@ -802,7 +802,7 @@
+ 		if resources.Pids == nil {
+ 			resources.Pids = new(spec.LinuxPids)
+ 		}
+-		resources.Pids.Limit = *options.PidsLimit
++		resources.Pids.Limit = options.PidsLimit
+ 	}
+ 
+ 	// Blkio Weight
+diff --git a/libpod/oci_conmon_linux.go b/libpod/oci_conmon_linux.go
+--- a/libpod/oci_conmon_linux.go
++++ b/libpod/oci_conmon_linux.go
+@@ -375,7 +375,7 @@
+ 
+ 	// Pids
+ 	if resource.Pids != nil {
+-		final.PidsLimit = &resource.Pids.Limit
++		final.PidsLimit = resource.Pids.Limit
+ 	}
+ 
+ 	// Networking
+diff --git a/libpod/container_inspect_linux.go b/libpod/container_inspect_linux.go
+--- a/libpod/container_inspect_linux.go
++++ b/libpod/container_inspect_linux.go
+@@ -70,8 +70,8 @@
+ 					hostConfig.OomKillDisable = *ctrSpec.Linux.Resources.Memory.DisableOOMKiller
+ 				}
+ 			}
+-			if ctrSpec.Linux.Resources.Pids != nil {
+-				hostConfig.PidsLimit = ctrSpec.Linux.Resources.Pids.Limit
++			if ctrSpec.Linux.Resources.Pids != nil && ctrSpec.Linux.Resources.Pids.Limit != nil {
++				hostConfig.PidsLimit = *ctrSpec.Linux.Resources.Pids.Limit
+ 			}
+ 			hostConfig.CgroupConf = ctrSpec.Linux.Resources.Unified
+ 			if ctrSpec.Linux.Resources.BlockIO != nil {

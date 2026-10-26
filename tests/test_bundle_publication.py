@@ -449,9 +449,25 @@ def test_runtime_security_updates_precede_exact_image_scans(tmp_path: Path) -> N
     )
 
 
-def test_java_database_has_independent_public_registry_fallback() -> None:
+@pytest.mark.parametrize(
+    "database", ["TRIVY_DB_REPOSITORY", "TRIVY_JAVA_DB_REPOSITORY"]
+)
+def test_scanner_databases_have_independent_public_registry_fallback(database: str) -> None:
     scan = next(step for step in STEPS if step.get("name") == "Scan exact bundle images")
-    assert "public.ecr.aws/aquasecurity/trivy-java-db:1" in scan["env"]["TRIVY_JAVA_DB_REPOSITORY"]
+    artifact = "trivy-java-db:1" if database == "TRIVY_JAVA_DB_REPOSITORY" else "trivy-db:2"
+    assert scan["env"][database].split(",") == [
+        f"mirror.gcr.io/aquasec/{artifact}",
+        f"ghcr.io/aquasecurity/{artifact}",
+        f"public.ecr.aws/aquasecurity/{artifact}",
+    ]
+
+
+def test_normalized_sarif_is_preserved_with_original_reports() -> None:
+    preserve = next(
+        step for step in STEPS if step.get("name") == "Preserve bundle provenance and security reports"
+    )
+    assert preserve["if"] == "always()"
+    assert preserve["with"]["path"].splitlines() == ["bundle-reports/", "bundle-sarif/"]
 
 
 @pytest.mark.parametrize(

@@ -26,7 +26,7 @@ RUN dnf -y --enablerepo=crb install go-rpm-macros python3.12-rpm-macros && dnf c
 FROM builder-base AS builder
 ARG PACKAGE=libevent
 COPY sources.json prepare.sh setuptools-unicode.patch setuptools_regression.py \
-     go-vendor.sh go-dependencies.json /aax/
+     go-vendor.sh go-dependencies.json podman-runtime-spec.patch podman-moby-api.patch /aax/
 RUN bash /aax/prepare.sh "${PACKAGE}"
 # Build-only cache retains verified dependencies across source-patch retries.
 RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked \
