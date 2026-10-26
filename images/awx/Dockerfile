@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:18-bookworm AS node-builder
+FROM node:26-bookworm AS node-builder
 
 ARG UI_DEVEL_REVISION=b512f07205f2be38d29dc245e955e66e64248ae3
 

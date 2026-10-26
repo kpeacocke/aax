@@ -54,7 +54,15 @@ must be advanced deliberately as a separate deployment target.
   or `.env.example`.
 - Keep CI/release workflows aligned with these defaults.
 - Run policy and docs contract tests after any version change.
-- Dependabot checks Python manifests and image build directories weekly.
+- Dependabot checks Python manifests, including the development container,
+  and image build directories weekly. Python patch/minor updates are grouped.
+- Build-only toolchains use Node 26 for AWX UI, Maven/JDK 26 for Drools
+  (Java 17 bytecode), and Python 3.15 for patched pip, DAB and Hub wheel builders.
+  These do not change the deployed application Python/JVM requirements.
+  DAB's builder includes zlib headers for its source-built lxml dependency.
+- DAB test dependencies retain `openapi-spec-validator` 0.8.1: version 0.9.0
+  requires `referencing>=0.37.0`, conflicting with the pinned DAB source's
+  `referencing<0.37.0` constraint.
 - Main-channel images are rebuilt weekly with fresh bases and package installs.
   Both architectures of each candidate digest must pass the fixable HIGH/CRITICAL
   vulnerability gate before `latest`/`main` tags are promoted. The execution-image

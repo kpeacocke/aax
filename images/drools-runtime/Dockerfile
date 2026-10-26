@@ -1,5 +1,5 @@
 ARG BASE_IMAGE=ansible-rulebook:devel
-FROM maven:3.9.11-eclipse-temurin-17 AS builder
+FROM maven:3.9-eclipse-temurin-26 AS builder
 WORKDIR /source
 ARG DROOLS_REVISION=541a88af7e06949dcd574718b593d9dd5681e8ae
 RUN git init && git remote add origin https://github.com/kiegroup/drools-ansible-rulebook-integration.git && \

@@ -282,7 +282,8 @@ jobs:
           trap cleanup EXIT
           docker network create "$network"
           docker volume create "$volume"
-          docker save eda-decision-environment:devel -o "$archive"
+          docker tag eda-decision-environment:devel localhost/eda-decision-environment:devel
+          docker save localhost/eda-decision-environment:devel -o "$archive"
           docker run -d --name aax-eda-podman-test --privileged \
             --network "$network" --dns 1.1.1.1 \
             -v "$volume:/var/lib/containers/storage" \
@@ -307,7 +308,7 @@ jobs:
             quay.io/ansible/ansible-rulebook@sha256:68bb8aae9ad8be20863a6d42a97cea8a4865d393e1ed63f29259162e5e6108dd
           docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
             --remote --url tcp://aax-eda-podman-test:8888 run --rm \
-            aax-eda-decision-environment:devel python3.12 -c \
+            localhost/eda-decision-environment:devel python3.12 -c \
             "import urllib.request; assert urllib.request.urlopen('https://api.github.com', timeout=20).status == 200"
 
       - name: Record exact build sources
@@ -332,7 +333,7 @@ jobs:
             images/dab-security images/rpm-security bundle-reports/
 
       - name: Install bundle scanner
-        uses: aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514 # v0.2.6
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
         with:
           version: v0.70.0
 
@@ -393,7 +394,7 @@ jobs:
 
       - name: Upload bundle security findings
         if: always() && hashFiles('bundle-sarif/*.sarif') != ''
-        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: bundle-sarif
 

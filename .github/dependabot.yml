@@ -59,6 +59,7 @@ updates:
 
   - package-ecosystem: "pip"
     directories:
+      - "/.devcontainer"
       - "/images/ee-base"
       - "/images/ee-builder"
       - "/images/dev-tools"
@@ -69,6 +70,18 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
+    groups:
+      python-patch-and-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # DAB's pinned referencing<0.37.0 conflicts with this release.
+      - dependency-name: "openapi-spec-validator"
+        versions:
+          - "0.9.0"
     labels:
       - "dependencies"
     commit-message:
