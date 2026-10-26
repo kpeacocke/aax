@@ -74,6 +74,8 @@ updates:
       python-patch-and-minor:
         patterns:
           - "*"
+        exclude-patterns:
+          - "ansible-core"
         update-types:
           - "minor"
           - "patch"
@@ -81,7 +83,7 @@ updates:
       # DAB's pinned referencing<0.37.0 conflicts with this release.
       - dependency-name: "openapi-spec-validator"
         versions:
-          - "0.9.0"
+          - ">=0.8.5"
     labels:
       - "dependencies"
     commit-message:
