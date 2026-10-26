@@ -215,9 +215,9 @@ def test_devel_overlay_supports_registry_tagged_images() -> None:
 def test_devel_publish_workflow_publishes_immutable_bundle() -> None:
     """The devel workflow must publish every image needed by the overlay."""
     workflow = _read(".github/workflows/publish-devel.yml")
+    assert re.search(r"uses: docker/login-action@[0-9a-f]{40}(?:\s|$)", workflow)
     required = [
         "packages: write",
-        "docker/login-action@dbcb813823bdd20940b903addbd779551569679f",
         "devel-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}",
         "SETUPTOOLS_SCM_PRETEND_VERSION=",
         "Record exact build sources",
