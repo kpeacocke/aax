@@ -8,7 +8,7 @@ cryptography==50.0.2
 dynaconf==3.3.5
 jaraco.context==6.1.2
 msgpack==1.2.3
-protobuf==6.33.5
+protobuf==6.33.6
 pyOpenSSL==26.4.0
 pyasn1==0.6.4
 urllib3==2.8.0

@@ -1,4 +1,4 @@
-Django==5.2.17
+Django==5.2.18
 PyJWT==2.15.1
 Twisted==26.10.0rc1
 ansible-core==2.21.5
