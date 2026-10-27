@@ -167,7 +167,10 @@ RPM versions and run the dependency check. The build retains corresponding
 source RPMs and build logs alongside its recipes. If vendor updates overtake
 the pinned AAX packages, publication stops instead of downgrading; maintainers
 must review and refresh `images/rpm-security/sources.json`, rebuild, rescan and
-repeat compatibility validation. This source maintenance is deliberately more
+repeat compatibility validation. Skopeo uses the signed EL9 release
+`1.22.2-9.el9_8` recipe, rebuilt as `1.22.2-10.el9.aax.3`, so it upgrades the
+distribution's `1.22.2-9.el9_8` without forcing a downgrade.
+This source maintenance is deliberately more
 expensive than ordinary package updates.
 
 Dependabot covers the downstream Docker directories and standard
