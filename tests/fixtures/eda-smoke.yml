@@ -1,0 +1,12 @@
+---
+- name: Security-patched decision runtime
+  hosts: all
+  sources:
+    - ansible.eda.range:
+        limit: 1
+  rules:
+    - name: Prove Python Java integration
+      condition: event.i == 0
+      action:
+        debug:
+          msg: AAX_DECISION_SECURITY_SMOKE_PASSED

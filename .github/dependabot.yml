@@ -83,7 +83,15 @@ updates:
       # DAB's pinned referencing<0.37.0 conflicts with this release.
       - dependency-name: "openapi-spec-validator"
         versions:
-          - ">=0.8.5"
+          - ">=0.8.4"
+      # Pinned EDA requires Django<5.3; its DAB dependency also requires <6.
+      - dependency-name: "django"
+        update-types:
+          - "version-update:semver-major"
+      # AWX's googleapis-common-protos and opentelemetry-proto require <7.
+      - dependency-name: "protobuf"
+        versions:
+          - ">=7"
     labels:
       - "dependencies"
     commit-message:

@@ -59,6 +59,11 @@ AWX tokens in Compose, `.env.example`, or Git.
    this account broader AWX permissions.
 4. Register the published decision environment
    `ghcr.io/kpeacocke/aax-eda-decision-environment:<immutable-bundle-tag>`.
+   Publication patches its application-user Python environment and replaces its
+   bundled Drools JAR with the maintained Jackson-patched build. Unused desktop
+   indexer/JavaScript-engine RPMs and pip build caches are removed. The final
+   patched image, not just its pinned upstream base, must pass the bundle scans
+   and nested Podman execution test before deployment.
    This image is based on the digest-pinned upstream ansible-rulebook image,
    includes Python 3.12 and `ansible.eda` 2.13.0, and is intentionally generic.
    The RustberryPi/Hailo event-source collection is deferred until that project

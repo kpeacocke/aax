@@ -213,7 +213,7 @@ jobs:
         run: pip install pytest pytest-cov PyYAML
 
       - name: Run repository policy and docs contract tests
-        run: pytest -q tests/test_repo_policy.py tests/test_docs_contract.py tests/test_bundle_publication.py tests/test_hub_bootstrap.py
+        run: pytest -q tests/test_repo_policy.py tests/test_docs_contract.py tests/test_bundle_publication.py tests/test_hub_bootstrap.py tests/test_eda_image_contracts.py
 
   release-please:
     name: Create Release
@@ -347,7 +347,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-${{ matrix.image }}@${{ steps.build-push.outputs.digest }}
 
       - name: Generate SBOM
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-${{ matrix.image }}:${{ needs.release-please.outputs.version }}
           format: spdx-json

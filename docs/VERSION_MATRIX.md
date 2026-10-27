@@ -66,11 +66,18 @@ must be advanced deliberately as a separate deployment target.
   (Java 17 bytecode), and Python 3.15 for patched pip, DAB and Hub wheel builders.
   These do not change the deployed application Python/JVM requirements.
   DAB's builder includes zlib headers for its source-built lxml dependency.
-- DAB test dependencies retain `openapi-spec-validator` 0.8.1: versions 0.8.5 and 0.9.0
-  requires `referencing>=0.37.0`, conflicting with the pinned DAB source's
+- DAB test dependencies retain `openapi-spec-validator` 0.8.1: versions 0.8.4, 0.8.5
+  and 0.9.0 require `referencing>=0.37.0`, conflicting with the pinned DAB source's
   `referencing<0.37.0` constraint.
   Newer validator releases remain deferred until the pinned DAB source accepts
   the newer dependency range.
+- EDA retains Django 5.2 because its pinned source requires `>=5.2,<5.3`
+  and DAB requires `<6`. AWX retains protobuf 6 because its Google API and
+  OpenTelemetry dependencies require `<7`. These incompatible major updates
+  are deferred until the upstream integrations can migrate together.
+- The EDA decision environment receives user-site Python and patched Drools/Jackson
+  updates, removes unused desktop RPMs and pip build caches, and executes a
+  range/debug rule inside nested Podman before publication.
 - Main-channel images are rebuilt weekly with fresh bases and package installs.
   Both architectures of each candidate digest must pass the fixable HIGH/CRITICAL
   vulnerability gate before `latest`/`main` tags are promoted. The execution-image

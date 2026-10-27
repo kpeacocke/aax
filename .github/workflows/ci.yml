@@ -113,7 +113,7 @@ jobs:
       - name: Run repository policy tests
         run: |
           pip install PyYAML Jinja2 'ansible-core~=2.18.0'
-          pytest -q tests/test_repo_policy.py tests/test_docs_contract.py tests/test_bundle_publication.py tests/test_hub_bootstrap.py tests/test_home_automation.py tests/test_mdns_validation.py tests/test_runner_paths.py tests/test_maintenance_precedence.py
+          pytest -q tests/test_repo_policy.py tests/test_docs_contract.py tests/test_bundle_publication.py tests/test_hub_bootstrap.py tests/test_eda_image_contracts.py tests/test_home_automation.py tests/test_mdns_validation.py tests/test_runner_paths.py tests/test_maintenance_precedence.py
 
   test-images:
     name: Test Docker Images
@@ -223,7 +223,7 @@ jobs:
           vuln-type: "os,library"
 
       - name: Generate SBOM with Syft
-        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: aax/${{ matrix.image }}:1.0.0
           format: spdx-json
