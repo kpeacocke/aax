@@ -12,35 +12,22 @@ on:
         required: false
         default: ''
       publish_latest_devel:
-        description: Also move the mutable devel tag
+        description: Also move the mutable devel tag (main only)
         required: true
         type: boolean
         default: true
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - .github/workflows/publish-devel.yml
       - docker-compose.devel.yml
       - docker-compose.yml
       - .env.example
-      - images/gateway/**
-      - images/eda-server/**
-      - images/eda-podman/**
-      - images/eda-decision-environment/**
-      - images/awx-ui-runtime/**
-      - images/galaxy-runtime/**
-      - images/runtime-security/**
-      - images/receptor-runtime/**
-      - images/awx-ee-runtime/**
-      - images/ee-base/pip-security/**
-      - images/hub-security/**
-      - images/drools-runtime/**
-      - images/dab-security/**
-      - images/rpm-security/**
+      - images/**
       - scripts/build-rpm-security.sh
       - scripts/build-upstream.sh
       - scripts/check-vulnerability-reports.sh
+      - scripts/*bundle*.sh
   schedule:
     - cron: "17 3 * * *"
 
@@ -59,28 +46,14 @@ env:
   IMAGE_TAG: devel-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
-  build-and-publish:
+  resolve-sources:
     runs-on: ubuntu-24.04
-    timeout-minutes: 360
+    timeout-minutes: 30
     steps:
       - name: Check out AAX
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-
-      - name: Log in to GHCR
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install upstream build tools
-        run: |
-          python3 -m pip install --disable-pip-version-check \
-            ansible-core ansible-builder build
-
+          persist-credentials: false
       - name: Check out upstream sources
         env:
           AWX_BRANCH: ${{ inputs.awx_ref || 'devel' }}
@@ -91,6 +64,8 @@ jobs:
           UPSTREAM_REVISIONS: ${{ inputs.upstream_revisions }}
         run: |
           set -euo pipefail
+          mkdir -p bundle-reports
+          exec > >(tee bundle-reports/source-resolution.log) 2>&1
           if [[ -n "$UPSTREAM_REVISIONS" ]]; then
             jq --exit-status '
               type == "object" and
@@ -105,264 +80,6 @@ jobs:
             export AWX_BRANCH AWX_EE_BRANCH RECEPTOR_BRANCH RULEBOOK_BRANCH GALAXY_NG_BRANCH
           fi
           ./scripts/build-upstream.sh
-
-      - name: Build AWX devel
-        working-directory: .upstream/awx
-        env:
-          AWX_BUILD_VERSION: 24.6.1.dev1+g${{ github.sha }}
-        run: |
-          ansible-playbook -e ansible_python_interpreter=python3 \
-            tools/ansible/dockerfile.yml \
-            -e dockerfile_name=Dockerfile.devel \
-            -e build_dev=False \
-            -e headless=True
-          grep -q '^ENV SETUPTOOLS_SCM_PRETEND_VERSION=' Dockerfile.devel || \
-            sed -i '/^ARG SETUPTOOLS_SCM_PRETEND_VERSION/a ENV SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION}' Dockerfile.devel
-          docker buildx build --load -f Dockerfile.devel \
-            -t awx:devel \
-            --build-arg VERSION="$AWX_BUILD_VERSION" \
-            --build-arg SETUPTOOLS_SCM_PRETEND_VERSION="$AWX_BUILD_VERSION" .
-
-      - name: Add compiled AWX UI
-        run: |
-          docker build --build-arg AWX_BASE_IMAGE=awx --build-arg AWX_BASE_TAG=devel -t awx:with-ui images/awx-ui-runtime
-          docker tag awx:with-ui awx:devel
-
-      - name: Build AWX EE devel
-        working-directory: .upstream/awx-ee
-        run: ansible-builder build -v3 -t awx-ee:devel --container-runtime=docker
-
-      - name: Build Receptor devel
-        working-directory: .upstream/receptor
-        run: |
-          rm -f .container-flag-*
-          PATH="$GITHUB_WORKSPACE/.venv/bin:$PATH" \
-            make VERSION=1.6.9.dev1+g${{ github.sha }} container \
-            REPO=receptor TAG=devel CONTAINERCMD=docker
-
-      - name: Build ansible-rulebook devel
-        working-directory: .upstream/ansible-rulebook
-        run: |
-          grep -q '^ENV SETUPTOOLS_SCM_PRETEND_VERSION=' Dockerfile || \
-            sed -i '/^ARG SETUPTOOLS_SCM_PRETEND_VERSION/a ENV SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION}' Dockerfile
-          docker buildx build --load -t ansible-rulebook:devel \
-            --build-arg SETUPTOOLS_SCM_PRETEND_VERSION=1.0.0.dev1+g${{ github.sha }} .
-
-      - name: Build Galaxy NG and Pulp devel
-        working-directory: .upstream/galaxy-ng
-        run: |
-          docker buildx build --load -t galaxy-ng:devel \
-            --build-arg GIT_COMMIT=${{ github.sha }} .
-
-      - name: Add durable Hub bootstrap
-        run: |
-          docker build --build-arg BASE_IMAGE=galaxy-ng:devel \
-            -t galaxy-ng:runtime images/galaxy-runtime
-          docker tag galaxy-ng:runtime galaxy-ng:devel
-
-      - name: Build AAX gateway devel
-        run: docker buildx build --load -t gateway:devel images/gateway
-
-      - name: Build AAX EDA controller devel
-        run: docker buildx build --load -t eda-controller:devel images/eda-server
-
-      - name: Build EDA Podman backend and decision environment
-        run: |
-          set -euo pipefail
-          docker buildx build --load \
-            --build-arg BASE_IMAGE=quay.io/centos/centos@sha256:6f8045fc4f552544d8a401d61848bafc8d06ca7c11897c5b54a2c37fc419a20a \
-            -t eda-podman:devel images/eda-podman
-          docker buildx build --load \
-            -t eda-decision-environment:devel images/eda-decision-environment
-
-      - name: Apply maintained runtime security patches
-        run: |
-          set -euo pipefail
-          docker build -f images/ee-base/pip-security/Dockerfile \
-            -t aax/pip-security:devel images/ee-base
-          docker build -f images/receptor-runtime/Dockerfile \
-            --build-arg BASE_IMAGE=receptor:devel \
-            --build-arg VERSION=1.6.9.dev1+g${{ github.sha }} \
-            -t receptor:patched .upstream/receptor
-          docker tag receptor:patched receptor:devel
-          for name in awx awx-ee galaxy-ng eda-controller ansible-rulebook receptor eda-podman eda-decision-environment; do
-            runtime_user="$(docker image inspect --format '{{.Config.User}}' "$name:devel")"
-            docker build -f images/runtime-security/OS.Dockerfile \
-              --build-arg BASE_IMAGE="$name:devel" \
-              --build-arg RUNTIME_USER="${runtime_user:-root}" \
-              -t "$name:os-patched" images/runtime-security
-            docker tag "$name:os-patched" "$name:devel"
-          done
-          mkdir -p bundle-reports
-          bash scripts/build-rpm-security.sh bundle-reports/rpm-security
-          for name in awx awx-ee galaxy-ng eda-controller ansible-rulebook receptor eda-podman eda-decision-environment; do
-            runtime_user="$(docker image inspect --format '{{.Config.User}}' "$name:devel")"
-            docker build -f images/rpm-security/Runtime.Dockerfile \
-              --build-arg BASE_IMAGE="$name:devel" \
-              --build-arg RUNTIME_USER="${runtime_user:-root}" \
-              -t "$name:rpm-patched" bundle-reports/rpm-security
-            docker tag "$name:rpm-patched" "$name:devel"
-          done
-          for name in awx awx-ee galaxy-ng eda-controller ansible-rulebook receptor eda-podman eda-decision-environment; do
-            runtime_user="$(docker image inspect --format '{{.Config.User}}' "$name:devel")"
-            docker build -f images/runtime-security/Finalize.Dockerfile \
-              --build-arg BASE_IMAGE="$name:devel" \
-              --build-arg RUNTIME_USER="${runtime_user:-root}" \
-              -t "$name:finalized" images/runtime-security
-            docker tag "$name:finalized" "$name:devel"
-          done
-          for entry in \
-            'awx /var/lib/awx/venv/awx/bin/python' \
-            'galaxy-ng /venv/bin/python' \
-            'eda-controller /app/venv/bin/python'; do
-            read -r name python <<< "$entry"
-            read -r revision version < <(
-              docker run --rm --entrypoint "$python" "$name:devel" -c \
-                'import importlib.metadata as m,json; d=m.distribution("django-ansible-base"); print(json.loads(d.read_text("direct_url.json"))["vcs_info"]["commit_id"], d.version.split("+")[0]+"+aax.2")'
-            )
-            [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || {
-              echo "Missing exact DAB source revision for $name" >&2
-              exit 1
-            }
-            jq -n --arg service "$name" --arg revision "$revision" --arg version "$version" \
-              '{service: $service, repository: "https://github.com/ansible/django-ansible-base", revision: $revision, version: $version}' \
-              > "bundle-reports/$name-dab-source.json"
-            docker build --build-arg DAB_REVISION="$revision" \
-              --build-arg DAB_VERSION="$version" \
-              -t "aax/dab-security:$name" images/dab-security
-          done
-          for entry in \
-            'awx /var/lib/awx/venv/awx/bin/python 1000 awx' \
-            'awx /usr/bin/python3.12 1000 awx-system' \
-            'awx-ee /usr/bin/python3.12 1000 awx-ee' \
-            'galaxy-ng /venv/bin/python galaxy galaxy' \
-            'eda-controller /app/venv/bin/python 1001 eda'; do
-            read -r name python runtime_user requirements <<< "$entry"
-            docker build --build-arg BASE_IMAGE="$name:devel" \
-              --build-arg PYTHON="$python" \
-              --build-arg REQUIREMENTS="requirements-$requirements.txt" \
-              --build-arg RUNTIME_USER="$runtime_user" \
-              -t "$name:python-patched" images/runtime-security
-            docker tag "$name:python-patched" "$name:devel"
-          done
-          docker build -f images/runtime-security/DAB.Dockerfile \
-            --build-arg BASE_IMAGE=awx:devel \
-            --build-arg DAB_IMAGE=aax/dab-security:awx \
-            -t awx:patched images/runtime-security
-          docker tag awx:patched awx:devel
-          docker build --build-arg BASE_IMAGE=awx-ee:devel \
-            --build-arg RECEPTOR_IMAGE=receptor:devel \
-            -t awx-ee:patched images/awx-ee-runtime
-          docker tag awx-ee:patched awx-ee:devel
-          docker build -f images/runtime-security/EDA.Dockerfile \
-            --build-arg BASE_IMAGE=eda-controller:devel \
-            --build-arg DAB_IMAGE=aax/dab-security:eda-controller \
-            -t eda-controller:patched images/runtime-security
-          docker tag eda-controller:patched eda-controller:devel
-          docker build --build-arg BASE_IMAGE=galaxy-ng:devel \
-            --build-arg DAB_IMAGE=aax/dab-security:galaxy-ng \
-            -t galaxy-ng:patched images/hub-security
-          docker tag galaxy-ng:patched galaxy-ng:devel
-          docker build --build-arg BASE_IMAGE=ansible-rulebook:devel \
-            -t ansible-rulebook:patched images/drools-runtime
-          docker tag ansible-rulebook:patched ansible-rulebook:devel
-          docker build -f images/eda-decision-environment/Security.Dockerfile \
-            -t eda-decision-environment:patched images/runtime-security
-          docker tag eda-decision-environment:patched eda-decision-environment:devel
-
-      - name: Reclaim build-only storage before runtime validation
-        run: |
-          set -euo pipefail
-          docker system df
-          names=(awx awx-ee receptor ansible-rulebook galaxy-ng gateway eda-controller eda-podman eda-decision-environment)
-          final_images=()
-          for name in "${names[@]}"; do
-            final_images+=("$(docker image inspect --format '{{.Id}}' "$name:devel")")
-          done
-          image_tags="$(docker image ls --format '{{.Repository}}:{{.Tag}}')"
-          candidates=(
-            awx:with-ui galaxy-ng:runtime
-            aax/rpm-builder:bootstrap aax/go-security:devel aax/pip-security:devel
-            aax/dab-security:awx aax/dab-security:galaxy-ng aax/dab-security:eda-controller
-          )
-          for name in awx awx-ee receptor ansible-rulebook galaxy-ng eda-controller eda-podman eda-decision-environment; do
-            for stage in os-patched rpm-patched finalized python-patched patched; do
-              candidates+=("$name:$stage")
-            done
-          done
-          for image in "${candidates[@]}"; do
-            if grep -Fxq "$image" <<< "$image_tags"; then
-              docker image rm "$image"
-            fi
-          done
-          # Only this disposable hosted runner's builders and dangling images.
-          docker buildx prune --all --force
-          docker builder prune --all --force
-          docker image prune --force
-          for index in "${!names[@]}"; do
-            name="${names[$index]}"
-            actual="$(docker image inspect --format '{{.Id}}' "$name:devel")"
-            if [[ "$actual" != "${final_images[$index]}" ]]; then
-              echo "Storage cleanup changed final candidate $name:devel" >&2
-              exit 1
-            fi
-          done
-          docker system df
-          df -h "$RUNNER_TEMP"
-          available="$(df -PB1 "$RUNNER_TEMP" | awk 'END {print $4}')"
-          required=$((20 * 1024 * 1024 * 1024))
-          if (( available < required )); then
-            echo "Nested VFS validation needs at least $required free bytes; only $available remain after build-cache cleanup." >&2
-            exit 1
-          fi
-
-      - name: Verify nested Podman execution and outbound HTTPS
-        run: |
-          set -euo pipefail
-          network=aax-eda-backend-test
-          volume=aax-eda-backend-storage-test
-          cleanup() {
-            docker rm -f aax-eda-podman-test >/dev/null 2>&1 || true
-            docker volume rm "$volume" >/dev/null 2>&1 || true
-            docker network rm "$network" >/dev/null 2>&1 || true
-          }
-          trap cleanup EXIT
-          docker network create "$network"
-          docker volume create "$volume"
-          docker tag eda-decision-environment:devel localhost/eda-decision-environment:devel
-          docker run -d --name aax-eda-podman-test --privileged \
-            --network "$network" --dns 1.1.1.1 \
-            -v "$volume:/var/lib/containers/storage" \
-            eda-podman:devel
-          for attempt in $(seq 1 30); do
-            if docker exec aax-eda-podman-test \
-              curl --fail --silent http://127.0.0.1:8888/_ping; then
-              break
-            fi
-            test "$(docker inspect -f '{{.State.Running}}' aax-eda-podman-test)" = true || {
-              docker logs aax-eda-podman-test
-              exit 1
-            }
-            sleep 2
-          done
-          docker save localhost/eda-decision-environment:devel \
-            | docker exec -i aax-eda-podman-test podman load
-          docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
-            --remote --url tcp://aax-eda-podman-test:8888 info
-          docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
-            --remote --url tcp://aax-eda-podman-test:8888 pull \
-            quay.io/prometheus/busybox@sha256:7379672d53c28113469275f2eb48adffa19954f39f8ef20c1e2992278f658e6c
-          docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
-            --remote --url tcp://aax-eda-podman-test:8888 run --rm \
-            localhost/eda-decision-environment:devel python3.12 -c \
-            "import urllib.request; assert urllib.request.urlopen('https://api.github.com', timeout=20).status == 200"
-          docker run --rm -i --network "$network" --entrypoint podman eda-podman:devel \
-            --remote --url tcp://aax-eda-podman-test:8888 run --rm -i \
-            localhost/eda-decision-environment:devel ansible-rulebook \
-            --rulebook /dev/stdin --shutdown-delay 1 < tests/fixtures/eda-smoke.yml \
-            | tee "$RUNNER_TEMP/eda-rulebook-smoke.log"
-          grep -Fq AAX_DECISION_SECURITY_SMOKE_PASSED "$RUNNER_TEMP/eda-rulebook-smoke.log"
-
       - name: Record exact build sources
         run: |
           set -euo pipefail
@@ -378,17 +95,190 @@ jobs:
           cp images/eda-podman/Dockerfile bundle-reports/eda-podman.Dockerfile
           cp images/eda-decision-environment/Dockerfile bundle-reports/eda-decision-environment.Dockerfile
           cp images/awx-ui-runtime/Dockerfile bundle-reports/awx-ui.Dockerfile
-          cp -R images/runtime-security bundle-reports/runtime-security
-          cp images/receptor-runtime/Dockerfile bundle-reports/receptor-runtime.Dockerfile
-          cp images/galaxy-runtime/Dockerfile bundle-reports/galaxy-runtime.Dockerfile
-          cp -R images/ee-base/pip-security images/hub-security images/drools-runtime \
+          cp -R images/runtime-security images/receptor-runtime images/galaxy-runtime \
+            images/ee-base/pip-security images/hub-security images/drools-runtime \
             images/dab-security images/rpm-security bundle-reports/
+          tar -czf upstream-sources.tar.gz .upstream
+      - name: Preserve frozen sources and patch inputs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bundle-input-sources-${{ github.run_attempt }}
+          path: |
+            upstream-sources.tar.gz
+            bundle-reports/
+          if-no-files-found: error
+          retention-days: 90
 
+  build-images:
+    needs: resolve-sources
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [awx, awx-ee, receptor, ansible-rulebook, galaxy-ng, gateway, eda-controller, eda-podman, eda-decision-environment]
+    steps:
+      - &checkout
+        name: Check out AAX
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - &buildx
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - &login
+        name: Log in to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download frozen sources
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: bundle-input-sources-${{ github.run_attempt }}
+      - name: Restore exact upstream sources
+        run: |
+          set -euo pipefail
+          tar -xzf upstream-sources.tar.gz
+          for name in awx awx-ee receptor ansible-rulebook galaxy-ng; do
+            expected="$(jq -er --arg name "$name" '.sources[] | select(.name == $name) | .revision' bundle-reports/sources.json)"
+            test "$(git -C ".upstream/$name" rev-parse HEAD)" = "$expected"
+          done
+      - name: Install upstream build tools
+        run: python3 -m pip install --disable-pip-version-check ansible-core ansible-builder build
+      - name: Build one upstream image
+        env:
+          BUNDLE_IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          bash scripts/build-bundle-image.sh "$BUNDLE_IMAGE" 2>&1 | tee "bundle-reports/$BUNDLE_IMAGE-build.log"
+      - name: Retain raw candidate by immutable digest
+        env:
+          BUNDLE_IMAGE: ${{ matrix.image }}
+        run: bash scripts/bundle-candidate.sh push "$BUNDLE_IMAGE" raw
+      - name: Preserve raw candidate identity
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bundle-input-raw-${{ matrix.image }}-${{ github.run_attempt }}
+          path: |
+            candidate-maps/raw/
+            bundle-reports/sources.json
+            bundle-reports/${{ matrix.image }}-build.log
+          if-no-files-found: error
+          retention-days: 90
+
+  native-tools:
+    needs: build-images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - *checkout
+      - *buildx
+      - *login
+      - name: Download retained build inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: bundle-input-*-${{ github.run_attempt }}
+          merge-multiple: true
+      - name: Build shared signed source RPMs and FIPS compiler once
+        run: |
+          set -euo pipefail
+          mkdir -p bundle-reports/rpm-security/logs
+          exec > >(tee bundle-reports/rpm-security/logs/native-tools.log) 2>&1
+          bash scripts/bundle-candidate.sh pull awx-ee raw
+          runtime_user="$(docker image inspect --format '{{.Config.User}}' awx-ee:devel)"
+          docker build -f images/runtime-security/OS.Dockerfile \
+            --build-arg BASE_IMAGE=awx-ee:devel --build-arg RUNTIME_USER="${runtime_user:-root}" \
+            -t awx-ee:os-patched images/runtime-security
+          docker build -f images/ee-base/pip-security/Dockerfile -t pip-security:devel images/ee-base
+          bash scripts/bundle-candidate.sh push pip-security tools
+          RPM_RETAIN_COMPILER=true bash scripts/build-rpm-security.sh bundle-reports/rpm-security
+      - name: Archive native outputs including signed source RPMs and failure logs
+        if: always()
+        run: |
+          set -euo pipefail
+          tar -czf native-rpms.tar.gz -C bundle-reports rpm-security
+      - name: Preserve native build artifacts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bundle-input-native-${{ github.run_attempt }}
+          path: |
+            native-rpms.tar.gz
+            candidate-maps/tools/
+          if-no-files-found: error
+          retention-days: 90
+
+  gate-foundations:
+    needs: native-tools
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [receptor, ansible-rulebook]
+    steps: &gate_steps
+      - *checkout
+      - *buildx
+      - *login
+      - name: Download retained image build inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: bundle-input-*-${{ github.run_attempt }}
+          merge-multiple: true
+      - name: Download exact scanned Receptor dependency
+        if: matrix.image == 'awx-ee'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: bundle-gate-receptor-${{ github.run_attempt }}
+      - name: Download exact scanned rulebook dependency
+        if: matrix.image == 'eda-decision-environment'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: bundle-gate-ansible-rulebook-${{ github.run_attempt }}
+      - name: Restore shared artifacts and this image only
+        env:
+          BUNDLE_IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          tar -xzf upstream-sources.tar.gz
+          tar -xzf native-rpms.tar.gz -C bundle-reports
+          bash scripts/bundle-candidate.sh pull "$BUNDLE_IMAGE" raw
+          bash scripts/bundle-candidate.sh pull pip-security tools
+          docker tag pip-security:devel aax/pip-security:devel
+          if [[ "$BUNDLE_IMAGE" == awx-ee ]]; then
+            bash scripts/bundle-candidate.sh pull receptor gated
+          elif [[ "$BUNDLE_IMAGE" == eda-decision-environment ]]; then
+            bash scripts/bundle-candidate.sh pull ansible-rulebook gated
+            docker tag ansible-rulebook:devel ansible-rulebook:patched
+          fi
+      - name: Apply maintained runtime security patches
+        env:
+          BUNDLE_IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          mkdir -p bundle-reports
+          bash scripts/patch-bundle-image.sh "$BUNDLE_IMAGE" 2>&1 | tee "bundle-reports/$BUNDLE_IMAGE-patch.log"
+      - name: Retain final candidate before security gates
+        env:
+          BUNDLE_IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          bash scripts/bundle-candidate.sh push "$BUNDLE_IMAGE" gated
+          bash scripts/bundle-candidate.sh pull "$BUNDLE_IMAGE" gated
+      - name: Reclaim only this disposable runner's build cache
+        run: |
+          set -euo pipefail
+          timeout 180 docker buildx prune --all --force
+          timeout 180 docker builder prune --all --force
+          df -h .
       - name: Install bundle scanner
         uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
         with:
           version: v0.70.0
-
       - name: Install supplemental OS scanner
         run: |
           set -euo pipefail
@@ -397,41 +287,27 @@ jobs:
             https://github.com/anchore/grype/releases/download/v0.121.0/grype_0.121.0_linux_amd64.tar.gz
           echo "64e07133d3486115de647a66581461dccf5c732748a0a3119077395565f15519  $RUNNER_TEMP/grype.tar.gz" | sha256sum --check -
           tar -xzf "$RUNNER_TEMP/grype.tar.gz" -C "$RUNNER_TEMP" grype
-
       - name: Scan exact bundle images
         env:
+          BUNDLE_IMAGE: ${{ matrix.image }}
           TRIVY_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2,public.ecr.aws/aquasecurity/trivy-db:2
           TRIVY_JAVA_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-java-db:1,ghcr.io/aquasecurity/trivy-java-db:1,public.ecr.aws/aquasecurity/trivy-java-db:1
-        run: |
-          set -euo pipefail
-          for name in awx awx-ee receptor ansible-rulebook galaxy-ng gateway eda-controller eda-podman eda-decision-environment; do
-            trivy image --scanners vuln --timeout 15m --format json \
-              --output "bundle-reports/$name.json" "$name:devel"
-            trivy convert --format sarif --output "bundle-reports/$name.sarif" \
-              "bundle-reports/$name.json"
-            trivy image --format cyclonedx --timeout 15m \
-              --output "bundle-reports/$name.cdx.json" "$name:devel"
-            "$RUNNER_TEMP/grype" "docker:$name:devel" --platform linux/amd64 \
-              -o "json=bundle-reports/$name-grype.json" \
-              -o "sarif=bundle-reports/$name-grype.sarif"
-          done
-
+        run: bash scripts/scan-bundle-image.sh "$BUNDLE_IMAGE"
       - name: Gate on fixable high and critical bundle vulnerabilities
+        env:
+          BUNDLE_IMAGE: ${{ matrix.image }}
         run: |
           set -euo pipefail
           bash scripts/check-vulnerability-reports.sh \
-            bundle-reports/awx.json bundle-reports/awx-ee.json \
-            bundle-reports/receptor.json bundle-reports/ansible-rulebook.json \
-            bundle-reports/galaxy-ng.json bundle-reports/gateway.json \
-            bundle-reports/eda-controller.json bundle-reports/eda-podman.json \
-            bundle-reports/eda-decision-environment.json bundle-reports/*-grype.json
-
+            "bundle-reports/$BUNDLE_IMAGE.json" "bundle-reports/$BUNDLE_IMAGE-grype.json"
       - name: Give security reports distinct analysis identities
         if: always() && hashFiles('bundle-reports/*.sarif') != ''
+        env:
+          BUNDLE_IMAGE: ${{ matrix.image }}
         run: |
           set -euo pipefail
           mkdir -p bundle-sarif
-          for name in awx awx-ee receptor ansible-rulebook galaxy-ng gateway eda-controller eda-podman eda-decision-environment; do
+          for name in "$BUNDLE_IMAGE"; do
             for scanner in trivy grype; do
               source="bundle-reports/$name.sarif"
               if [[ "$scanner" == grype ]]; then
@@ -443,48 +319,141 @@ jobs:
                 "$source" > "bundle-sarif/$scanner-$name.sarif"
             done
           done
-
       - name: Upload bundle security findings
         if: always() && hashFiles('bundle-sarif/*.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: bundle-sarif
+      - name: Preserve bundle provenance and security reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bundle-gate-${{ matrix.image }}-${{ github.run_attempt }}
+          path: |
+            candidate-maps/gated/${{ matrix.image }}.json
+            bundle-reports/${{ matrix.image }}*
+            bundle-sarif/*-${{ matrix.image }}.sarif
+          if-no-files-found: error
+          retention-days: 90
 
-      - name: Tag and push bundle
-        env:
-          PUSH_MUTABLE: ${{ github.event_name == 'push' || github.event_name == 'schedule' || inputs.publish_latest_devel }}
+  gate-images:
+    needs: [native-tools, gate-foundations]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [awx, awx-ee, galaxy-ng, gateway, eda-controller, eda-podman, eda-decision-environment]
+    steps: *gate_steps
+
+  validate-runtime:
+    needs: [gate-foundations, gate-images]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - *checkout
+      - *login
+      - name: Download scanned runtime candidates
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: bundle-gate-eda-*-${{ github.run_attempt }}
+          merge-multiple: true
+      - name: Load only scanned runtime digests on a fresh runner
         run: |
           set -euo pipefail
-          owner=$(printf '%s' "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')
-          prefix="$REGISTRY/$owner"
-          declare -A images=(
-            [awx]=awx:devel
-            [awx-ee]=awx-ee:devel
-            [receptor]=receptor:devel
-            [ansible-rulebook]=ansible-rulebook:devel
-            [galaxy-ng]=galaxy-ng:devel
-            [pulp]=galaxy-ng:devel
-            [gateway]=gateway:devel
-            [eda-controller]=eda-controller:devel
-            [eda-podman]=eda-podman:devel
-            [eda-decision-environment]=eda-decision-environment:devel
-          )
-          for name in "${!images[@]}"; do
-            source_image="${images[$name]}"
-            docker tag "$source_image" "$prefix/aax-$name:$IMAGE_TAG"
-            docker push "$prefix/aax-$name:$IMAGE_TAG"
-            docker buildx imagetools inspect "$prefix/aax-$name:$IMAGE_TAG" \
-              --format '{{json .Manifest}}' > "bundle-reports/$name-manifest.json"
-          done
-          for name in "${!images[@]}"; do
-            if [[ "$PUSH_MUTABLE" == true ]]; then
-              docker tag "$prefix/aax-$name:$IMAGE_TAG" "$prefix/aax-$name:devel"
-              docker push "$prefix/aax-$name:devel"
+          bash scripts/bundle-candidate.sh pull eda-podman gated
+          bash scripts/bundle-candidate.sh pull eda-decision-environment gated
+      - name: Require nested VFS disk budget
+        run: |
+          set -euo pipefail
+          df -h .
+          available="$(df -PB1 . | awk 'END {print $4}')"
+          required=$((20 * 1024 * 1024 * 1024))
+          if (( available < required )); then
+            echo "Nested VFS validation needs $required free bytes; only $available remain." >&2
+            exit 1
+          fi
+      - name: Verify nested Podman execution and outbound HTTPS
+        run: |
+          set -euo pipefail
+          exec > >(tee bundle-reports/nested-runtime.log) 2>&1
+          network=aax-eda-backend-test
+          volume=aax-eda-backend-storage-test
+          cleanup() {
+            docker logs aax-eda-podman-test || true
+            docker rm -f aax-eda-podman-test >/dev/null 2>&1 || true
+            docker volume rm "$volume" >/dev/null 2>&1 || true
+            docker network rm "$network" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker network create "$network"
+          docker volume create "$volume"
+          docker tag eda-decision-environment:devel localhost/eda-decision-environment:devel
+          docker run -d --name aax-eda-podman-test --privileged \
+            --network "$network" --dns 1.1.1.1 \
+            -v "$volume:/var/lib/containers/storage" eda-podman:devel
+          ready=false
+          for attempt in $(seq 1 30); do
+            if docker exec aax-eda-podman-test curl --fail --silent http://127.0.0.1:8888/_ping; then
+              ready=true
+              break
             fi
+            test "$(docker inspect -f '{{.State.Running}}' aax-eda-podman-test)" = true
+            sleep 2
           done
-          echo "Published bundle: \`$IMAGE_TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          test "$ready" = true
+          docker save localhost/eda-decision-environment:devel \
+            | docker exec -i aax-eda-podman-test podman load
+          docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
+            --remote --url tcp://aax-eda-podman-test:8888 info
+          docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
+            --remote --url tcp://aax-eda-podman-test:8888 pull \
+            quay.io/prometheus/busybox@sha256:7379672d53c28113469275f2eb48adffa19954f39f8ef20c1e2992278f658e6c
+          docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
+            --remote --url tcp://aax-eda-podman-test:8888 run --rm \
+            localhost/eda-decision-environment:devel python3.12 -c \
+            "import urllib.request; assert urllib.request.urlopen('https://api.github.com', timeout=20).status == 200"
+          docker run --rm -i --network "$network" --entrypoint podman eda-podman:devel \
+            --remote --url tcp://aax-eda-podman-test:8888 run --rm -i \
+            localhost/eda-decision-environment:devel ansible-rulebook \
+            --rulebook /dev/stdin --shutdown-delay 1 < tests/fixtures/eda-smoke.yml \
+            | tee bundle-reports/eda-rulebook-smoke.log
+          grep -Fq AAX_DECISION_SECURITY_SMOKE_PASSED bundle-reports/eda-rulebook-smoke.log
+          jq -n --slurpfile podman candidate-maps/gated/eda-podman.json \
+            --slurpfile decision candidate-maps/gated/eda-decision-environment.json \
+            '{podman: $podman[0], decision: $decision[0]}' > bundle-reports/runtime-gate.json
+      - name: Preserve runtime evidence on failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bundle-runtime-${{ github.run_attempt }}
+          path: |
+            bundle-reports/nested-runtime.log
+            bundle-reports/eda-rulebook-smoke.log
+            bundle-reports/runtime-gate.json
+          if-no-files-found: error
+          retention-days: 90
 
-      - name: Preserve bundle provenance and security reports
+  publish:
+    needs: [resolve-sources, build-images, native-tools, gate-foundations, gate-images, validate-runtime]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - *checkout
+      - *buildx
+      - *login
+      - name: Download all exact candidate identities and evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: bundle-*-${{ github.run_attempt }}
+          merge-multiple: true
+      - name: Verify complete bundle evidence before any publication
+        run: bash scripts/verify-bundle-evidence.sh
+      - name: Tag and push bundle
+        env:
+          PUSH_MUTABLE: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'schedule' || inputs.publish_latest_devel) }}
+        run: bash scripts/promote-bundle.sh
+      - name: Preserve complete bundle evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -492,5 +461,7 @@ jobs:
           path: |
             bundle-reports/
             bundle-sarif/
+            candidate-maps/
+            native-rpms.tar.gz
           if-no-files-found: error
           retention-days: 90

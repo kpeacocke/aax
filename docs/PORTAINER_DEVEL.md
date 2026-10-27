@@ -22,7 +22,10 @@ these images under `ghcr.io/<owner>`:
 New immutable tags are `devel-<full-commit-sha>-<run-id>-<attempt>`. Each daily
 build gets a distinct tag even when only upstream sources have changed. Older
 `devel-<full-commit-sha>` tags remain usable. The mutable `devel` tag is also
-published when the workflow input allows it, after all immutable images push.
+published on `main` when the workflow input allows it, after all immutable images
+have been copied and their digests verified. Pushes and scheduled runs on `main`
+still move `devel`; manual `main` runs honor `publish_latest_devel`. Branch
+dispatches never publish deployment tags, even when that input is true.
 
 Publication is blocked by fixable HIGH/CRITICAL vulnerabilities in the exact
 built images. All severities, including vulnerabilities without patches, remain
@@ -31,6 +34,57 @@ artifact contains upstream Git revisions, pinned EDA/UI build inputs, SBOMs,
 security reports, and registry manifests with image digests. Use the tag printed
 in the successful workflow summary rather than constructing one from a commit.
 This scan gate does not replace full-stack runtime/compatibility validation.
+
+### Staged builds and retained candidates
+
+The workflow no longer builds the entire bundle on one runner:
+
+1. Resolve upstream sources once and retain their exact Git checkouts and patch
+   inputs. Each of the nine upstream/runtime images builds on its own fresh
+   hosted runner; no matrix entry builds the whole bundle.
+2. A separate native-tools runner builds the signed-source RPM rebuilds, patched
+   FIPS compiler and patched pip once. Runtime jobs reuse the RPM archive and
+   pip image; the compiler image is retained for investigation and reuse.
+   The archive includes original signed source RPMs, signature evidence, rebuilt
+   source/binary RPMs, build recipes and logs.
+3. Separate Receptor and rulebook patch/scan runners produce the exact dependency
+   images consumed by AWX EE and the decision environment. Seven more independent
+   patch/scan runners complete the other images. Each candidate passes both Trivy
+   and Grype, with scanner image IDs matched to the registry manifest's config
+   digest. Every image has its own reports, SBOM and successful gate receipt.
+4. A fresh runtime runner pulls only the scanned Podman and decision-environment
+   digests. It verifies genuine nested Podman operation, a small real
+   digest-pinned Quay pull, outbound HTTPS, and the range-source/debug rulebook
+   inside the patched decision image.
+5. Publication verifies all nine identities, complete scan evidence, native
+   artifacts and the digest-bound runtime receipt before its first registry write.
+   It copies the scanned digests without rebuilding. Pulp aliases the scanned
+   Galaxy NG digest. A failed/missing gate blocks all final promotion.
+
+GHCR transfer tags are `candidate-<run-id>-<attempt>-raw`,
+`candidate-<run-id>-<attempt>-tools` and
+`candidate-<run-id>-<attempt>-gated`, under each `aax-<image>` repository.
+They are **unpromoted candidates**, not release/main/devel tags and not security
+clearance. Consumers use recorded `repository@sha256:...` references, never
+re-resolve these tags. Candidates are deliberately not deleted after failures.
+Build/source, native, per-image scan and runtime artifacts are retained for 90
+days, including failure reports. Artifact names include the attempt number;
+candidate maps bind the AAX revision, run, attempt, stage, repository, manifest
+digest and image/config ID. Retry using **Re-run all jobs**, not only failed jobs:
+cross-attempt artifacts cannot satisfy the identity checks.
+
+For safe full branch validation after the branch has been pushed:
+
+```bash
+gh workflow run publish-devel.yml --ref fix/staged-upstream-bundle \
+  -f publish_latest_devel=false
+```
+
+This runs every build, scanner, nested-runtime and evidence gate, retaining
+candidates without changing any deployment tag or calling Portainer. Inspect
+all job results and the `bundle-<run-id>-<attempt>` artifact. An actual hosted run
+is still required to establish capacity and upstream compatibility; local policy
+tests alone do not prove those properties.
 
 For a source-pinned remediation retry, supply `upstream_revisions` as a JSON
 object mapping `awx`, `awx-ee`, `receptor`, `ansible-rulebook` and `galaxy-ng`
@@ -84,14 +138,12 @@ Upstream changes may require reviewed patch refreshes before the next bundle
 can publish. Full-stack compatibility validation is still required before
 production deployment; the image scan gate alone is not production sign-off.
 
-Before nested Podman validation, the disposable GitHub-hosted runner removes
-only named build-stage image tags, builder caches and dangling images. It
-verifies that all nine final candidate image IDs are unchanged and requires
-at least 20 GiB free for nested VFS storage and scanning. The decision environment
-streams directly into Podman, avoiding a retained Docker archive. Registry
-egress uses a small digest-pinned Quay BusyBox pull; HTTPS and rulebook execution
-still run in the actual patched decision environment. Production storage is
-never pruned by this workflow.
+Per-image patch runners reclaim only their own builder caches, with bounded
+cleanup commands; no blocking `docker system df` diagnostic is used. Nested
+Podman validation uses a fresh runner without build caches and requires at least
+20 GiB free after pulling its two exact images. The decision environment streams
+directly into Podman, avoiding a retained Docker archive. Production storage and
+shared local Docker are never pruned by this workflow.
 
 ### CentOS Stream and native package coverage
 
