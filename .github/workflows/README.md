@@ -4,9 +4,14 @@ This document describes the CI/CD pipeline for the AAX project.
 
 ## Publication contract
 
-`publish-images.yml` (main-channel images), `release.yml` (versioned execution
-images), and `publish-devel.yml` (the upstream controller bundle) are distinct
-publication lanes. A green build in one lane is not clearance for another.
+`publish-images.yml` (execution/dev-tool images and gateway), `release.yml`
+(versioned execution images), and `publish-devel.yml` (the upstream controller
+bundle) are distinct publication lanes. A green build in one lane is not
+clearance for another. Only the upstream bundle publishes AWX, Hub/Pulp and the
+real EDA controller. The obsolete Python 3.11 Hub/Pulp and rulebook-only EDA
+recipes are no longer in the generic publication matrix. The standalone
+AWX UI and EDA workflows test runtime behavior but do not publish unpatched
+controller snapshots.
 
 Main-channel and release publication follow this sequence:
 
@@ -24,7 +29,7 @@ Main-channel and release publication follow this sequence:
 
 Main-channel promotion is restricted to `refs/heads/main`. A manual run on a
 fix branch validates real candidates and SARIF uploads without moving production
-`main`/`latest` tags or triggering the main-branch deployment webhook.
+`main`/`latest` tags.
 
 Scanner errors, malformed reports, missing OS coverage, fixable HIGH/CRITICAL
 findings and reporting failures all block promotion. PR policy tests execute the
@@ -35,6 +40,22 @@ The upstream bundle additionally needs its source-patch builds and nested
 Podman/rulebook test. A published image or successful webhook is not proof that
 the production stack is upgraded: deployment must select the successful lane's
 immutable tag and verify the actual services and activation behavior.
+
+## Explicit production deployment
+
+`deploy.yml` is manual-only. Neither a Compose push nor image publication
+automatically calls Portainer. Configure all stack pins to a successfully
+published immutable upstream bundle, prepare backups/rollback, then dispatch
+the deployment workflow from `main` with its run ID, exact tag and explicit pin
+confirmation. The workflow verifies that the referenced run is the completed,
+successful main-branch upstream bundle and that the tag matches its commit,
+run ID and attempt. A failed, in-progress, unrelated or branch build cannot
+trigger the webhook. Deployment requests are serialized without cancellation.
+
+The webhook does not update Portainer's saved image pins. Confirmation is an
+operator prerequisite, not a claim that CI has inspected the stack. A successful
+webhook is only an accepted request; service health, activation recovery and
+AWX job execution still require post-deployment checks.
 
 ## Workflow Architecture
 

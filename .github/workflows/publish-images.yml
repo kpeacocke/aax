@@ -134,18 +134,6 @@ jobs:
             context: ./images/gateway
             file: ./images/gateway/Dockerfile
             use_base: false
-          - name: pulp
-            context: ./images/pulp
-            file: ./images/pulp/Dockerfile.pulp
-            use_base: false
-          - name: galaxy-ng
-            context: ./images/galaxy-ng
-            file: ./images/galaxy-ng/Dockerfile
-            use_base: false
-          - name: eda-controller
-            context: ./images/eda-controller
-            file: ./images/eda-controller/Dockerfile
-            use_base: false
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

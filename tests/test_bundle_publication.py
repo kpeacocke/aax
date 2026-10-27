@@ -922,3 +922,89 @@ def test_ci_validates_all_workflow_definitions() -> None:
     workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
     lint = workflow["jobs"]["lint"]["steps"]
     assert any("actionlint@v1.7.12" in step.get("run", "") for step in lint)
+
+
+def test_controller_publication_has_one_maintained_owner() -> None:
+    main = yaml.safe_load((ROOT / ".github/workflows/publish-images.yml").read_text())
+    matrix = main["jobs"]["build-and-push"]["strategy"]["matrix"]["image"]
+    assert {image["name"] for image in matrix} == {"ee-builder", "dev-tools", "gateway"}
+    for filename in ("awx-ui-runtime.yml", "eda-runtime.yml"):
+        workflow = yaml.safe_load((ROOT / ".github/workflows" / filename).read_text())
+        assert "packages" not in workflow["permissions"]
+        for job in workflow["jobs"].values():
+            assert all("docker push" not in step.get("run", "") for step in job["steps"])
+    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
+    for name in (
+        "pulp-api", "pulp-content", "pulp-worker", "galaxy-ng", "eda-controller",
+        "eda-worker", "eda-activation-worker", "eda-ws", "eda-podman",
+    ):
+        assert "${DEVEL_IMAGE_TAG:-devel}" in compose["services"][name]["image"]
+        assert "${AAX_VERSION" not in compose["services"][name]["image"]
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        "valid", "failed", "in-progress", "wrong-workflow", "branch", "wrong-tag",
+        "wrong-attempt", "unconfirmed", "invalid-id", "missing-webhook", "webhook-failure",
+    ],
+)
+def test_deployment_requires_explicit_verified_bundle_before_webhook(
+    tmp_path: Path, scenario: str
+) -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/deploy.yml").read_text())
+    triggers = workflow.get("on", workflow.get(True))
+    assert set(triggers) == {"workflow_dispatch"}
+    assert workflow["concurrency"]["cancel-in-progress"] is False
+    job = workflow["jobs"]["deploy"]
+    assert job["if"] == "github.ref == 'refs/heads/main'"
+    verify, deploy = job["steps"]
+    assert "PORTAINER_WEBHOOK_URL" not in verify.get("env", {})
+    assert "${{ inputs." not in verify["run"]
+    run = {
+        "id": 123, "run_attempt": 2, "path": ".github/workflows/publish-devel.yml",
+        "head_branch": "main", "status": "completed", "conclusion": "success",
+        "head_sha": "a" * 40,
+    }
+    if scenario == "failed":
+        run["conclusion"] = "failure"
+    elif scenario == "in-progress":
+        run["status"] = "in_progress"
+    elif scenario == "wrong-workflow":
+        run["path"] = ".github/workflows/publish-images.yml"
+    elif scenario == "branch":
+        run["head_branch"] = "fix/not-production"
+    run_json = tmp_path / "run.json"
+    run_json.write_text(json.dumps(run))
+    gh = tmp_path / "gh"
+    gh.write_text('#!/bin/sh\ncat "$RUN_JSON"\n')
+    gh.chmod(0o755)
+    curl = tmp_path / "curl"
+    curl.write_text(
+        '#!/bin/sh\nprintf "%s\\n" "$*" > "$WEBHOOK_LOG"\n'
+        'if [ "$SCENARIO" = webhook-failure ]; then exit 22; fi\n'
+    )
+    curl.chmod(0o755)
+    webhook_log = tmp_path / "webhook.log"
+    summary = tmp_path / "summary"
+    tag = "devel-" + "a" * 40 + "-123-2"
+    if scenario == "wrong-tag":
+        tag = "devel-unpublished"
+    elif scenario == "wrong-attempt":
+        tag = "devel-" + "a" * 40 + "-123-1"
+    result = subprocess.run(
+        ["bash", "-c", verify["run"] + "\n" + deploy["run"]],
+        cwd=tmp_path, capture_output=True, text=True, timeout=15,
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
+             "SCENARIO": scenario, "RUN_JSON": str(run_json), "WEBHOOK_LOG": str(webhook_log),
+             "GITHUB_REPOSITORY": "example/aax", "GITHUB_STEP_SUMMARY": str(summary),
+             "BUNDLE_RUN_ID": "invalid" if scenario == "invalid-id" else "123",
+             "BUNDLE_TAG": tag,
+             "PORTAINER_PINS_CONFIRMED": "false" if scenario == "unconfirmed" else "true",
+             "PORTAINER_WEBHOOK_URL": "" if scenario == "missing-webhook" else "https://portainer.invalid/webhook"},
+    )
+    assert (result.returncode == 0) == (scenario == "valid"), result.stderr
+    assert webhook_log.exists() == (scenario in ("valid", "webhook-failure"))
+    assert summary.exists() == (scenario == "valid")
+    if scenario == "valid":
+        assert "Verify service health and activations" in summary.read_text()

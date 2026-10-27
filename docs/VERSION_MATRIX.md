@@ -7,7 +7,8 @@ This document is the canonical tested version matrix for the current AAX baselin
 The project intentionally targets a recent, compatible AAP-like deployment baseline:
 
 - upstream AWX and AWX EE are pinned to recent tested versions
-- repo-owned compatibility components follow the AAX release channel
+- execution/dev-tool images follow the AAX release channel
+- Hub/EDA use the maintained upstream bundle, not the retired legacy publisher
 - Portainer remains the deployment gate for the assembled stack
 
 | Component      | Default Tag | Source             |
@@ -17,9 +18,10 @@ The project intentionally targets a recent, compatible AAP-like deployment basel
 | ee-base        | `latest`    | `AAX_VERSION`      |
 | ee-builder     | `latest`    | `AAX_VERSION`      |
 | dev-tools      | `latest`    | `AAX_VERSION`      |
-| galaxy-ng      | `latest`    | `AAX_VERSION`      |
-| pulp           | `latest`    | `AAX_VERSION`      |
-| eda-controller | `latest`    | `AAX_VERSION`      |
+| galaxy-ng      | `devel`     | `DEVEL_IMAGE_TAG`  |
+| pulp           | `devel`     | `DEVEL_IMAGE_TAG`  |
+| eda-controller | `devel`     | `DEVEL_IMAGE_TAG`  |
+| eda-podman     | `devel`     | `DEVEL_IMAGE_TAG`  |
 | gateway        | `latest`    | `AAX_VERSION`      |
 | receptor       | `devel`     | `RECEPTOR_VERSION` |
 
@@ -29,14 +31,22 @@ compatibility pin for callers who build the older `24.6.1` stable tag.
 
 The execution environment uses `ansible-core` 2.21.5, `ansible-runner` 2.4.3,
 and Python 3.14. Development tools use `ansible-navigator` 26.10.0,
-`ansible-lint` 26.10.1, and `ansible-dev-tools` 26.10.0. EDA uses
-`ansible-rulebook` 1.3.2. Galaxy NG uses its latest tagged release, 4.10.6,
-with Pulp 3.49.40, `pulp-ansible` 0.25.1, and `pulp-container` 2.19.2, matching
-that release's dependency constraints.
+`ansible-lint` 26.10.1, and `ansible-dev-tools` 26.10.0. Controller and Hub
+versions follow the exact source revisions and source-patched dependencies
+recorded in each successful upstream bundle's provenance, not the versions
+in the retained legacy Docker recipes.
 
 The EE builder uses `ansible-builder` 3.2.0. Development validation uses
 pytest 9.1.1, pytest-cov 7.1.0, pre-commit 4.7.0 and Commitizen 4.19.2.
 The patched pip wheel vendors Rich 15.0.0.
+
+The Python 3.11 Galaxy/Pulp recipes and rulebook-only EDA recipe are retained
+as legacy source, not published as production controllers. Their old `latest`
+images are not maintained and must not be used for new deployments. The upstream
+bundle is the only publisher of AWX, Hub/Pulp and the real EDA controller;
+standalone AWX UI and EDA workflows are validation-only. Production selects a
+successful immutable bundle tag and uses both Compose files as documented in
+[Portainer deployment](PORTAINER_DEVEL.md).
 
 ## Kubernetes Component Images
 
