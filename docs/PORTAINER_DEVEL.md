@@ -84,6 +84,15 @@ Upstream changes may require reviewed patch refreshes before the next bundle
 can publish. Full-stack compatibility validation is still required before
 production deployment; the image scan gate alone is not production sign-off.
 
+Before nested Podman validation, the disposable GitHub-hosted runner removes
+only named build-stage image tags, builder caches and dangling images. It
+verifies that all nine final candidate image IDs are unchanged and requires
+at least 20 GiB free for nested VFS storage and scanning. The decision environment
+streams directly into Podman, avoiding a retained Docker archive. Registry
+egress uses a small digest-pinned Quay BusyBox pull; HTTPS and rulebook execution
+still run in the actual patched decision environment. Production storage is
+never pruned by this workflow.
+
 ### CentOS Stream and native package coverage
 
 Trivy does not cover CentOS Stream OS packages. The bundle also uses

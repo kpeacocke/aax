@@ -270,27 +270,69 @@ jobs:
             -t eda-decision-environment:patched images/runtime-security
           docker tag eda-decision-environment:patched eda-decision-environment:devel
 
+      - name: Reclaim build-only storage before runtime validation
+        run: |
+          set -euo pipefail
+          docker system df
+          names=(awx awx-ee receptor ansible-rulebook galaxy-ng gateway eda-controller eda-podman eda-decision-environment)
+          final_images=()
+          for name in "${names[@]}"; do
+            final_images+=("$(docker image inspect --format '{{.Id}}' "$name:devel")")
+          done
+          image_tags="$(docker image ls --format '{{.Repository}}:{{.Tag}}')"
+          candidates=(
+            awx:with-ui galaxy-ng:runtime
+            aax/rpm-builder:bootstrap aax/go-security:devel aax/pip-security:devel
+            aax/dab-security:awx aax/dab-security:galaxy-ng aax/dab-security:eda-controller
+          )
+          for name in awx awx-ee receptor ansible-rulebook galaxy-ng eda-controller eda-podman eda-decision-environment; do
+            for stage in os-patched rpm-patched finalized python-patched patched; do
+              candidates+=("$name:$stage")
+            done
+          done
+          for image in "${candidates[@]}"; do
+            if grep -Fxq "$image" <<< "$image_tags"; then
+              docker image rm "$image"
+            fi
+          done
+          # Only this disposable hosted runner's builders and dangling images.
+          docker buildx prune --all --force
+          docker builder prune --all --force
+          docker image prune --force
+          for index in "${!names[@]}"; do
+            name="${names[$index]}"
+            actual="$(docker image inspect --format '{{.Id}}' "$name:devel")"
+            if [[ "$actual" != "${final_images[$index]}" ]]; then
+              echo "Storage cleanup changed final candidate $name:devel" >&2
+              exit 1
+            fi
+          done
+          docker system df
+          df -h "$RUNNER_TEMP"
+          available="$(df -PB1 "$RUNNER_TEMP" | awk 'END {print $4}')"
+          required=$((20 * 1024 * 1024 * 1024))
+          if (( available < required )); then
+            echo "Nested VFS validation needs at least $required free bytes; only $available remain after build-cache cleanup." >&2
+            exit 1
+          fi
+
       - name: Verify nested Podman execution and outbound HTTPS
         run: |
           set -euo pipefail
           network=aax-eda-backend-test
           volume=aax-eda-backend-storage-test
-          archive="$RUNNER_TEMP/eda-decision-environment.tar"
           cleanup() {
             docker rm -f aax-eda-podman-test >/dev/null 2>&1 || true
             docker volume rm "$volume" >/dev/null 2>&1 || true
             docker network rm "$network" >/dev/null 2>&1 || true
-            rm -f "$archive"
           }
           trap cleanup EXIT
           docker network create "$network"
           docker volume create "$volume"
           docker tag eda-decision-environment:devel localhost/eda-decision-environment:devel
-          docker save localhost/eda-decision-environment:devel -o "$archive"
           docker run -d --name aax-eda-podman-test --privileged \
             --network "$network" --dns 1.1.1.1 \
             -v "$volume:/var/lib/containers/storage" \
-            -v "$archive:/tmp/eda-decision-environment.tar:ro" \
             eda-podman:devel
           for attempt in $(seq 1 30); do
             if docker exec aax-eda-podman-test \
@@ -303,12 +345,13 @@ jobs:
             }
             sleep 2
           done
-          docker exec aax-eda-podman-test podman load -i /tmp/eda-decision-environment.tar
+          docker save localhost/eda-decision-environment:devel \
+            | docker exec -i aax-eda-podman-test podman load
           docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
             --remote --url tcp://aax-eda-podman-test:8888 info
           docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
             --remote --url tcp://aax-eda-podman-test:8888 pull \
-            quay.io/ansible/ansible-rulebook@sha256:68bb8aae9ad8be20863a6d42a97cea8a4865d393e1ed63f29259162e5e6108dd
+            quay.io/prometheus/busybox@sha256:7379672d53c28113469275f2eb48adffa19954f39f8ef20c1e2992278f658e6c
           docker run --rm --network "$network" --entrypoint podman eda-podman:devel \
             --remote --url tcp://aax-eda-podman-test:8888 run --rm \
             localhost/eda-decision-environment:devel python3.12 -c \
