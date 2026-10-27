@@ -14,8 +14,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check branch name follows gitflow
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
         run: |
-          BRANCH_NAME="${{ github.head_ref }}"
           echo "Checking branch name: $BRANCH_NAME"
 
           # Allow specific gitflow branch patterns plus common automation branch prefixes
@@ -55,10 +56,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check PR target follows gitflow
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref }}
+          TARGET_BRANCH: ${{ github.base_ref }}
         run: |
-          SOURCE_BRANCH="${{ github.head_ref }}"
-          TARGET_BRANCH="${{ github.base_ref }}"
-
           echo "Source: $SOURCE_BRANCH → Target: $TARGET_BRANCH"
 
           # Gitflow rules:

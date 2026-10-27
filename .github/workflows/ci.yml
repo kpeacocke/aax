@@ -64,6 +64,9 @@ jobs:
       - name: Run pre-commit hooks
         run: pre-commit run --all-files
 
+      - name: Validate GitHub Actions workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -shellcheck=''
+
   secrets-scan:
     name: Scan for Secrets
     runs-on: ubuntu-latest

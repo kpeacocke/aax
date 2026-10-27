@@ -2,6 +2,40 @@
 
 This document describes the CI/CD pipeline for the AAX project.
 
+## Publication contract
+
+`publish-images.yml` (main-channel images), `release.yml` (versioned execution
+images), and `publish-devel.yml` (the upstream controller bundle) are distinct
+publication lanes. A green build in one lane is not clearance for another.
+
+Main-channel and release publication follow this sequence:
+
+1. Build both architectures under a run/attempt-specific candidate tag.
+2. Scan that exact manifest digest on `linux/amd64` and `linux/arm64` using
+   [scan-image-candidate.sh](../../scripts/scan-image-candidate.sh). The helper
+   rejects mutable tags and applies the strict vulnerability-report gate.
+3. Give every SARIF run a stable lane/image/architecture/run-index identity.
+   Upload only normalized SARIF; retain the original scanner JSON and SARIF as
+   artifacts even when scanning, gating or uploading fails. A shared upload
+   `category` must not collapse the architecture identities.
+4. Promote the scanned digest, never rebuild it. Descendant execution images
+   use the exact scanned base digest. Release descendants are also signed and
+   attested before version tags are promoted.
+
+Main-channel promotion is restricted to `refs/heads/main`. A manual run on a
+fix branch validates real candidates and SARIF uploads without moving production
+`main`/`latest` tags or triggering the main-branch deployment webhook.
+
+Scanner errors, malformed reports, missing OS coverage, fixable HIGH/CRITICAL
+findings and reporting failures all block promotion. PR policy tests execute the
+scanner helper with clean, vulnerable, failed and malformed scanner responses,
+including multiple SARIF runs per architecture.
+
+The upstream bundle additionally needs its source-patch builds and nested
+Podman/rulebook test. A published image or successful webhook is not proof that
+the production stack is upgraded: deployment must select the successful lane's
+immutable tag and verify the actual services and activation behavior.
+
 ## Workflow Architecture
 
 ```text

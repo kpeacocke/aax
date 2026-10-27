@@ -767,9 +767,158 @@ def test_main_channel_promotes_only_scanned_candidate_digests() -> None:
         build = next(step for step in steps if step.get("id") == "build")
         assert ":build-${{ github.run_id }}-${{ github.run_attempt }}" in build["with"]["tags"]
         scan = next(step for step in steps if step.get("name", "").startswith("Scan candidate"))
-        assert "for arch in amd64 arm64" in scan["run"]
+        assert 'bash scripts/scan-image-candidate.sh "$IMAGE"' in scan["run"]
         assert "@${{ steps.build.outputs.digest }}" in scan["env"]["IMAGE"]
-        assert "bash scripts/check-vulnerability-reports.sh" in scan["run"]
+        upload = next(step for step in steps if step.get("name") == "Upload candidate findings")
+        assert upload["with"] == {"sarif_file": "image-sarif"}
+        assert upload["if"] == "always() && hashFiles('image-sarif/*.sarif') != ''"
+        preserve = next(step for step in steps if step.get("name") == "Preserve candidate reports")
+        assert preserve["if"] == "always() && hashFiles('image-reports/*') != ''"
+        assert preserve["with"]["path"].splitlines() == ["image-reports/", "image-sarif/"]
+        promote = next(step for step in steps if step.get("name") == "Promote scanned candidate")
+        assert promote["if"] == "github.ref == 'refs/heads/main'"
+        assert promote["env"]["IMAGE"] == scan["env"]["IMAGE"]
     base = workflow["jobs"]["build-and-push"]["steps"]
     base_arg = next(step for step in base if step.get("id") == "base")
     assert "aax-ee-base@$BASE_DIGEST" in base_arg["run"]
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    ["clean", "high-amd64", "high-arm64", "scanner-failure", "invalid-json", "invalid-sarif"],
+)
+def test_candidate_scan_executes_both_architectures_and_fails_closed(
+    tmp_path: Path, scenario: str
+) -> None:
+    scanner = tmp_path / "trivy"
+    scanner.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os, pathlib, sys\n"
+        "args = sys.argv[1:]\n"
+        "with open(os.environ['SCAN_LOG'], 'a') as log:\n"
+        "    log.write(json.dumps(args) + '\\n')\n"
+        "output = pathlib.Path(args[args.index('--output') + 1])\n"
+        "scenario = os.environ['SCENARIO']\n"
+        "if args[0] == 'convert':\n"
+        "    if scenario == 'invalid-sarif' and output.stem == 'arm64':\n"
+        "        output.write_text(json.dumps({'runs': []}))\n"
+        "    else:\n"
+        "        run = {'tool': {'driver': {'name': 'Trivy'}},\n"
+        "               'automationDetails': {'id': 'duplicate/'},\n"
+        "               'results': [{'ruleId': 'keep-finding'}]}\n"
+        "        output.write_text(json.dumps({'version': '2.1.0', 'runs': [run, run]}))\n"
+        "else:\n"
+        "    arch = args[args.index('--platform') + 1].split('/')[-1]\n"
+        "    if scenario == 'scanner-failure' and arch == 'arm64':\n"
+        "        sys.exit(7)\n"
+        "    if scenario == 'invalid-json' and arch == 'arm64':\n"
+        "        output.write_text('{}')\n"
+        "    else:\n"
+        "        vulnerabilities = []\n"
+        "        if scenario == 'high-' + arch:\n"
+        "            vulnerabilities.append({'VulnerabilityID': 'TEST-CVE',\n"
+        "                                    'Severity': 'HIGH', 'FixedVersion': '2'})\n"
+        "        output.write_text(json.dumps({'SchemaVersion': 2, 'Results': [\n"
+        "            {'Class': 'os-pkgs', 'Vulnerabilities': vulnerabilities}]}))\n"
+    )
+    scanner.chmod(0o755)
+    image = "ghcr.io/example/candidate@sha256:" + "a" * 64
+    log = tmp_path / "scanner.log"
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/scan-image-candidate.sh"), image, "published-test"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=15,
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
+             "SCENARIO": scenario, "SCAN_LOG": str(log)},
+    )
+    assert (result.returncode == 0) == (scenario == "clean"), result.stderr
+    calls = [json.loads(line) for line in log.read_text().splitlines()]
+    scans = [call for call in calls if call[0] == "image"]
+    assert [call[call.index("--platform") + 1] for call in scans] == [
+        "linux/amd64", "linux/arm64",
+    ]
+    assert all(call[-1] == image for call in scans)
+    assert (tmp_path / "image-reports/amd64.json").exists()
+    assert (tmp_path / "image-reports/amd64.sarif").exists()
+    identities = []
+    for path in (tmp_path / "image-sarif").glob("*.sarif"):
+        data = json.loads(path.read_text())
+        for index, run in enumerate(data["runs"]):
+            assert run["results"] == [{"ruleId": "keep-finding"}]
+            assert run["automationDetails"]["id"] == f"published-test/{path.stem}/{index}/"
+            identities.append(run["automationDetails"]["id"])
+    assert len(identities) == len(set(identities))
+    assert len(identities) == (2 if scenario in ("scanner-failure", "invalid-sarif") else 4)
+    if scenario.startswith("high-"):
+        assert "TEST-CVE" in result.stderr
+
+
+def test_candidate_scan_rejects_mutable_tags_before_running_scanner(tmp_path: Path) -> None:
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/scan-image-candidate.sh"), "example:main", "test"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 2
+    assert "immutable sha256 image digest" in result.stderr
+    assert not (tmp_path / "image-reports").exists()
+
+
+@pytest.mark.parametrize("job_name", ["build-base-image", "build-and-push"])
+def test_release_promotes_only_the_exact_multiarch_scanned_digest(job_name: str) -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
+    job = workflow["jobs"][job_name]
+    steps = job["steps"]
+    names = [step.get("name", "") for step in steps]
+    assert names.index("Scan candidate on both architectures before promotion") < names.index(
+        "Promote scanned candidate"
+    )
+    build = next(step for step in steps if step.get("id") in ("build", "build-push"))
+    assert ":release-build-${{ github.run_id }}-${{ github.run_attempt }}" in build["with"]["tags"]
+    scan = next(step for step in steps if step.get("name", "").startswith("Scan candidate"))
+    assert 'bash scripts/scan-image-candidate.sh "$IMAGE" release-' in scan["run"] or (
+        'bash scripts/scan-image-candidate.sh "$IMAGE" "release-' in scan["run"]
+    )
+    assert f"@${{{{ steps.{build['id']}.outputs.digest }}}}" in scan["env"]["IMAGE"]
+    upload = next(step for step in steps if step.get("name") == "Upload candidate findings")
+    assert upload["with"] == {"sarif_file": "image-sarif"}
+    preserve = next(step for step in steps if step.get("name") == "Preserve candidate reports")
+    assert preserve["if"] == "always() && hashFiles('image-reports/*') != ''"
+    promote = next(step for step in steps if step.get("name") == "Promote scanned candidate")
+    assert "if" not in promote
+    assert promote["env"]["IMAGE"] == scan["env"]["IMAGE"]
+    if job_name == "build-and-push":
+        assert "aax-ee-base@${{ needs.build-base-image.outputs.digest }}" in build["with"]["build-args"]
+        sbom = next(step for step in steps if step.get("name") == "Generate SBOM")
+        assert sbom["with"]["image"] == scan["env"]["IMAGE"]
+        assert names.index("Attest SBOM") < names.index("Promote scanned candidate")
+
+
+@pytest.mark.parametrize(
+    "filename,job_name,step_name,env_name",
+    [
+        ("gitflow-enforce.yml", "check-branch-name", "Check branch name follows gitflow", "BRANCH_NAME"),
+        ("gitflow-enforce.yml", "check-target-branch", "Check PR target follows gitflow", "SOURCE_BRANCH"),
+        ("pr-automation.yml", "conventional-commits", "Advisory conventional commit check", "PR_TITLE"),
+    ],
+)
+def test_pr_metadata_is_data_not_executable_shell(
+    tmp_path: Path, filename: str, job_name: str, step_name: str, env_name: str
+) -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows" / filename).read_text())
+    step = next(step for step in workflow["jobs"][job_name]["steps"] if step["name"] == step_name)
+    assert "${{ github." not in step["run"]
+    assert env_name in step["env"]
+    payload = "$(touch INJECTED)"
+    result = subprocess.run(
+        ["bash", "-c", step["run"]],
+        cwd=tmp_path, capture_output=True, text=True, timeout=10,
+        env={**os.environ, env_name: payload, "TARGET_BRANCH": "main"},
+    )
+    assert not (tmp_path / "INJECTED").exists()
+    assert payload in result.stdout
+    assert result.returncode == (0 if env_name == "PR_TITLE" else 1)
+
+
+def test_ci_validates_all_workflow_definitions() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
+    lint = workflow["jobs"]["lint"]["steps"]
+    assert any("actionlint@v1.7.12" in step.get("run", "") for step in lint)
