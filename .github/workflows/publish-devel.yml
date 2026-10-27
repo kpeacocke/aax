@@ -428,6 +428,8 @@ jobs:
         with:
           name: bundle-runtime-${{ github.run_attempt }}
           path: |
+            candidate-maps/gated/eda-podman.json
+            candidate-maps/gated/eda-decision-environment.json
             bundle-reports/nested-runtime.log
             bundle-reports/eda-rulebook-smoke.log
             bundle-reports/runtime-gate.json

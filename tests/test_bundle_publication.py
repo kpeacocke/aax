@@ -424,11 +424,27 @@ def test_staged_jobs_build_independently_and_reuse_exact_dependencies() -> None:
     assert "git ls-remote" not in (ROOT / "scripts/build-bundle-image.sh").read_text()
 
 
+def test_runtime_artifact_preserves_workspace_relative_evidence_layout() -> None:
+    preserve = next(
+        step for step in JOBS["validate-runtime"]["steps"]
+        if step.get("name") == "Preserve runtime evidence on failure"
+    )
+    paths = [Path(path) for path in preserve["with"]["path"].splitlines()]
+    assert Path(os.path.commonpath([str(path.parent) for path in paths])) == Path(".")
+    assert set(paths) == {
+        Path("candidate-maps/gated/eda-podman.json"),
+        Path("candidate-maps/gated/eda-decision-environment.json"),
+        Path("bundle-reports/nested-runtime.log"),
+        Path("bundle-reports/eda-rulebook-smoke.log"),
+        Path("bundle-reports/runtime-gate.json"),
+    }
+    assert preserve["if"] == "always()"
+
+
 @pytest.mark.parametrize("mismatch,fail_push", [(False, False), (True, False), (False, True)])
 def test_candidate_transfer_records_exact_manifest_and_rejects_substitution(
     tmp_path: Path, mismatch: bool, fail_push: bool
 ) -> None:
-    expected_success = not (mismatch or fail_push)
     env = bundle_evidence(tmp_path)
     descriptor = tmp_path / "candidate-maps/gated/awx.json"
     descriptor.unlink()
@@ -456,11 +472,11 @@ def test_candidate_transfer_records_exact_manifest_and_rejects_substitution(
             "MANIFEST_ID": "sha256:" + "e" * 64, "FAIL_PUSH": str(fail_push).lower(),
         }, capture_output=True, text=True, timeout=30,
     )
-    assert (result.returncode == 0) == expected_success, result.stderr
-    assert descriptor.exists() == expected_success
+    assert (result.returncode == 0) == (not (mismatch or fail_push)), result.stderr
+    assert descriptor.exists() == (not (mismatch or fail_push))
     assert "candidate-101-1-gated" in log.read_text()
     assert ":devel-" not in log.read_text()
-    if expected_success:
+    if not (mismatch or fail_push):
         identity = json.loads(descriptor.read_text())
         assert identity["image_id"] == image_id
         assert identity["digest"] == "sha256:" + "e" * 64
@@ -628,7 +644,6 @@ def test_branch_dispatch_retains_candidates_without_any_promotion(tmp_path: Path
 def test_exact_digest_scans_require_both_scanners_before_receipt(
     tmp_path: Path, fail_scanner: bool, mismatch: bool, fixable: bool
 ) -> None:
-    expected_success = not (fail_scanner or mismatch or fixable)
     env = bundle_evidence(tmp_path)
     receipt = tmp_path / "bundle-reports/awx-gate.json"
     receipt.unlink()
@@ -669,8 +684,8 @@ def test_exact_digest_scans_require_both_scanners_before_receipt(
              "GRYPE_SOURCE": str(grype_source), "FAIL_SCANNER": str(fail_scanner).lower()},
         capture_output=True, text=True, timeout=30,
     )
-    assert (result.returncode == 0) == expected_success, result.stderr
-    assert receipt.exists() == expected_success
+    assert (result.returncode == 0) == (not (fail_scanner or mismatch or fixable)), result.stderr
+    assert receipt.exists() == (not (fail_scanner or mismatch or fixable))
     commands = log.read_text().splitlines()
     reference = "ghcr.io/testowner/aax-awx@sha256:" + f"{1:064x}"
     assert any(reference in command and "--image-src docker" in command for command in commands)
