@@ -266,6 +266,9 @@ jobs:
           docker build --build-arg BASE_IMAGE=ansible-rulebook:devel \
             -t ansible-rulebook:patched images/drools-runtime
           docker tag ansible-rulebook:patched ansible-rulebook:devel
+          docker build -f images/eda-decision-environment/Security.Dockerfile \
+            -t eda-decision-environment:patched images/runtime-security
+          docker tag eda-decision-environment:patched eda-decision-environment:devel
 
       - name: Verify nested Podman execution and outbound HTTPS
         run: |
@@ -310,6 +313,12 @@ jobs:
             --remote --url tcp://aax-eda-podman-test:8888 run --rm \
             localhost/eda-decision-environment:devel python3.12 -c \
             "import urllib.request; assert urllib.request.urlopen('https://api.github.com', timeout=20).status == 200"
+          docker run --rm -i --network "$network" --entrypoint podman eda-podman:devel \
+            --remote --url tcp://aax-eda-podman-test:8888 run --rm -i \
+            localhost/eda-decision-environment:devel ansible-rulebook \
+            --rulebook /dev/stdin --shutdown-delay 1 < tests/fixtures/eda-smoke.yml \
+            | tee "$RUNNER_TEMP/eda-rulebook-smoke.log"
+          grep -Fq AAX_DECISION_SECURITY_SMOKE_PASSED "$RUNNER_TEMP/eda-rulebook-smoke.log"
 
       - name: Record exact build sources
         run: |

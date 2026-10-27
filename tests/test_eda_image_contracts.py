@@ -25,6 +25,25 @@ def test_podman_backend_uses_persistent_vfs_storage() -> None:
     assert 'tcp://0.0.0.0:8888' in dockerfile
 
 
+def test_decision_environment_receives_runtime_security_patches() -> None:
+    dockerfile = (ROOT / "images/eda-decision-environment/Security.Dockerfile").read_text()
+    workflow = (ROOT / ".github/workflows/publish-devel.yml").read_text()
+
+    assert "ARG PIP_IMAGE=aax/pip-security:devel" in dockerfile
+    assert "ARG DROOLS_IMAGE=ansible-rulebook:patched" in dockerfile
+    assert "dnf -y remove tracker-miners webkit2gtk3-jsc" in dockerfile
+    assert "python3.12 -m pip install --no-cache-dir --user --upgrade" in dockerfile
+    assert "requirements-decision-environment.txt" in dockerfile
+    assert "python3.12 -m pip check" in dockerfile
+    assert "python3.12 -m pip cache purge" in dockerfile
+    patch = workflow.index("docker build -f images/eda-decision-environment/Security.Dockerfile")
+    execution = workflow.index("- name: Verify nested Podman execution and outbound HTTPS")
+    assert patch < execution
+    assert "docker tag eda-decision-environment:patched eda-decision-environment:devel" in workflow
+    assert "--rulebook /dev/stdin --shutdown-delay 1 < tests/fixtures/eda-smoke.yml" in workflow
+    assert 'grep -Fq AAX_DECISION_SECURITY_SMOKE_PASSED "$RUNNER_TEMP/eda-rulebook-smoke.log"' in workflow
+
+
 def test_eda_entrypoint_dispatches_both_workers_and_asgi() -> None:
     entrypoint = (ROOT / "images/eda-server/entrypoint.sh").read_text()
 
