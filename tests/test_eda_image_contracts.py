@@ -50,3 +50,8 @@ def test_eda_entrypoint_dispatches_both_workers_and_asgi() -> None:
     assert "dispatcherd --worker-class DefaultWorker" in entrypoint
     assert "dispatcherd --worker-class ActivationWorker" in entrypoint
     assert "daphne -b 0.0.0.0 -p 8000 aap_eda.asgi:application" in entrypoint
+
+
+def test_image_contracts_run_in_every_policy_command() -> None:
+    for path in (".github/workflows/ci.yml", ".github/workflows/release.yml", "Makefile"):
+        assert "tests/test_eda_image_contracts.py" in (ROOT / path).read_text()
