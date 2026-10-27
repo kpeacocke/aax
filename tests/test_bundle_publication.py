@@ -428,6 +428,7 @@ def test_staged_jobs_build_independently_and_reuse_exact_dependencies() -> None:
 def test_candidate_transfer_records_exact_manifest_and_rejects_substitution(
     tmp_path: Path, mismatch: bool, fail_push: bool
 ) -> None:
+    expected_success = not (mismatch or fail_push)
     env = bundle_evidence(tmp_path)
     descriptor = tmp_path / "candidate-maps/gated/awx.json"
     descriptor.unlink()
@@ -455,12 +456,11 @@ def test_candidate_transfer_records_exact_manifest_and_rejects_substitution(
             "MANIFEST_ID": "sha256:" + "e" * 64, "FAIL_PUSH": str(fail_push).lower(),
         }, capture_output=True, text=True, timeout=30,
     )
-    success = not (mismatch or fail_push)
-    assert (result.returncode == 0) == success, result.stderr
-    assert descriptor.exists() == success
+    assert (result.returncode == 0) == expected_success, result.stderr
+    assert descriptor.exists() == expected_success
     assert "candidate-101-1-gated" in log.read_text()
     assert ":devel-" not in log.read_text()
-    if success:
+    if expected_success:
         identity = json.loads(descriptor.read_text())
         assert identity["image_id"] == image_id
         assert identity["digest"] == "sha256:" + "e" * 64
@@ -628,6 +628,7 @@ def test_branch_dispatch_retains_candidates_without_any_promotion(tmp_path: Path
 def test_exact_digest_scans_require_both_scanners_before_receipt(
     tmp_path: Path, fail_scanner: bool, mismatch: bool, fixable: bool
 ) -> None:
+    expected_success = not (fail_scanner or mismatch or fixable)
     env = bundle_evidence(tmp_path)
     receipt = tmp_path / "bundle-reports/awx-gate.json"
     receipt.unlink()
@@ -668,9 +669,8 @@ def test_exact_digest_scans_require_both_scanners_before_receipt(
              "GRYPE_SOURCE": str(grype_source), "FAIL_SCANNER": str(fail_scanner).lower()},
         capture_output=True, text=True, timeout=30,
     )
-    success = not (fail_scanner or mismatch or fixable)
-    assert (result.returncode == 0) == success, result.stderr
-    assert receipt.exists() == success
+    assert (result.returncode == 0) == expected_success, result.stderr
+    assert receipt.exists() == expected_success
     commands = log.read_text().splitlines()
     reference = "ghcr.io/testowner/aax-awx@sha256:" + f"{1:064x}"
     assert any(reference in command and "--image-src docker" in command for command in commands)
