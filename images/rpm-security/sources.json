@@ -101,9 +101,9 @@
     "release": "2.el9.aax.1"
   },
   "skopeo": {
-    "url": "https://vault.almalinux.org/9.8/AppStream/Source/Packages/skopeo-1.22.2-8.el9_8.src.rpm",
-    "sha256": "f8693b717156da7cca7b486cc21a587cf0c87cd9636bb079344ed55990bc3222",
-    "release": "9.el9.aax.2"
+    "url": "https://vault.almalinux.org/9.8/AppStream/Source/Packages/skopeo-1.22.2-9.el9_8.src.rpm",
+    "sha256": "1031a266cc0495f16c34289d2070739e542511a3fc647371723200c08c399fe3",
+    "release": "10.el9.aax.3"
   },
   "sqlite": {
     "url": "https://vault.almalinux.org/9.8/BaseOS/Source/Packages/sqlite-3.34.1-11.el9_8.src.rpm",
