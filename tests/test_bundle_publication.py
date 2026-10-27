@@ -348,6 +348,74 @@ def test_nested_podman_uses_explicit_local_decision_environment() -> None:
     assert f"docker tag eda-decision-environment:devel {image}" in nested_podman
     assert f"docker save {image}" in nested_podman
     assert f"{image} python3.12 -c" in nested_podman
+    assert '| docker exec -i aax-eda-podman-test podman load' in nested_podman
+    assert "eda-decision-environment.tar" not in nested_podman
+    assert "quay.io/prometheus/busybox@sha256:" in nested_podman
+    assert "pull \\\n            quay.io/ansible/ansible-rulebook@" not in nested_podman
+    names = [step.get("name", "") for step in STEPS]
+    assert names.index("Apply maintained runtime security patches") < names.index(
+        "Reclaim build-only storage before runtime validation"
+    ) < names.index("Verify nested Podman execution and outbound HTTPS")
+
+
+@pytest.mark.parametrize(
+    ("available", "fail_prune", "changed_image", "success"),
+    [(20 * 1024**3, False, False, True),
+     (20 * 1024**3 - 1, False, False, False),
+     (40 * 1024**3, True, False, False),
+     (40 * 1024**3, False, True, False)],
+)
+def test_bundle_storage_cleanup_preserves_candidates_and_requires_disk_budget(
+    tmp_path: Path, available: int, fail_prune: bool, changed_image: bool, success: bool
+) -> None:
+    binary = tmp_path / "bin"
+    binary.mkdir()
+    (binary / "docker").write_text(
+        '#!/bin/bash\n'
+        'printf "%s\\n" "$*" >> "$DOCKER_LOG"\n'
+        'case "$1 $2" in\n'
+        '  "image inspect")\n'
+        '    if [[ -f "$PRUNED" && "$CHANGED_IMAGE" == true ]]; then echo changed;\n'
+        '    else echo "sha256:${*: -1}"; fi ;;\n'
+        '  "image ls") printf "%s\\n" awx:devel awx:with-ui awx:os-patched '
+        'aax/rpm-builder:bootstrap unrelated:keep ;;\n'
+        '  "buildx prune"|"builder prune")\n'
+        '    if [[ "$FAIL_PRUNE" == true ]]; then echo "prune failed" >&2; exit 1; fi\n'
+        '    touch "$PRUNED" ;;\n'
+        'esac\n'
+    )
+    (binary / "df").write_text(
+        '#!/bin/bash\n'
+        'printf "Filesystem 1B-blocks Used Available Use%% Mounted on\\n"\n'
+        'printf "/dev/test 99999999999 0 %s 0%% /\\n" "$AVAILABLE"\n'
+    )
+    for executable in binary.iterdir():
+        executable.chmod(0o755)
+    log = tmp_path / "docker.log"
+    result = subprocess.run(
+        ["bash", "-c", script("Reclaim build-only storage before runtime validation")],
+        env={
+            **os.environ, "PATH": f"{binary}:{os.environ['PATH']}",
+            "DOCKER_LOG": str(log), "PRUNED": str(tmp_path / "pruned"),
+            "RUNNER_TEMP": str(tmp_path), "AVAILABLE": str(available),
+            "FAIL_PRUNE": str(fail_prune).lower(),
+            "CHANGED_IMAGE": str(changed_image).lower(),
+        },
+        capture_output=True, text=True, timeout=10,
+    )
+    assert (result.returncode == 0) == success, result.stderr
+    commands = log.read_text().splitlines()
+    assert [command for command in commands if command.startswith("image rm ")] == [
+        "image rm awx:with-ui",
+        "image rm aax/rpm-builder:bootstrap",
+        "image rm awx:os-patched",
+    ]
+    assert "image prune --all" not in "\n".join(commands)
+    assert "system prune" not in "\n".join(commands)
+    if available < 20 * 1024**3:
+        assert "free bytes" in result.stderr
+    if fail_prune:
+        assert "prune failed" in result.stderr
 
 
 @pytest.mark.parametrize(
