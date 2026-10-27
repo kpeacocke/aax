@@ -8,6 +8,7 @@ on:
       - "images/**"
       - ".github/workflows/publish-images.yml"
       - "scripts/check-vulnerability-reports.sh"
+      - "scripts/scan-image-candidate.sh"
   workflow_dispatch:
   schedule:
     - cron: "43 4 * * 1"
@@ -85,24 +86,25 @@ jobs:
       - name: Scan candidate on both architectures before promotion
         env:
           IMAGE: ${{ env.IMAGE_PREFIX }}/aax-ee-base@${{ steps.build.outputs.digest }}
-        run: |
-          set -euo pipefail
-          mkdir -p image-reports
-          for arch in amd64 arm64; do
-            trivy image --scanners vuln --platform "linux/$arch" --timeout 15m \
-              --format json --output "image-reports/$arch.json" "$IMAGE"
-            trivy convert --format sarif --output "image-reports/$arch.sarif" "image-reports/$arch.json"
-          done
-          bash scripts/check-vulnerability-reports.sh image-reports/*.json
+        run: bash scripts/scan-image-candidate.sh "$IMAGE" published-ee-base
 
       - name: Upload candidate findings
-        if: always()
+        if: always() && hashFiles('image-sarif/*.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
-          sarif_file: image-reports
-          category: published-ee-base
+          sarif_file: image-sarif
+
+      - name: Preserve candidate reports
+        if: always() && hashFiles('image-reports/*') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: published-ee-base-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            image-reports/
+            image-sarif/
 
       - name: Promote scanned candidate
+        if: github.ref == 'refs/heads/main'
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           IMAGE: ${{ env.IMAGE_PREFIX }}/aax-ee-base@${{ steps.build.outputs.digest }}
@@ -131,18 +133,6 @@ jobs:
           - name: gateway
             context: ./images/gateway
             file: ./images/gateway/Dockerfile
-            use_base: false
-          - name: pulp
-            context: ./images/pulp
-            file: ./images/pulp/Dockerfile.pulp
-            use_base: false
-          - name: galaxy-ng
-            context: ./images/galaxy-ng
-            file: ./images/galaxy-ng/Dockerfile
-            use_base: false
-          - name: eda-controller
-            context: ./images/eda-controller
-            file: ./images/eda-controller/Dockerfile
             use_base: false
     steps:
       - name: Checkout code
@@ -210,24 +200,25 @@ jobs:
       - name: Scan candidate on both architectures before promotion
         env:
           IMAGE: ${{ env.IMAGE_PREFIX }}/aax-${{ matrix.image.name }}@${{ steps.build.outputs.digest }}
-        run: |
-          set -euo pipefail
-          mkdir -p image-reports
-          for arch in amd64 arm64; do
-            trivy image --scanners vuln --platform "linux/$arch" --timeout 15m \
-              --format json --output "image-reports/$arch.json" "$IMAGE"
-            trivy convert --format sarif --output "image-reports/$arch.sarif" "image-reports/$arch.json"
-          done
-          bash scripts/check-vulnerability-reports.sh image-reports/*.json
+        run: bash scripts/scan-image-candidate.sh "$IMAGE" "published-${{ matrix.image.name }}"
 
       - name: Upload candidate findings
-        if: always()
+        if: always() && hashFiles('image-sarif/*.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
-          sarif_file: image-reports
-          category: published-${{ matrix.image.name }}
+          sarif_file: image-sarif
+
+      - name: Preserve candidate reports
+        if: always() && hashFiles('image-reports/*') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: published-${{ matrix.image.name }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            image-reports/
+            image-sarif/
 
       - name: Promote scanned candidate
+        if: github.ref == 'refs/heads/main'
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           IMAGE: ${{ env.IMAGE_PREFIX }}/aax-${{ matrix.image.name }}@${{ steps.build.outputs.digest }}

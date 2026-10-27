@@ -241,6 +241,8 @@ jobs:
     timeout-minutes: 30
     needs: [release-please]
     if: ${{ needs.release-please.outputs.release_created }}
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -263,6 +265,7 @@ jobs:
         run: echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Build and push ee-base multi-arch
+        id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ./images/ee-base
@@ -272,10 +275,41 @@ jobs:
             VERSION=${{ needs.release-please.outputs.version }}
             BUILD_DATE=${{ steps.build-meta.outputs.build_date }}
             VCS_REF=${{ github.sha }}
-          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-ee-base:${{ needs.release-please.outputs.version }}
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-ee-base:release-build-${{ github.run_id }}-${{ github.run_attempt }}
           cache-from: type=gha,scope=ee-base
           cache-to: type=gha,mode=max,scope=ee-base
           push: true
+
+      - name: Install image scanner
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.70.0
+
+      - name: Scan candidate on both architectures before promotion
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-ee-base@${{ steps.build.outputs.digest }}
+        run: bash scripts/scan-image-candidate.sh "$IMAGE" release-ee-base
+
+      - name: Upload candidate findings
+        if: always() && hashFiles('image-sarif/*.sarif') != ''
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: image-sarif
+
+      - name: Preserve candidate reports
+        if: always() && hashFiles('image-reports/*') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-ee-base-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            image-reports/
+            image-sarif/
+
+      - name: Promote scanned candidate
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-ee-base@${{ steps.build.outputs.digest }}
+          TAG: ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-ee-base:${{ needs.release-please.outputs.version }}
+        run: docker buildx imagetools create --tag "$TAG" "$IMAGE"
 
   build-and-push:
     name: Build and Push Images
@@ -330,14 +364,39 @@ jobs:
             VERSION=${{ needs.release-please.outputs.version }}
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
             VCS_REF=${{ github.sha }}
-            ${{ matrix.image != 'ee-base' && format('BASE_IMAGE={0}/{1}/aax-ee-base:{2}', env.REGISTRY, github.repository_owner, needs.release-please.outputs.version) || '' }}
-          tags: ${{ steps.meta.outputs.tags }}
+            BASE_IMAGE=${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-ee-base@${{ needs.build-base-image.outputs.digest }}
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-${{ matrix.image }}:release-build-${{ github.run_id }}-${{ github.run_attempt }}
           labels: ${{ steps.meta.outputs.labels }}
           push: true
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           sbom: true
           provenance: true
+
+      - name: Install image scanner
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.70.0
+
+      - name: Scan candidate on both architectures before promotion
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-${{ matrix.image }}@${{ steps.build-push.outputs.digest }}
+        run: bash scripts/scan-image-candidate.sh "$IMAGE" "release-${{ matrix.image }}"
+
+      - name: Upload candidate findings
+        if: always() && hashFiles('image-sarif/*.sarif') != ''
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: image-sarif
+
+      - name: Preserve candidate reports
+        if: always() && hashFiles('image-reports/*') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ matrix.image }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            image-reports/
+            image-sarif/
 
       - name: Sign image with Cosign
         env:
@@ -349,7 +408,7 @@ jobs:
       - name: Generate SBOM
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
-          image: ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-${{ matrix.image }}:${{ needs.release-please.outputs.version }}
+          image: ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-${{ matrix.image }}@${{ steps.build-push.outputs.digest }}
           format: spdx-json
           output-file: sbom-${{ matrix.image }}.spdx.json
 
@@ -373,3 +432,13 @@ jobs:
           name: ${{ matrix.image }}-manifest
           path: release-manifest.txt
           retention-days: 90
+
+      - name: Promote scanned candidate
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/aax-${{ matrix.image }}@${{ steps.build-push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r tag; do args+=(-t "$tag"); done <<< "$TAGS"
+          docker buildx imagetools create "${args[@]}" "$IMAGE"

@@ -642,7 +642,7 @@ services:
     <<: *service-defaults
     profiles:
       - hub
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${AAX_VERSION:-latest}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${DEVEL_IMAGE_TAG:-devel}
     pull_policy: missing
     container_name: aax-pulp-api
     command: ["pulpcore-api"]
@@ -691,7 +691,7 @@ services:
     <<: *service-defaults
     profiles:
       - hub
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${AAX_VERSION:-latest}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${DEVEL_IMAGE_TAG:-devel}
     container_name: aax-pulp-content
     pull_policy: missing
     command: ["pulpcore-content"]
@@ -733,7 +733,7 @@ services:
     <<: *service-defaults
     profiles:
       - hub
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${AAX_VERSION:-latest}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-pulp:${DEVEL_IMAGE_TAG:-devel}
     container_name: aax-pulp-worker
     pull_policy: missing
     command: ["pulpcore-worker"]
@@ -779,7 +779,7 @@ services:
     <<: *service-defaults
     profiles:
       - hub
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-galaxy-ng:${AAX_VERSION:-latest}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-galaxy-ng:${DEVEL_IMAGE_TAG:-devel}
     pull_policy: missing
     container_name: aax-galaxy-ng
     security_opt:
@@ -880,7 +880,7 @@ services:
 
   eda-controller:
     <<: *service-defaults
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${AAX_VERSION:-latest}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${DEVEL_IMAGE_TAG:-devel}
     pull_policy: missing
     container_name: eda-controller
     profiles:
@@ -923,7 +923,7 @@ services:
 
   eda-worker:
     <<: *service-defaults
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${AAX_VERSION:-latest}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${DEVEL_IMAGE_TAG:-devel}
     pull_policy: missing
     container_name: eda-worker
     profiles: [eda]
@@ -941,7 +941,7 @@ services:
 
   eda-activation-worker:
     <<: *service-defaults
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${AAX_VERSION:-latest}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${DEVEL_IMAGE_TAG:-devel}
     pull_policy: missing
     container_name: eda-activation-worker
     profiles: [eda]
@@ -964,7 +964,7 @@ services:
 
   eda-ws:
     <<: *service-defaults
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${AAX_VERSION:-latest}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-controller:${DEVEL_IMAGE_TAG:-devel}
     pull_policy: missing
     container_name: eda-ws
     profiles: [eda]
@@ -987,7 +987,7 @@ services:
 
   eda-podman:
     <<: *service-defaults
-    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-podman:${AAX_VERSION:-latest}
+    image: ${AAX_IMAGE_PREFIX:-ghcr.io/kpeacocke}/aax-eda-podman:${DEVEL_IMAGE_TAG:-devel}
     pull_policy: missing
     container_name: eda-podman
     profiles: [eda]

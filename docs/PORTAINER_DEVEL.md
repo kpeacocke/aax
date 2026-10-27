@@ -16,6 +16,8 @@ these images under `ghcr.io/<owner>`:
 - `aax-pulp`
 - `aax-gateway`
 - `aax-eda-controller`
+- `aax-eda-podman`
+- `aax-eda-decision-environment`
 
 New immutable tags are `devel-<full-commit-sha>-<run-id>-<attempt>`. Each daily
 build gets a distinct tag even when only upstream sources have changed. Older
@@ -222,9 +224,21 @@ copy or migrate existing content separately before changing storage backends.
 
 ## 4. Deploy
 
+Production deployment is explicit: pushes and image publication do not trigger
+Portainer automatically. The upstream bundle is the sole publisher for
+AWX/Hub/EDA; generic image publication does not update these services.
+
 In Portainer, create or update the Git-backed stack and redeploy. Portainer pulls
 the exact image tag selected above. To advance the baseline, run the workflow
 again and change only `DEVEL_IMAGE_TAG` and the matching AWX/Receptor variables.
+
+Alternatively, after saving and verifying every matching image pin in Portainer,
+dispatch **Deploy controller stack** from `main`. Supply the successful
+**Publish upstream devel bundle** run ID, its exact immutable tag and the explicit
+pin/backup confirmation. The workflow rejects failed/incomplete runs, other
+workflows, non-main bundles and mismatched tags before calling the webhook.
+It does not set the image pins for you. Verify actual service health, EDA
+activation recovery and AWX job execution after the request is accepted.
 
 The local helper `scripts/deploy-devel.sh` remains for Docker Desktop development;
 it defaults to local `aax/*:devel` images and is not required by Portainer.
