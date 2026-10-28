@@ -121,6 +121,8 @@ security update. These are downstream builds, not unmodified upstream releases:
   imports after upgrading Autobahn.
 - AWX's system virtualenv/filelock packages are maintained separately from its
   application virtualenv; EDA's user-site tooling receives its own updates.
+  EDA's `/app/.local` msgpack is pinned to 1.2.3 for CVE-2026-114613; its
+  dependency check and serialization round trip run during the image build.
 - AWX and EDA pin Twisted 26.10.0rc1 because it is the currently published
   security-fixed release; no patched stable release is available. This
   prerelease choice requires compatibility validation before production use.

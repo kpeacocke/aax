@@ -46,6 +46,17 @@ def test_decision_environment_receives_runtime_security_patches() -> None:
     assert "grep -Fq AAX_DECISION_SECURITY_SMOKE_PASSED bundle-reports/eda-rulebook-smoke.log" in workflow
 
 
+def test_eda_user_site_receives_fixed_msgpack() -> None:
+    dockerfile = (ROOT / "images/runtime-security/EDA.Dockerfile").read_text()
+    user_site = dockerfile.split("RUN PYTHONUSERBASE=/app/.local", 1)[1]
+    assert "--user --upgrade" in user_site
+    assert "msgpack==1.2.3" in user_site
+    assert "certifi==2026.10.23" in user_site
+    assert 'msgpack.__version__ == "1.2.3"' in user_site
+    assert "msgpack.unpackb(msgpack.packb" in user_site
+    assert "PYTHONUSERBASE=/app/.local /usr/bin/python3.12 -m pip check" in user_site
+
+
 def test_eda_entrypoint_dispatches_both_workers_and_asgi() -> None:
     entrypoint = (ROOT / "images/eda-server/entrypoint.sh").read_text()
 
