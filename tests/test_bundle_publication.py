@@ -1041,6 +1041,14 @@ def test_rpm_installer_only_upgrades_existing_packages_and_checks_result(
         assert "expected 0:2-1.x86_64, found 0:3-1.x86_64" in result.stderr
 
 
+def test_native_go_jose_pin_covers_embedded_jwk_parser_fix() -> None:
+    pins = json.loads((ROOT / "images/rpm-security/go-dependencies.json").read_text())
+    assert pins["github.com/go-jose/go-jose/v4"] == "v4.1.6"
+    prepare = (ROOT / "images/rpm-security/prepare.sh").read_text()
+    assert "git-lfs|podman|skopeo)" in prepare
+    assert "bash %{SOURCE9999} %{SOURCE9998} %{SOURCE9997}" in prepare
+
+
 @pytest.mark.parametrize(
     ("current", "list_failure", "success"),
     [("v0.59.0", False, True), ("v0.61.0", False, False),
