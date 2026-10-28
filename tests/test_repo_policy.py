@@ -216,6 +216,10 @@ def test_devel_publish_workflow_publishes_immutable_bundle() -> None:
     """The devel workflow must publish every image needed by the overlay."""
     workflow = _read(".github/workflows/publish-devel.yml")
     assert re.search(r"uses: docker/login-action@[0-9a-f]{40}(?:\s|$)", workflow)
+    scripts = "\n".join(_read(path) for path in [
+        "scripts/build-bundle-image.sh", "scripts/promote-bundle.sh",
+        "scripts/bundle-candidate.sh",
+    ])
     required = [
         "packages: write",
         "devel-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}",
@@ -226,17 +230,12 @@ def test_devel_publish_workflow_publishes_immutable_bundle() -> None:
         "Scan exact bundle images",
         "Gate on fixable high and critical bundle vulnerabilities",
         "bundle-reports/sources.json",
-        "[awx]=awx:devel",
-        "[awx-ee]=awx-ee:devel",
-        "[receptor]=receptor:devel",
-        "[ansible-rulebook]=ansible-rulebook:devel",
-        "[galaxy-ng]=galaxy-ng:devel",
-        "[pulp]=galaxy-ng:devel",
-        "[gateway]=gateway:devel",
-        "[eda-controller]=eda-controller:devel",
+        "candidate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$stage",
+        "source=galaxy-ng",
+        "--prefer-index=false",
         "docker push",
     ]
-    missing = [token for token in required if token not in workflow]
+    missing = [token for token in required if token not in workflow + scripts]
     assert missing == [], "Devel publish workflow is missing: " + ", ".join(missing)
 
 

@@ -28,6 +28,7 @@ def test_podman_backend_uses_persistent_vfs_storage() -> None:
 def test_decision_environment_receives_runtime_security_patches() -> None:
     dockerfile = (ROOT / "images/eda-decision-environment/Security.Dockerfile").read_text()
     workflow = (ROOT / ".github/workflows/publish-devel.yml").read_text()
+    patch_script = (ROOT / "scripts/patch-bundle-image.sh").read_text()
 
     assert "ARG PIP_IMAGE=aax/pip-security:devel" in dockerfile
     assert "ARG DROOLS_IMAGE=ansible-rulebook:patched" in dockerfile
@@ -36,12 +37,24 @@ def test_decision_environment_receives_runtime_security_patches() -> None:
     assert "requirements-decision-environment.txt" in dockerfile
     assert "python3.12 -m pip check" in dockerfile
     assert "python3.12 -m pip cache purge" in dockerfile
-    patch = workflow.index("docker build -f images/eda-decision-environment/Security.Dockerfile")
+    patch = workflow.index("- name: Apply maintained runtime security patches")
     execution = workflow.index("- name: Verify nested Podman execution and outbound HTTPS")
     assert patch < execution
-    assert "docker tag eda-decision-environment:patched eda-decision-environment:devel" in workflow
+    assert "docker build -f images/eda-decision-environment/Security.Dockerfile" in patch_script
+    assert 'docker tag "$name:patched" "$name:devel"' in patch_script
     assert "--rulebook /dev/stdin --shutdown-delay 1 < tests/fixtures/eda-smoke.yml" in workflow
-    assert 'grep -Fq AAX_DECISION_SECURITY_SMOKE_PASSED "$RUNNER_TEMP/eda-rulebook-smoke.log"' in workflow
+    assert "grep -Fq AAX_DECISION_SECURITY_SMOKE_PASSED bundle-reports/eda-rulebook-smoke.log" in workflow
+
+
+def test_eda_user_site_receives_fixed_msgpack() -> None:
+    dockerfile = (ROOT / "images/runtime-security/EDA.Dockerfile").read_text()
+    user_site = dockerfile.split("RUN PYTHONUSERBASE=/app/.local", 1)[1]
+    assert "--user --upgrade" in user_site
+    assert "msgpack==1.2.3" in user_site
+    assert "certifi==2026.10.23" in user_site
+    assert 'msgpack.__version__ == "1.2.3"' in user_site
+    assert "msgpack.unpackb(msgpack.packb" in user_site
+    assert "PYTHONUSERBASE=/app/.local /usr/bin/python3.12 -m pip check" in user_site
 
 
 def test_eda_entrypoint_dispatches_both_workers_and_asgi() -> None:

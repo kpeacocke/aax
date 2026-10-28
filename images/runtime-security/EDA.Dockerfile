@@ -23,7 +23,9 @@ RUN git -C /app/src apply /tmp/eda-source.patch && \
     /app/venv/bin/python /tmp/test_eda_crypto.py && \
     rm /tmp/eda-source.patch /tmp/test_eda_crypto.py /tmp/pin_eda_dab.py /tmp/aax-eda-wheel/*.whl
 RUN PYTHONUSERBASE=/app/.local /usr/bin/python3.12 -m pip install \
-      --no-cache-dir --user --upgrade certifi==2026.10.19 virtualenv==21.14.13 filelock==4.2.1 && \
-    PYTHONUSERBASE=/app/.local /usr/bin/python3.12 -m pip check
+      --no-cache-dir --user --upgrade certifi==2026.10.23 virtualenv==21.14.13 filelock==4.2.1 msgpack==1.2.3 && \
+    PYTHONUSERBASE=/app/.local /usr/bin/python3.12 -m pip check && \
+    PYTHONUSERBASE=/app/.local /usr/bin/python3.12 -c \
+      'import msgpack; assert msgpack.__version__ == "1.2.3"; assert msgpack.unpackb(msgpack.packb({"eda": True})) == {"eda": True}'
 # hadolint ignore=DL3066
 USER 1001
