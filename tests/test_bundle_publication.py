@@ -1041,6 +1041,18 @@ def test_rpm_installer_only_upgrades_existing_packages_and_checks_result(
         assert "expected 0:2-1.x86_64, found 0:3-1.x86_64" in result.stderr
 
 
+def test_native_brotli_source_includes_decoder_security_backport() -> None:
+    sources = json.loads((ROOT / "images/rpm-security/sources.json").read_text())
+    assert sources["brotli"] == {
+        "url": (
+            "https://vault.almalinux.org/9.8/BaseOS/Source/Packages/"
+            "brotli-1.0.9-10.el9_8.1.src.rpm"
+        ),
+        "sha256": "d211e0455ee313b52cbdb0078d69601e613ec2dd51049f09306f14c2fa4848b2",
+        "release": "11.el9.aax.1",
+    }
+
+
 def test_native_go_jose_pin_covers_embedded_jwk_parser_fix() -> None:
     pins = json.loads((ROOT / "images/rpm-security/go-dependencies.json").read_text())
     assert pins["github.com/go-jose/go-jose/v4"] == "v4.1.6"
