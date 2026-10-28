@@ -158,6 +158,9 @@ The maintained source layer keeps the original distribution identity. It
 verifies both SHA-256 digests and vendor signatures on pinned EL9 source RPMs,
 then rebuilds their actual patched sources on CentOS Stream. AAX packages have
 their own vendor/release identifiers; installed RPM metadata is not rewritten.
+The Brotli recipe uses signed EL9 `1.0.9-10.el9_8.1` sources, including the
+CVE-2026-111497 decoder backport, rebuilt as `1.0.9-11.el9.aax.1`. This updates
+installed `libbrotli` without removing the library or its consumers.
 The system setuptools compatibility package receives a real Unicode exclusion
 backport, including a regression that inspects the resulting source archive.
 

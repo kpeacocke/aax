@@ -4,6 +4,11 @@
     "sha256": "73d38cbdd8058304328a79ebb2c74e399ada3f7908e774284381b7f0cecdae68",
     "release": "13.el9.aax.1"
   },
+  "brotli": {
+    "url": "https://vault.almalinux.org/9.8/BaseOS/Source/Packages/brotli-1.0.9-10.el9_8.1.src.rpm",
+    "sha256": "d211e0455ee313b52cbdb0078d69601e613ec2dd51049f09306f14c2fa4848b2",
+    "release": "11.el9.aax.1"
+  },
   "cups": {
     "url": "https://vault.almalinux.org/9.8/BaseOS/Source/Packages/cups-2.3.3op2-39.el9_8.src.rpm",
     "sha256": "f30a592bb4b4243ca7e519a26db37a12ea9270d006bf42c5b1551f6991e9a4ad",
