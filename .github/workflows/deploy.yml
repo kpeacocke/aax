@@ -2,32 +2,69 @@
 name: Deploy controller stack
 
 "on":
-  push:
-    branches: [main]
-    paths:
-      - docker-compose.yml
-      - automation/**
-      - collections/**
-      - .github/workflows/deploy.yml
-  workflow_run:
-    workflows: ["Publish Images"]
-    types: [completed]
   workflow_dispatch:
+    inputs:
+      bundle_run_id:
+        description: Successful main-branch upstream bundle workflow run ID
+        required: true
+        type: string
+      bundle_tag:
+        description: Immutable bundle tag already configured in Portainer
+        required: true
+        type: string
+      portainer_pins_confirmed:
+        description: All Portainer image pins match this bundle; backups and rollback are ready
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
 
 concurrency:
   group: deploy-aax
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
-    if: >-
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main')
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
+      - name: Verify published bundle and explicit deployment confirmation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUNDLE_RUN_ID: ${{ inputs.bundle_run_id }}
+          BUNDLE_TAG: ${{ inputs.bundle_tag }}
+          PORTAINER_PINS_CONFIRMED: ${{ inputs.portainer_pins_confirmed }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$BUNDLE_RUN_ID" =~ ^[0-9]+$ || "$PORTAINER_PINS_CONFIRMED" != true ]]; then
+            echo "A numeric bundle run ID and explicit Portainer pin confirmation are required." >&2
+            exit 1
+          fi
+          run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUNDLE_RUN_ID")"
+          jq --exit-status '
+            .path == ".github/workflows/publish-devel.yml" and
+            .head_branch == "main" and .status == "completed" and
+            .conclusion == "success" and
+            (.head_sha | test("^[0-9a-f]{40}$"))
+          ' <<< "$run" >/dev/null
+          expected="$(jq -r '"devel-\(.head_sha)-\(.id)-\(.run_attempt)"' <<< "$run")"
+          if [[ "$BUNDLE_TAG" != "$expected" ]]; then
+            echo "Portainer tag does not match the successful bundle: $expected" >&2
+            exit 1
+          fi
       - name: Trigger Portainer GitOps webhook
         env:
           PORTAINER_WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
-        run: curl --fail --show-error --silent --request POST "$PORTAINER_WEBHOOK_URL"
+        run: |
+          set -euo pipefail
+          if [[ -z "$PORTAINER_WEBHOOK_URL" ]]; then
+            echo "PORTAINER_WEBHOOK_URL is not configured." >&2
+            exit 1
+          fi
+          curl --fail --show-error --silent --connect-timeout 10 --max-time 60 \
+            --request POST "$PORTAINER_WEBHOOK_URL"
+          echo "Portainer accepted the deployment request. Verify service health and activations before sign-off." >> "$GITHUB_STEP_SUMMARY"

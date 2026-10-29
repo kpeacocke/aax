@@ -1,11 +1,14 @@
 """Execute publication and vulnerability-gate scripts without registry writes."""
 
 import json
+import hashlib
+import io
 import os
 from pathlib import Path
 import shlex
 import subprocess
 import runpy
+import tarfile
 import zipfile
 
 import pytest
@@ -14,7 +17,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = yaml.safe_load((ROOT / ".github/workflows/publish-devel.yml").read_text())
-STEPS = WORKFLOW["jobs"]["build-and-publish"]["steps"]
+JOBS = WORKFLOW["jobs"]
+STEPS = [step for job in JOBS.values() for step in job["steps"]]
 IMAGES = [
     "awx",
     "awx-ee",
@@ -26,6 +30,81 @@ IMAGES = [
     "eda-podman",
     "eda-decision-environment",
 ]
+
+
+AWX_PRODUCTION_CHECK = '''def assert_production_settings(settings: Dynaconf, settings_dir: str, settings_file_path: str):  # pragma: no cover
+    """Ensure at least one setting file has been loaded in production mode.
+    Current systems will require /etc/tower/settings.py and
+    new systems will require /etc/ansible-automation-platform/*.yaml
+    """
+    if "production" not in settings.current_env.lower():
+        return
+
+    required_settings_paths = [
+        os.path.dirname(settings_file_path),
+        "/etc/ansible-automation-platform/",
+        settings_dir,
+    ]
+
+    for path in required_settings_paths:
+        if any([path in os.path.dirname(f) for f in settings._loaded_files]):
+            break
+    else:
+        from django.core.exceptions import ImproperlyConfigured  # noqa
+
+        msg = 'No AWX configuration found at %s.' % required_settings_paths
+        msg += '\\nDefine the AWX_SETTINGS_FILE environment variable to '
+        msg += 'specify an alternate path.'
+        raise ImproperlyConfigured(msg)
+'''
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["unchanged", "missing", "duplicate", "predicate", "environment", "paths", "rejection"],
+)
+def test_awx_dynaconf_patch_requires_exact_production_check(
+    tmp_path: Path, mutation: str
+) -> None:
+    patch = runpy.run_path(str(ROOT / "images/runtime-security/patch_awx_dynaconf.py"))["patch"]
+    source = tmp_path / "functions.py"
+    original = AWX_PRODUCTION_CHECK
+    if mutation == "missing":
+        original = ""
+    elif mutation == "duplicate":
+        original *= 2
+    elif mutation == "predicate":
+        original = original.replace("path in os.path.dirname(f)", "True")
+    elif mutation == "environment":
+        original = original.replace('"production" not in', '"production" in')
+    elif mutation == "paths":
+        original = original.replace("os.path.dirname(settings_file_path)", '"/tmp"')
+    elif mutation == "rejection":
+        original = original.replace("raise ImproperlyConfigured(msg)", "return")
+    source.write_text(original)
+    if mutation == "unchanged":
+        patch(source)
+        assert source.read_text() == original.replace(
+            "settings._loaded_files", "settings.__core__.config.loaded_files"
+        )
+        with pytest.raises(ValueError, match="Unexpected AWX"):
+            patch(source)
+    else:
+        with pytest.raises(ValueError, match="Unexpected AWX"):
+            patch(source)
+        assert source.read_text() == original
+
+
+def test_final_awx_image_checks_production_settings_after_dynaconf_patch() -> None:
+    dockerfile = (ROOT / "images/runtime-security/DAB.Dockerfile").read_text()
+    assert dockerfile.index('"${PYTHON}" /tmp/aax-patch-awx-dynaconf.py') < dockerfile.index(
+        "AWX_MODE=production"
+    )
+    assert "DJANGO_SETTINGS_MODULE=awx.settings" in dockerfile
+    assert 'AWX_SETTINGS_FILE="$settings_file"' in dockerfile
+    assert "settings.AAX_TEST" in dockerfile
+    assert "AWX_SETTINGS_DIR=/tmp/aax-missing-settings-dir" in dockerfile  # pragma: allowlist secret
+    assert "grep -F 'No AWX configuration found at'" in dockerfile
 
 
 @pytest.mark.parametrize(
@@ -77,11 +156,13 @@ def test_sarif_has_unique_image_scanner_identities(tmp_path: Path, incomplete: b
             filename = f"{name}-grype.sarif" if scanner == "grype" else f"{name}.sarif"
             (reports / filename).write_text(json.dumps(original))
             expected.add(f"devel-bundle/{scanner}/{name}/")
-    result = subprocess.run(
-        ["bash", "-c", script("Give security reports distinct analysis identities")],
-        cwd=tmp_path, capture_output=True, text=True, timeout=10,
-    )
-    assert result.returncode == 0, result.stderr
+    for image in IMAGES:
+        result = subprocess.run(
+            ["bash", "-c", script("Give security reports distinct analysis identities")],
+            cwd=tmp_path, env={**os.environ, "BUNDLE_IMAGE": image},
+            capture_output=True, text=True, timeout=10,
+        )
+        assert result.returncode == 0, result.stderr
     identities = []
     for report in (tmp_path / "bundle-sarif").glob("*.sarif"):
         data = json.loads(report.read_text())
@@ -117,7 +198,7 @@ def test_system_setuptools_removal_respects_rpm_dependencies(
     assert (result.returncode != 0) == removal_fails
     commands = log.read_text().splitlines()
     assert ("--erase python3.12-setuptools" in commands) == installed
-    runtime = script("Apply maintained runtime security patches")
+    runtime = (ROOT / "scripts/patch-bundle-image.sh").read_text()
     assert runtime.index('docker tag "$name:rpm-patched"') < runtime.index(
         "images/runtime-security/Finalize.Dockerfile"
     ) < runtime.index("'awx-ee /usr/bin/python3.12 1000 awx-ee'")
@@ -256,6 +337,86 @@ def test_scheduled_builds_and_retries_have_distinct_tags() -> None:
     assert len({tag("10", "1"), tag("11", "1"), tag("11", "2")}) == 3
 
 
+def bundle_evidence(path: Path) -> dict[str, str]:
+    """Create complete run-bound evidence; production verification is not stubbed."""
+    (path / "scripts").symlink_to(ROOT / "scripts", target_is_directory=True)
+    (path / "images/rpm-security").mkdir(parents=True)
+    reports = path / "bundle-reports"
+    reports.mkdir()
+    env = {
+        **os.environ, "IMAGE_OWNER": "TestOwner", "REGISTRY": "ghcr.io",
+        "GITHUB_SHA": "a" * 40, "GITHUB_RUN_ID": "101", "GITHUB_RUN_ATTEMPT": "1",
+        "IMAGE_TAG": "devel-" + "a" * 40 + "-101-1", "GITHUB_REF": "refs/heads/main",
+        "PUSH_MUTABLE": "false", "GITHUB_STEP_SUMMARY": str(path / "summary"),
+    }
+    for stage, names in (("raw", IMAGES), ("gated", IMAGES),
+                         ("tools", ["pip-security", "go-security"])):
+        directory = path / "candidate-maps" / stage
+        directory.mkdir(parents=True)
+        for index, name in enumerate(names, 1):
+            descriptor = {
+                "name": name, "stage": stage, "repository": f"ghcr.io/testowner/aax-{name}",
+                "digest": f"sha256:{index:064x}", "image_id": f"sha256:{index + 100:064x}",
+                "aax_revision": env["GITHUB_SHA"], "run_id": "101", "run_attempt": "1",
+            }
+            text = json.dumps(descriptor)
+            (directory / f"{name}.json").write_text(text)
+            if stage != "gated":
+                continue
+            (reports / f"{name}-gate.json").write_text(text)
+            (reports / f"{name}.json").write_text(json.dumps({
+                "SchemaVersion": 2, "Results": [],
+                "Metadata": {"ImageID": descriptor["image_id"]},
+            }))
+            (reports / f"{name}-grype.json").write_text(
+                json.dumps(grype_report(descriptor["image_id"]))
+            )
+            (reports / f"{name}.cdx.json").write_text(
+                json.dumps({"bomFormat": "CycloneDX", "components": [{"name": "real-package"}]})
+            )
+            for suffix in (".sarif", "-grype.sarif"):
+                (reports / f"{name}{suffix}").write_text(
+                    json.dumps({"version": "2.1.0", "runs": [
+                        {"tool": {"driver": {"name": "scanner"}}, "results": []},
+                    ]})
+                )
+    for name in ("awx", "galaxy-ng", "eda-controller"):
+        (reports / f"{name}-dab-source.json").write_text(json.dumps({
+            "service": name, "repository": "https://github.com/ansible/django-ansible-base",
+            "revision": "c" * 40, "version": "1.2.3+aax.2",
+        }))
+    (reports / "sources.json").write_text(json.dumps({
+        "aax_revision": env["GITHUB_SHA"], "image_tag": env["IMAGE_TAG"],
+        "sources": [{"name": name, "revision": "b" * 40} for name in IMAGES[:5]],
+    }))
+    (reports / "runtime-gate.json").write_text(json.dumps({
+        key: json.loads((path / "candidate-maps/gated" / f"{name}.json").read_text())
+        for key, name in (("podman", "eda-podman"), ("decision", "eda-decision-environment"))
+    }))
+    (reports / "eda-rulebook-smoke.log").write_text("AAX_DECISION_SECURITY_SMOKE_PASSED\n")
+    (reports / "nested-runtime.log").write_text("HTTPS/range debug passed\n")
+    packages = json.loads((ROOT / "images/rpm-security/sources.json").read_text())
+    source_bytes = b"pinned signed source RPM"
+    for spec in packages.values():
+        spec["sha256"] = hashlib.sha256(source_bytes).hexdigest()
+    (path / "images/rpm-security/sources.json").write_text(json.dumps(packages))
+    with tarfile.open(path / "native-rpms.tar.gz", "w:gz") as archive:
+        info = tarfile.TarInfo("rpm-security/install.sh")
+        info.size = 4
+        archive.addfile(info, io.BytesIO(b"true"))
+        for package in packages:
+            for member in ("signed-source.src.rpm", "source-signature.txt",
+                           "srpms/patched.src.rpm", "rpms/patched.rpm"):
+                payload = (
+                    source_bytes if member == "signed-source.src.rpm"
+                    else b"digests signatures OK"
+                )
+                info = tarfile.TarInfo(f"rpm-security/packages/{package}/{member}")
+                info.size = len(payload)
+                archive.addfile(info, io.BytesIO(payload))
+    return env
+
+
 @pytest.mark.parametrize("mutable", [True, False])
 @pytest.mark.parametrize("fail_push", [True, False])
 def test_publisher_never_skips_fresh_images(
@@ -265,41 +426,345 @@ def test_publisher_never_skips_fresh_images(
     docker.write_text(
         '#!/bin/bash\n'
         'printf "%s\\n" "$*" >> "$DOCKER_LOG"\n'
-        'if [[ "$1" == push && "$FAIL_PUSH" == true ]]; then exit 1; fi\n'
-        'if [[ "$1" == buildx ]]; then printf "{}\\n"; fi\n'
+        'if [[ "$3" == create && "$FAIL_PUSH" == true ]]; then exit 1; fi\n'
+        'if [[ "$3" == inspect ]]; then\n'
+        '  name="${4##*/aax-}"; name="${name%%:*}"; [[ "$name" != pulp ]] || name=galaxy-ng\n'
+        '  jq "{digest: .digest}" "candidate-maps/gated/$name.json"\nfi\n'
     )
     docker.chmod(0o755)
-    (tmp_path / "bundle-reports").mkdir()
     log = tmp_path / "docker.log"
     env = {
-        **os.environ,
+        **bundle_evidence(tmp_path),
         "PATH": f"{tmp_path}:{os.environ['PATH']}",
         "DOCKER_LOG": str(log),
         "FAIL_PUSH": str(fail_push).lower(),
         "PUSH_MUTABLE": str(mutable).lower(),
-        "IMAGE_OWNER": "TestOwner",
-        "REGISTRY": "ghcr.io",
-        "IMAGE_TAG": "devel-commit-101-1",
-        "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"),
     }
     result = subprocess.run(
         ["bash", "-c", script("Tag and push bundle")],
         cwd=tmp_path, env=env, capture_output=True, text=True, timeout=10,
     )
-    commands = log.read_text().splitlines()
-    pushes = [command for command in commands if command.startswith("push ")]
+    commands = log.read_text().splitlines() if log.exists() else []
+    pushes = [command for command in commands if command.startswith("buildx imagetools create ")]
     if fail_push:
         assert result.returncode != 0
         assert len(pushes) == 1
-        assert all(not command.endswith(":devel") for command in pushes)
+        assert all("--tag ghcr.io/testowner/aax-awx:devel " not in command for command in pushes)
         return
     assert result.returncode == 0, result.stderr
     assert len(pushes) == (20 if mutable else 10)
-    assert all(command.endswith(":devel-commit-101-1") for command in pushes[:10])
+    assert all(f":{env['IMAGE_TAG']} " in command for command in pushes[:10])
     assert len({command for command in pushes[:10]}) == 10
     assert len(list((tmp_path / "bundle-reports").glob("*-manifest.json"))) == 10
     if mutable:
-        assert all(command.endswith(":devel") for command in pushes[10:])
+        assert all(":devel " in command for command in pushes[10:])
+    for command in pushes:
+        assert "--prefer-index=false" in command
+        assert "@sha256:" in command
+    assert not any(command.startswith(("build ", "pull ", "tag ", "push ")) for command in commands)
+
+
+def test_staged_jobs_build_independently_and_reuse_exact_dependencies() -> None:
+    assert JOBS["build-images"]["needs"] == "resolve-sources"
+    assert JOBS["build-images"]["strategy"]["matrix"]["image"] == IMAGES
+    assert JOBS["native-tools"]["needs"] == "build-images"
+    assert JOBS["gate-foundations"]["needs"] == "native-tools"
+    assert JOBS["gate-images"]["needs"] == ["native-tools", "gate-foundations"]
+    gated = [
+        image for job in ("gate-foundations", "gate-images")
+        for image in JOBS[job]["strategy"]["matrix"]["image"]
+    ]
+    assert sorted(gated) == sorted(IMAGES)
+    for job in ("build-images", "gate-foundations", "gate-images"):
+        assert JOBS[job]["strategy"]["fail-fast"] is False
+        assert JOBS[job]["runs-on"] == "ubuntu-24.04"
+    builds = [step["run"] for step in STEPS if "build-bundle-image.sh" in step.get("run", "")]
+    assert len(builds) == 1
+    assert 'bash scripts/build-bundle-image.sh "$BUNDLE_IMAGE"' in builds[0]
+    assert "set -euo pipefail" in builds[0]
+    native = script("Build shared signed source RPMs and FIPS compiler once")
+    assert native.count("bash scripts/build-rpm-security.sh") == 1
+    assert "RPM_RETAIN_COMPILER=true bash scripts/build-rpm-security.sh" in native
+    rpm = (ROOT / "scripts/build-rpm-security.sh").read_text()
+    assert rpm.index('push go-security tools') < rpm.index("while IFS= read -r package")
+    restore = script("Restore shared artifacts and this image only")
+    assert 'pull "$BUNDLE_IMAGE" raw' in restore
+    assert "pull receptor gated" in restore and "pull ansible-rulebook gated" in restore
+    assert "ansible-rulebook:devel ansible-rulebook:patched" in restore
+    for step in STEPS:
+        if step.get("uses", "").startswith("actions/download-artifact@"):
+            assert "${{ github.run_attempt }}" in str(step["with"])
+        if step.get("uses", "").startswith("actions/checkout@"):
+            assert step["with"]["persist-credentials"] is False
+    assert "git ls-remote" not in (ROOT / "scripts/build-bundle-image.sh").read_text()
+
+
+def test_runtime_artifact_preserves_workspace_relative_evidence_layout() -> None:
+    preserve = next(
+        step for step in JOBS["validate-runtime"]["steps"]
+        if step.get("name") == "Preserve runtime evidence on failure"
+    )
+    paths = [Path(path) for path in preserve["with"]["path"].splitlines()]
+    assert Path(os.path.commonpath([str(path.parent) for path in paths])) == Path(".")
+    assert set(paths) == {
+        Path("candidate-maps/gated/eda-podman.json"),
+        Path("candidate-maps/gated/eda-decision-environment.json"),
+        Path("bundle-reports/nested-runtime.log"),
+        Path("bundle-reports/eda-rulebook-smoke.log"),
+        Path("bundle-reports/runtime-gate.json"),
+    }
+    assert preserve["if"] == "always()"
+
+
+@pytest.mark.parametrize("mismatch,fail_push", [(False, False), (True, False), (False, True)])
+def test_candidate_transfer_records_exact_manifest_and_rejects_substitution(
+    tmp_path: Path, mismatch: bool, fail_push: bool
+) -> None:
+    env = bundle_evidence(tmp_path)
+    descriptor = tmp_path / "candidate-maps/gated/awx.json"
+    descriptor.unlink()
+    docker = tmp_path / "docker"
+    docker.write_text(
+        '#!/bin/bash\nset -eu\n'
+        'echo "$*" >> "$DOCKER_LOG"\n'
+        'case "$1 $2" in\n'
+        '  "image inspect") echo "$IMAGE_ID" ;;\n'
+        '  "push "*) [[ "$FAIL_PUSH" != true ]] ;;\n'
+        '  "buildx imagetools")\n'
+        '    if [[ "$4" == --raw ]]; then\n'
+        '      jq -n --arg id "$CONFIG_ID" "{config: {digest: \\$id}}"\n'
+        '    else jq -n --arg digest "$MANIFEST_ID" "{digest: \\$digest}"; fi ;;\n'
+        'esac\n'
+    )
+    docker.chmod(0o755)
+    image_id = "sha256:" + "c" * 64
+    log = tmp_path / "docker.log"
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/bundle-candidate.sh"), "push", "awx", "gated"],
+        cwd=tmp_path, env={
+            **env, "PATH": f"{tmp_path}:{os.environ['PATH']}", "DOCKER_LOG": str(log),
+            "IMAGE_ID": image_id, "CONFIG_ID": "sha256:" + "d" * 64 if mismatch else image_id,
+            "MANIFEST_ID": "sha256:" + "e" * 64, "FAIL_PUSH": str(fail_push).lower(),
+        }, capture_output=True, text=True, timeout=30,
+    )
+    assert (result.returncode == 0) == (not (mismatch or fail_push)), result.stderr
+    assert descriptor.exists() == (not (mismatch or fail_push))
+    assert "candidate-101-1-gated" in log.read_text()
+    assert ":devel-" not in log.read_text()
+    if not (mismatch or fail_push):
+        identity = json.loads(descriptor.read_text())
+        assert identity["image_id"] == image_id
+        assert identity["digest"] == "sha256:" + "e" * 64
+        assert identity["run_attempt"] == "1"
+
+
+@pytest.mark.parametrize("damage", [
+    "missing-map", "extra-map", "empty-map", "mutable-digest", "wrong-run", "wrong-attempt",
+    "wrong-owner", "wrong-name", "wrong-stage", "wrong-aax", "missing-raw", "missing-tool",
+    "missing-native", "missing-sources", "missing-trivy", "missing-grype", "missing-sbom",
+    "empty-sarif", "mismatched-trivy", "mismatched-grype", "missing-gate",
+    "mismatched-runtime", "missing-runtime", "missing-range-debug", "fixable-vulnerability",
+    "empty-native", "substituted-source-rpm",
+    "empty-sbom", "missing-dab-provenance", "mutable-dab-provenance",
+])
+def test_incomplete_or_substituted_evidence_blocks_all_registry_writes(
+    tmp_path: Path, damage: str
+) -> None:
+    env = bundle_evidence(tmp_path)
+    descriptor = tmp_path / "candidate-maps/gated/awx.json"
+    data = json.loads(descriptor.read_text())
+    paths = {
+        "missing-map": descriptor, "missing-raw": tmp_path / "candidate-maps/raw/awx.json",
+        "missing-tool": tmp_path / "candidate-maps/tools/go-security.json",
+        "missing-native": tmp_path / "native-rpms.tar.gz",
+        "missing-sources": tmp_path / "bundle-reports/sources.json",
+        "missing-trivy": tmp_path / "bundle-reports/awx.json",
+        "missing-grype": tmp_path / "bundle-reports/awx-grype.json",
+        "missing-sbom": tmp_path / "bundle-reports/awx.cdx.json",
+        "missing-gate": tmp_path / "bundle-reports/awx-gate.json",
+        "missing-runtime": tmp_path / "bundle-reports/runtime-gate.json",
+        "missing-range-debug": tmp_path / "bundle-reports/eda-rulebook-smoke.log",
+        "missing-dab-provenance": tmp_path / "bundle-reports/awx-dab-source.json",
+    }
+    if damage in paths:
+        paths[damage].unlink()
+    elif damage == "empty-native":
+        (tmp_path / "native-rpms.tar.gz").write_bytes(b"")
+    elif damage == "empty-sbom":
+        (tmp_path / "bundle-reports/awx.cdx.json").write_text(json.dumps({
+            "bomFormat": "CycloneDX", "components": [],
+        }))
+    elif damage == "mutable-dab-provenance":
+        source = tmp_path / "bundle-reports/awx-dab-source.json"
+        data = json.loads(source.read_text())
+        data["revision"] = "devel"
+        source.write_text(json.dumps(data))
+    elif damage == "substituted-source-rpm":
+        sources = tmp_path / "images/rpm-security/sources.json"
+        data = json.loads(sources.read_text())
+        data["apr"]["sha256"] = "0" * 64
+        sources.write_text(json.dumps(data))
+    elif damage == "extra-map":
+        descriptor.with_name("unexpected.json").write_text(descriptor.read_text())
+    elif damage == "empty-map":
+        descriptor.write_text("{}")
+    elif damage == "empty-sarif":
+        (tmp_path / "bundle-reports/awx.sarif").write_text("{}")
+    elif damage.startswith("wrong-") or damage == "mutable-digest":
+        field, value = {
+            "wrong-run": ("run_id", "102"), "wrong-attempt": ("run_attempt", "2"),
+            "wrong-owner": ("repository", "ghcr.io/attacker/aax-awx"),
+            "wrong-name": ("name", "awx-ee"), "wrong-stage": ("stage", "raw"),
+            "wrong-aax": ("aax_revision", "b" * 40), "mutable-digest": ("digest", "devel"),
+        }[damage]
+        data[field] = value
+        descriptor.write_text(json.dumps(data))
+    elif damage == "mismatched-runtime":
+        (tmp_path / "bundle-reports/runtime-gate.json").write_text("{}")
+    elif damage == "mismatched-trivy":
+        report = tmp_path / "bundle-reports/awx.json"
+        data = json.loads(report.read_text())
+        data["Metadata"]["ImageID"] = "sha256:" + "f" * 64
+        report.write_text(json.dumps(data))
+    elif damage == "mismatched-grype":
+        (tmp_path / "bundle-reports/awx-grype.json").write_text(json.dumps(grype_report()))
+    elif damage == "fixable-vulnerability":
+        report = tmp_path / "bundle-reports/awx.json"
+        data = json.loads(report.read_text())
+        data["Results"] = [{"Vulnerabilities": [{
+            "VulnerabilityID": "BLOCK", "Severity": "HIGH", "FixedVersion": "1",
+        }]}]
+        report.write_text(json.dumps(data))
+    docker = tmp_path / "docker"
+    docker.write_text('#!/bin/sh\necho registry-write >> "$DOCKER_LOG"\n')
+    docker.chmod(0o755)
+    log = tmp_path / "docker.log"
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/promote-bundle.sh")], cwd=tmp_path,
+        env={**env, "DOCKER_LOG": str(log), "PATH": f"{tmp_path}:{os.environ['PATH']}"},
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode != 0, damage
+    assert not log.exists(), damage
+
+
+def test_native_output_recipe_preserves_original_signed_source_rpms() -> None:
+    native = (ROOT / "scripts/build-rpm-security.sh").read_text()
+    assert "COPY --from=builder /build/source.src.rpm /signed-source.src.rpm" in native
+    assert '-f "$output/Artifacts.Dockerfile"' in native
+    assert 'test -s "$output/packages/$package/signed-source.src.rpm"' in native
+    assert '--build-arg GO_IMAGE=aax/go-security:devel' in native
+
+
+def test_native_package_failure_retains_compiler_identity_and_build_logs(tmp_path: Path) -> None:
+    env = bundle_evidence(tmp_path)
+    descriptor = tmp_path / "candidate-maps/tools/go-security.json"
+    descriptor.unlink()
+    docker = tmp_path / "docker"
+    docker.write_text(
+        '#!/bin/bash\nset -eu\n'
+        'echo "$*" >> "$DOCKER_LOG"\n'
+        'case "$1 $2" in\n'
+        '  "build "*) [[ "$*" != *"--output "* ]] || exit 42 ;;\n'
+        '  "image inspect") echo "$IMAGE_ID" ;;\n'
+        '  "buildx imagetools")\n'
+        '    if [[ "$4" == --raw ]]; then\n'
+        '      jq -n --arg id "$IMAGE_ID" "{config: {digest: \\$id}}"\n'
+        '    else jq -n --arg digest "$MANIFEST_ID" "{digest: \\$digest}"; fi ;;\n'
+        'esac\n'
+    )
+    docker.chmod(0o755)
+    log = tmp_path / "docker.log"
+    output = tmp_path / "native-output"
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/build-rpm-security.sh"), str(output)], cwd=tmp_path,
+        env={**env, "RPM_RETAIN_COMPILER": "true", "DOCKER_LOG": str(log),
+             "PATH": f"{tmp_path}:{os.environ['PATH']}",
+             "IMAGE_ID": "sha256:" + "a" * 64, "MANIFEST_ID": "sha256:" + "b" * 64},
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 42
+    assert descriptor.is_file()
+    assert (output / "logs/bootstrap.log").is_file()
+    assert (output / "logs/compiler.log").is_file()
+    assert (output / "logs/apr.log").is_file()
+    commands = log.read_text().splitlines()
+    push = next(index for index, command in enumerate(commands) if command.startswith("push "))
+    package_build = next(index for index, command in enumerate(commands) if "--output " in command)
+    assert push < package_build
+    assert "/Artifacts.Dockerfile" in commands[package_build]
+
+
+def test_branch_dispatch_retains_candidates_without_any_promotion(tmp_path: Path) -> None:
+    env = bundle_evidence(tmp_path)
+    docker = tmp_path / "docker"
+    docker.write_text('#!/bin/sh\necho registry-write >> "$DOCKER_LOG"\nexit 1\n')
+    docker.chmod(0o755)
+    log = tmp_path / "docker.log"
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/promote-bundle.sh")], cwd=tmp_path,
+        env={**env, "GITHUB_REF": "refs/heads/fix/staged-upstream-bundle",
+             "PUSH_MUTABLE": "true", "DOCKER_LOG": str(log),
+             "PATH": f"{tmp_path}:{os.environ['PATH']}"},
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert not log.exists()
+    assert "retains candidates" in result.stdout
+
+
+@pytest.mark.parametrize("fail_scanner,mismatch,fixable", [
+    (False, False, False), (True, False, False), (False, True, False), (False, False, True),
+])
+def test_exact_digest_scans_require_both_scanners_before_receipt(
+    tmp_path: Path, fail_scanner: bool, mismatch: bool, fixable: bool
+) -> None:
+    env = bundle_evidence(tmp_path)
+    receipt = tmp_path / "bundle-reports/awx-gate.json"
+    receipt.unlink()
+    binary = tmp_path / "bin"
+    binary.mkdir()
+    (binary / "trivy").write_text(
+        '#!/bin/bash\nset -eu\n'
+        'echo "$*" >> "$SCANNER_LOG"\n'
+        'if [[ "$1" != image ]]; then exit 0; fi\n'
+        'while [[ "$1" != --output ]]; do shift; done\n'
+        'cp "$TRIVY_SOURCE" "$2"\n'
+    )
+    (binary / "grype").write_text(
+        '#!/bin/bash\nset -eu\n'
+        'echo "$*" >> "$SCANNER_LOG"\n'
+        '[[ "$FAIL_SCANNER" != true ]] || exit 1\n'
+        'while [[ "$1" != json=* ]]; do shift; done\n'
+        'cp "$GRYPE_SOURCE" "${1#json=}"\n'
+    )
+    for executable in binary.iterdir():
+        executable.chmod(0o755)
+    trivy_source = tmp_path / "trivy-source.json"
+    data = json.loads((tmp_path / "bundle-reports/awx.json").read_text())
+    if fixable:
+        data["Results"] = [{"Vulnerabilities": [{
+            "VulnerabilityID": "BLOCK", "Severity": "CRITICAL", "FixedVersion": "1",
+        }]}]
+    trivy_source.write_text(json.dumps(data))
+    grype_source = tmp_path / "grype-source.json"
+    grype_source.write_text(json.dumps(grype_report(
+        "sha256:" + "f" * 64 if mismatch else data["Metadata"]["ImageID"]
+    )))
+    log = tmp_path / "scanner.log"
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/scan-bundle-image.sh"), "awx"], cwd=tmp_path,
+        env={**env, "PATH": f"{binary}:{os.environ['PATH']}", "RUNNER_TEMP": str(binary),
+             "SCANNER_LOG": str(log), "TRIVY_SOURCE": str(trivy_source),
+             "GRYPE_SOURCE": str(grype_source), "FAIL_SCANNER": str(fail_scanner).lower()},
+        capture_output=True, text=True, timeout=30,
+    )
+    assert (result.returncode == 0) == (not (fail_scanner or mismatch or fixable)), result.stderr
+    assert receipt.exists() == (not (fail_scanner or mismatch or fixable))
+    commands = log.read_text().splitlines()
+    reference = "ghcr.io/testowner/aax-awx@sha256:" + f"{1:064x}"
+    assert any(reference in command and "--image-src docker" in command for command in commands)
+    assert any(f"docker:{reference}" in command for command in commands)
 
 
 @pytest.mark.parametrize(
@@ -322,23 +787,29 @@ def test_gate_measures_fixed_version_and_severity(
     )
     result = subprocess.run(
         ["bash", "-c", script("Gate on fixable high and critical bundle vulnerabilities")],
-        cwd=tmp_path, capture_output=True, text=True, timeout=10,
+        cwd=tmp_path, env={**os.environ, "BUNDLE_IMAGE": "awx"},
+        capture_output=True, text=True, timeout=10,
     )
     assert (result.returncode != 0) == blocked, result.stderr
 
 
 def test_bundle_scan_precedes_publication() -> None:
-    names = [step.get("name", "") for step in STEPS]
+    names = [step.get("name", "") for step in JOBS["gate-images"]["steps"]]
     assert names.index("Scan exact bundle images") < names.index(
         "Gate on fixable high and critical bundle vulnerabilities"
-    ) < names.index("Tag and push bundle")
-    scan = script("Scan exact bundle images")
-    for image in IMAGES:
-        assert image in scan
+    )
+    assert JOBS["publish"]["needs"] == [
+        "resolve-sources", "build-images", "native-tools",
+        "gate-foundations", "gate-images", "validate-runtime",
+    ]
+    assert "if" not in JOBS["publish"]
+    scan = (ROOT / "scripts/scan-bundle-image.sh").read_text()
     assert "set -euo pipefail" in scan
     assert '"$RUNNER_TEMP/grype"' in scan
     assert 'json=bundle-reports/$name-grype.json' in scan
     assert 'sarif=bundle-reports/$name-grype.sarif' in scan
+    assert '"docker:$reference"' in scan and '--output "bundle-reports/$name.json" "$reference"' in scan
+    assert ".Metadata.ImageID == $id" in scan and ".source.target.imageID == $id" in scan
     assert "sha256sum --check -" in script("Install supplemental OS scanner")
 
 
@@ -348,6 +819,102 @@ def test_nested_podman_uses_explicit_local_decision_environment() -> None:
     assert f"docker tag eda-decision-environment:devel {image}" in nested_podman
     assert f"docker save {image}" in nested_podman
     assert f"{image} python3.12 -c" in nested_podman
+    assert '| docker exec -i aax-eda-podman-test podman load' in nested_podman
+    assert "eda-decision-environment.tar" not in nested_podman
+    assert "quay.io/prometheus/busybox@sha256:" in nested_podman
+    assert "pull \\\n            quay.io/ansible/ansible-rulebook@" not in nested_podman
+    assert JOBS["validate-runtime"]["needs"] == ["gate-foundations", "gate-images"]
+    names = [step.get("name", "") for step in JOBS["validate-runtime"]["steps"]]
+    assert names.index("Load only scanned runtime digests on a fresh runner") < names.index(
+        "Require nested VFS disk budget"
+    ) < names.index("Verify nested Podman execution and outbound HTTPS")
+    assert "test \"$ready\" = true" in nested_podman
+    assert "bundle-reports/runtime-gate.json" in nested_podman
+
+
+@pytest.mark.parametrize("https_fails,marker", [(False, True), (True, True), (False, False)])
+def test_nested_runtime_receipt_requires_https_and_real_range_debug_marker(
+    tmp_path: Path, https_fails: bool, marker: bool
+) -> None:
+    env = bundle_evidence(tmp_path)
+    receipt = tmp_path / "bundle-reports/runtime-gate.json"
+    receipt.unlink()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/fixtures").symlink_to(ROOT / "tests/fixtures", target_is_directory=True)
+    docker = tmp_path / "docker"
+    docker.write_text(
+        '#!/bin/bash\nset -eu\n'
+        'echo "$*" >> "$DOCKER_LOG"\n'
+        'case "$*" in\n'
+        '  *"python3.12 -c"*) [[ "$HTTPS_FAILS" != true ]] || exit 1 ;;\n'
+        '  *"--rulebook /dev/stdin"*)\n'
+        '    if [[ "$MARKER" == true ]]; then echo AAX_DECISION_SECURITY_SMOKE_PASSED;\n'
+        '    else echo "No range events processed"; fi ;;\n'
+        '  "exec -i aax-eda-podman-test podman load") cat >/dev/null ;;\n'
+        'esac\n'
+    )
+    docker.chmod(0o755)
+    log = tmp_path / "docker.log"
+    result = subprocess.run(
+        ["bash", "-c", script("Verify nested Podman execution and outbound HTTPS")],
+        cwd=tmp_path, env={**env, "PATH": f"{tmp_path}:{os.environ['PATH']}",
+                          "DOCKER_LOG": str(log), "HTTPS_FAILS": str(https_fails).lower(),
+                          "MARKER": str(marker).lower()},
+        capture_output=True, text=True, timeout=30,
+    )
+    success = not https_fails and marker
+    assert (result.returncode == 0) == success, result.stdout + result.stderr
+    assert receipt.exists() == success
+    assert (tmp_path / "bundle-reports/nested-runtime.log").exists()
+    commands = log.read_text()
+    assert "docker system" not in commands
+    assert "localhost/eda-decision-environment:devel python3.12 -c" in commands
+    if success:
+        assert "--rulebook /dev/stdin --shutdown-delay 1" in commands
+        recorded = json.loads(receipt.read_text())
+        assert recorded["podman"]["name"] == "eda-podman"
+        assert recorded["decision"]["name"] == "eda-decision-environment"
+
+
+@pytest.mark.parametrize(
+    ("available", "success"),
+    [(20 * 1024**3, True), (20 * 1024**3 - 1, False)],
+)
+def test_fresh_runtime_runner_requires_disk_budget_without_pruning(
+    tmp_path: Path, available: int, success: bool
+) -> None:
+    binary = tmp_path / "bin"
+    binary.mkdir()
+    (binary / "docker").write_text(
+        '#!/bin/bash\n'
+        'printf "%s\\n" "$*" >> "$DOCKER_LOG"\n'
+        'exit 1\n'
+    )
+    (binary / "df").write_text(
+        '#!/bin/bash\n'
+        'printf "Filesystem 1B-blocks Used Available Use%% Mounted on\\n"\n'
+        'printf "/dev/test 99999999999 0 %s 0%% /\\n" "$AVAILABLE"\n'
+    )
+    for executable in binary.iterdir():
+        executable.chmod(0o755)
+    log = tmp_path / "docker.log"
+    result = subprocess.run(
+        ["bash", "-c", script("Require nested VFS disk budget")],
+        env={
+            **os.environ, "PATH": f"{binary}:{os.environ['PATH']}",
+            "DOCKER_LOG": str(log),
+            "RUNNER_TEMP": str(tmp_path), "AVAILABLE": str(available),
+        },
+        capture_output=True, text=True, timeout=10,
+    )
+    assert (result.returncode == 0) == success, result.stderr
+    assert not log.exists()
+    workflow = (ROOT / ".github/workflows/publish-devel.yml").read_text()
+    assert "docker system df" not in workflow
+    assert "docker system prune" not in workflow
+    assert "timeout 180 docker buildx prune" in workflow
+    if available < 20 * 1024**3:
+        assert "free bytes" in result.stderr
 
 
 @pytest.mark.parametrize(
@@ -403,7 +970,7 @@ def test_invalid_supplemental_database_is_not_a_clean_scan(tmp_path: Path) -> No
 
 
 def test_runtime_security_updates_precede_exact_image_scans(tmp_path: Path) -> None:
-    names = [step.get("name", "") for step in STEPS]
+    names = [step.get("name", "") for step in JOBS["gate-images"]["steps"]]
     assert names.index("Apply maintained runtime security patches") < names.index(
         "Scan exact bundle images"
     )
@@ -413,41 +980,36 @@ def test_runtime_security_updates_precede_exact_image_scans(tmp_path: Path) -> N
         'if [[ "$1" == run ]]; then printf "%040d 2026.10.21.1.dev2+aax.2\\n" 1; fi\n'
     )
     docker.chmod(0o755)
-    scripts = tmp_path / "scripts"
-    scripts.mkdir()
-    (scripts / "build-rpm-security.sh").write_text(
-        '#!/bin/bash\nprintf "build-source-rpms %s\\n" "$*" >> "$DOCKER_LOG"\n'
-    )
+    (tmp_path / "scripts").symlink_to(ROOT / "scripts", target_is_directory=True)
     log = tmp_path / "docker.log"
-    result = subprocess.run(
-        ["bash", "-c", script("Apply maintained runtime security patches").replace(
-            "${{ github.sha }}", "test-sha"
-        )],
-        cwd=tmp_path,
-        env={
-            **os.environ,
-            "PATH": f"{tmp_path}:{os.environ['PATH']}",
-            "DOCKER_LOG": str(log),
-        },
-        capture_output=True, text=True, timeout=30,
-    )
-    assert result.returncode == 0, result.stderr
+    for image in IMAGES:
+        result = subprocess.run(
+            ["bash", "-c", script("Apply maintained runtime security patches")],
+            cwd=tmp_path,
+            env={
+                **os.environ, "BUNDLE_IMAGE": image, "GITHUB_SHA": "test-sha",
+                "PATH": f"{tmp_path}:{os.environ['PATH']}", "DOCKER_LOG": str(log),
+            },
+            capture_output=True, text=True, timeout=30,
+        )
+        assert result.returncode == 0, result.stderr
     commands = log.read_text().splitlines()
-    assert "build-source-rpms bundle-reports/rpm-security" in commands
+    assert not any("build-source-rpms" in command for command in commands)
     for name in ("awx", "awx-ee", "galaxy-ng", "eda-controller", "ansible-rulebook", "receptor"):
         rpm_build = next(
             command for command in commands if f"-t {name}:rpm-patched " in command
         )
         assert "images/rpm-security/Runtime.Dockerfile" in rpm_build
-        assert commands.index(rpm_build) > commands.index(
-            "build-source-rpms bundle-reports/rpm-security"
-        )
+        final_build = next(command for command in commands if f"-t {name}:finalized " in command)
+        assert commands.index(rpm_build) < commands.index(final_build)
     for name in ("awx", "awx-ee", "galaxy-ng", "eda-controller"):
         build = next(command for command in commands if f"-t {name}:python-patched " in command)
         assert f"BASE_IMAGE={name}:devel" in build
         assert "RUNTIME_USER=" in build and "PYTHON=" in build
     assert any("RECEPTOR_IMAGE=receptor:devel" in command for command in commands)
     assert any("images/runtime-security/EDA.Dockerfile" in command for command in commands)
+    assert any("images/eda-decision-environment/Security.Dockerfile" in command for command in commands)
+    assert any("images/drools-runtime" in command for command in commands)
     for name in ("awx", "galaxy-ng", "eda-controller"):
         source_build = next(
             command for command in commands if f"-t aax/dab-security:{name} " in command
@@ -485,7 +1047,12 @@ def test_normalized_sarif_is_preserved_with_original_reports() -> None:
         step for step in STEPS if step.get("name") == "Preserve bundle provenance and security reports"
     )
     assert preserve["if"] == "always()"
-    assert preserve["with"]["path"].splitlines() == ["bundle-reports/", "bundle-sarif/"]
+    assert preserve["with"]["path"].splitlines() == [
+        "candidate-maps/gated/${{ matrix.image }}.json",
+        "bundle-reports/${{ matrix.image }}*",
+        "bundle-sarif/*-${{ matrix.image }}.sarif",
+    ]
+    assert preserve["with"]["retention-days"] == 90
 
 
 @pytest.mark.parametrize(
@@ -547,6 +1114,26 @@ def test_rpm_installer_only_upgrades_existing_packages_and_checks_result(
         assert "upgrade failed" in result.stderr
     else:
         assert "expected 0:2-1.x86_64, found 0:3-1.x86_64" in result.stderr
+
+
+def test_native_brotli_source_includes_decoder_security_backport() -> None:
+    sources = json.loads((ROOT / "images/rpm-security/sources.json").read_text())
+    assert sources["brotli"] == {
+        "url": (
+            "https://vault.almalinux.org/9.8/BaseOS/Source/Packages/"
+            "brotli-1.0.9-10.el9_8.1.src.rpm"
+        ),
+        "sha256": "d211e0455ee313b52cbdb0078d69601e613ec2dd51049f09306f14c2fa4848b2",
+        "release": "11.el9.aax.1",
+    }
+
+
+def test_native_go_jose_pin_covers_embedded_jwk_parser_fix() -> None:
+    pins = json.loads((ROOT / "images/rpm-security/go-dependencies.json").read_text())
+    assert pins["github.com/go-jose/go-jose/v4"] == "v4.1.6"
+    prepare = (ROOT / "images/rpm-security/prepare.sh").read_text()
+    assert "git-lfs|podman|skopeo)" in prepare
+    assert "bash %{SOURCE9999} %{SOURCE9998} %{SOURCE9997}" in prepare
 
 
 @pytest.mark.parametrize(
@@ -767,9 +1354,244 @@ def test_main_channel_promotes_only_scanned_candidate_digests() -> None:
         build = next(step for step in steps if step.get("id") == "build")
         assert ":build-${{ github.run_id }}-${{ github.run_attempt }}" in build["with"]["tags"]
         scan = next(step for step in steps if step.get("name", "").startswith("Scan candidate"))
-        assert "for arch in amd64 arm64" in scan["run"]
+        assert 'bash scripts/scan-image-candidate.sh "$IMAGE"' in scan["run"]
         assert "@${{ steps.build.outputs.digest }}" in scan["env"]["IMAGE"]
-        assert "bash scripts/check-vulnerability-reports.sh" in scan["run"]
+        upload = next(step for step in steps if step.get("name") == "Upload candidate findings")
+        assert upload["with"] == {"sarif_file": "image-sarif"}
+        assert upload["if"] == "always() && hashFiles('image-sarif/*.sarif') != ''"
+        preserve = next(step for step in steps if step.get("name") == "Preserve candidate reports")
+        assert preserve["if"] == "always() && hashFiles('image-reports/*') != ''"
+        assert preserve["with"]["path"].splitlines() == ["image-reports/", "image-sarif/"]
+        promote = next(step for step in steps if step.get("name") == "Promote scanned candidate")
+        assert promote["if"] == "github.ref == 'refs/heads/main'"
+        assert promote["env"]["IMAGE"] == scan["env"]["IMAGE"]
     base = workflow["jobs"]["build-and-push"]["steps"]
     base_arg = next(step for step in base if step.get("id") == "base")
     assert "aax-ee-base@$BASE_DIGEST" in base_arg["run"]
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    ["clean", "high-amd64", "high-arm64", "scanner-failure", "invalid-json", "invalid-sarif"],
+)
+def test_candidate_scan_executes_both_architectures_and_fails_closed(
+    tmp_path: Path, scenario: str
+) -> None:
+    scanner = tmp_path / "trivy"
+    scanner.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os, pathlib, sys\n"
+        "args = sys.argv[1:]\n"
+        "with open(os.environ['SCAN_LOG'], 'a') as log:\n"
+        "    log.write(json.dumps(args) + '\\n')\n"
+        "output = pathlib.Path(args[args.index('--output') + 1])\n"
+        "scenario = os.environ['SCENARIO']\n"
+        "if args[0] == 'convert':\n"
+        "    if scenario == 'invalid-sarif' and output.stem == 'arm64':\n"
+        "        output.write_text(json.dumps({'runs': []}))\n"
+        "    else:\n"
+        "        run = {'tool': {'driver': {'name': 'Trivy'}},\n"
+        "               'automationDetails': {'id': 'duplicate/'},\n"
+        "               'results': [{'ruleId': 'keep-finding'}]}\n"
+        "        output.write_text(json.dumps({'version': '2.1.0', 'runs': [run, run]}))\n"
+        "else:\n"
+        "    arch = args[args.index('--platform') + 1].split('/')[-1]\n"
+        "    if scenario == 'scanner-failure' and arch == 'arm64':\n"
+        "        sys.exit(7)\n"
+        "    if scenario == 'invalid-json' and arch == 'arm64':\n"
+        "        output.write_text('{}')\n"
+        "    else:\n"
+        "        vulnerabilities = []\n"
+        "        if scenario == 'high-' + arch:\n"
+        "            vulnerabilities.append({'VulnerabilityID': 'TEST-CVE',\n"
+        "                                    'Severity': 'HIGH', 'FixedVersion': '2'})\n"
+        "        output.write_text(json.dumps({'SchemaVersion': 2, 'Results': [\n"
+        "            {'Class': 'os-pkgs', 'Vulnerabilities': vulnerabilities}]}))\n"
+    )
+    scanner.chmod(0o755)
+    image = "ghcr.io/example/candidate@sha256:" + "a" * 64
+    log = tmp_path / "scanner.log"
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/scan-image-candidate.sh"), image, "published-test"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=15,
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
+             "SCENARIO": scenario, "SCAN_LOG": str(log)},
+    )
+    assert (result.returncode == 0) == (scenario == "clean"), result.stderr
+    calls = [json.loads(line) for line in log.read_text().splitlines()]
+    scans = [call for call in calls if call[0] == "image"]
+    assert [call[call.index("--platform") + 1] for call in scans] == [
+        "linux/amd64", "linux/arm64",
+    ]
+    assert all(call[-1] == image for call in scans)
+    assert (tmp_path / "image-reports/amd64.json").exists()
+    assert (tmp_path / "image-reports/amd64.sarif").exists()
+    identities = []
+    for path in (tmp_path / "image-sarif").glob("*.sarif"):
+        data = json.loads(path.read_text())
+        for index, run in enumerate(data["runs"]):
+            assert run["results"] == [{"ruleId": "keep-finding"}]
+            assert run["automationDetails"]["id"] == f"published-test/{path.stem}/{index}/"
+            identities.append(run["automationDetails"]["id"])
+    assert len(identities) == len(set(identities))
+    assert len(identities) == (2 if scenario in ("scanner-failure", "invalid-sarif") else 4)
+    if scenario.startswith("high-"):
+        assert "TEST-CVE" in result.stderr
+
+
+def test_candidate_scan_rejects_mutable_tags_before_running_scanner(tmp_path: Path) -> None:
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/scan-image-candidate.sh"), "example:main", "test"],
+        cwd=tmp_path, capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 2
+    assert "immutable sha256 image digest" in result.stderr
+    assert not (tmp_path / "image-reports").exists()
+
+
+@pytest.mark.parametrize("job_name", ["build-base-image", "build-and-push"])
+def test_release_promotes_only_the_exact_multiarch_scanned_digest(job_name: str) -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
+    job = workflow["jobs"][job_name]
+    steps = job["steps"]
+    names = [step.get("name", "") for step in steps]
+    assert names.index("Scan candidate on both architectures before promotion") < names.index(
+        "Promote scanned candidate"
+    )
+    build = next(step for step in steps if step.get("id") in ("build", "build-push"))
+    assert ":release-build-${{ github.run_id }}-${{ github.run_attempt }}" in build["with"]["tags"]
+    scan = next(step for step in steps if step.get("name", "").startswith("Scan candidate"))
+    assert 'bash scripts/scan-image-candidate.sh "$IMAGE" release-' in scan["run"] or (
+        'bash scripts/scan-image-candidate.sh "$IMAGE" "release-' in scan["run"]
+    )
+    assert f"@${{{{ steps.{build['id']}.outputs.digest }}}}" in scan["env"]["IMAGE"]
+    upload = next(step for step in steps if step.get("name") == "Upload candidate findings")
+    assert upload["with"] == {"sarif_file": "image-sarif"}
+    preserve = next(step for step in steps if step.get("name") == "Preserve candidate reports")
+    assert preserve["if"] == "always() && hashFiles('image-reports/*') != ''"
+    promote = next(step for step in steps if step.get("name") == "Promote scanned candidate")
+    assert "if" not in promote
+    assert promote["env"]["IMAGE"] == scan["env"]["IMAGE"]
+    if job_name == "build-and-push":
+        assert "aax-ee-base@${{ needs.build-base-image.outputs.digest }}" in build["with"]["build-args"]
+        sbom = next(step for step in steps if step.get("name") == "Generate SBOM")
+        assert sbom["with"]["image"] == scan["env"]["IMAGE"]
+        assert names.index("Attest SBOM") < names.index("Promote scanned candidate")
+
+
+@pytest.mark.parametrize(
+    "filename,job_name,step_name,env_name",
+    [
+        ("gitflow-enforce.yml", "check-branch-name", "Check branch name follows gitflow", "BRANCH_NAME"),
+        ("gitflow-enforce.yml", "check-target-branch", "Check PR target follows gitflow", "SOURCE_BRANCH"),
+        ("pr-automation.yml", "conventional-commits", "Advisory conventional commit check", "PR_TITLE"),
+    ],
+)
+def test_pr_metadata_is_data_not_executable_shell(
+    tmp_path: Path, filename: str, job_name: str, step_name: str, env_name: str
+) -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows" / filename).read_text())
+    step = next(step for step in workflow["jobs"][job_name]["steps"] if step["name"] == step_name)
+    assert "${{ github." not in step["run"]
+    assert env_name in step["env"]
+    payload = "$(touch INJECTED)"
+    result = subprocess.run(
+        ["bash", "-c", step["run"]],
+        cwd=tmp_path, capture_output=True, text=True, timeout=10,
+        env={**os.environ, env_name: payload, "TARGET_BRANCH": "main"},
+    )
+    assert not (tmp_path / "INJECTED").exists()
+    assert payload in result.stdout
+    assert result.returncode == (0 if env_name == "PR_TITLE" else 1)
+
+
+def test_ci_validates_all_workflow_definitions() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
+    lint = workflow["jobs"]["lint"]["steps"]
+    assert any("actionlint@v1.7.12" in step.get("run", "") for step in lint)
+
+
+def test_controller_publication_has_one_maintained_owner() -> None:
+    main = yaml.safe_load((ROOT / ".github/workflows/publish-images.yml").read_text())
+    matrix = main["jobs"]["build-and-push"]["strategy"]["matrix"]["image"]
+    assert {image["name"] for image in matrix} == {"ee-builder", "dev-tools", "gateway"}
+    for filename in ("awx-ui-runtime.yml", "eda-runtime.yml"):
+        workflow = yaml.safe_load((ROOT / ".github/workflows" / filename).read_text())
+        assert "packages" not in workflow["permissions"]
+        for job in workflow["jobs"].values():
+            assert all("docker push" not in step.get("run", "") for step in job["steps"])
+    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
+    for name in (
+        "pulp-api", "pulp-content", "pulp-worker", "galaxy-ng", "eda-controller",
+        "eda-worker", "eda-activation-worker", "eda-ws", "eda-podman",
+    ):
+        assert "${DEVEL_IMAGE_TAG:-devel}" in compose["services"][name]["image"]
+        assert "${AAX_VERSION" not in compose["services"][name]["image"]
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        "valid", "failed", "in-progress", "wrong-workflow", "branch", "wrong-tag",
+        "wrong-attempt", "unconfirmed", "invalid-id", "missing-webhook", "webhook-failure",
+    ],
+)
+def test_deployment_requires_explicit_verified_bundle_before_webhook(
+    tmp_path: Path, scenario: str
+) -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/deploy.yml").read_text())
+    triggers = workflow.get("on", workflow.get(True))
+    assert set(triggers) == {"workflow_dispatch"}
+    assert workflow["concurrency"]["cancel-in-progress"] is False
+    job = workflow["jobs"]["deploy"]
+    assert job["if"] == "github.ref == 'refs/heads/main'"
+    verify, deploy = job["steps"]
+    assert "PORTAINER_WEBHOOK_URL" not in verify.get("env", {})
+    assert "${{ inputs." not in verify["run"]
+    run = {
+        "id": 123, "run_attempt": 2, "path": ".github/workflows/publish-devel.yml",
+        "head_branch": "main", "status": "completed", "conclusion": "success",
+        "head_sha": "a" * 40,
+    }
+    if scenario == "failed":
+        run["conclusion"] = "failure"
+    elif scenario == "in-progress":
+        run["status"] = "in_progress"
+    elif scenario == "wrong-workflow":
+        run["path"] = ".github/workflows/publish-images.yml"
+    elif scenario == "branch":
+        run["head_branch"] = "fix/not-production"
+    run_json = tmp_path / "run.json"
+    run_json.write_text(json.dumps(run))
+    gh = tmp_path / "gh"
+    gh.write_text('#!/bin/sh\ncat "$RUN_JSON"\n')
+    gh.chmod(0o755)
+    curl = tmp_path / "curl"
+    curl.write_text(
+        '#!/bin/sh\nprintf "%s\\n" "$*" > "$WEBHOOK_LOG"\n'
+        'if [ "$SCENARIO" = webhook-failure ]; then exit 22; fi\n'
+    )
+    curl.chmod(0o755)
+    webhook_log = tmp_path / "webhook.log"
+    summary = tmp_path / "summary"
+    tag = "devel-" + "a" * 40 + "-123-2"
+    if scenario == "wrong-tag":
+        tag = "devel-unpublished"
+    elif scenario == "wrong-attempt":
+        tag = "devel-" + "a" * 40 + "-123-1"
+    result = subprocess.run(
+        ["bash", "-c", verify["run"] + "\n" + deploy["run"]],
+        cwd=tmp_path, capture_output=True, text=True, timeout=15,
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
+             "SCENARIO": scenario, "RUN_JSON": str(run_json), "WEBHOOK_LOG": str(webhook_log),
+             "GITHUB_REPOSITORY": "example/aax", "GITHUB_STEP_SUMMARY": str(summary),
+             "BUNDLE_RUN_ID": "invalid" if scenario == "invalid-id" else "123",
+             "BUNDLE_TAG": tag,
+             "PORTAINER_PINS_CONFIRMED": "false" if scenario == "unconfirmed" else "true",
+             "PORTAINER_WEBHOOK_URL": "" if scenario == "missing-webhook" else "https://portainer.invalid/webhook"},
+    )
+    assert (result.returncode == 0) == (scenario == "valid"), result.stderr
+    assert webhook_log.exists() == (scenario in ("valid", "webhook-failure"))
+    assert summary.exists() == (scenario == "valid")
+    if scenario == "valid":
+        assert "Verify service health and activations" in summary.read_text()

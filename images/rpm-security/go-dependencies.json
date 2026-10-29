@@ -1,5 +1,6 @@
 {
   "github.com/fsouza/go-dockerclient": "v1.13.2",
+  "github.com/go-jose/go-jose/v4": "v4.1.6",
   "github.com/klauspost/compress": "v1.18.7",
   "github.com/moby/buildkit": "v0.31.1",
   "github.com/moby/go-archive": "v0.3.0",
