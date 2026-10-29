@@ -32,6 +32,81 @@ IMAGES = [
 ]
 
 
+AWX_PRODUCTION_CHECK = '''def assert_production_settings(settings: Dynaconf, settings_dir: str, settings_file_path: str):  # pragma: no cover
+    """Ensure at least one setting file has been loaded in production mode.
+    Current systems will require /etc/tower/settings.py and
+    new systems will require /etc/ansible-automation-platform/*.yaml
+    """
+    if "production" not in settings.current_env.lower():
+        return
+
+    required_settings_paths = [
+        os.path.dirname(settings_file_path),
+        "/etc/ansible-automation-platform/",
+        settings_dir,
+    ]
+
+    for path in required_settings_paths:
+        if any([path in os.path.dirname(f) for f in settings._loaded_files]):
+            break
+    else:
+        from django.core.exceptions import ImproperlyConfigured  # noqa
+
+        msg = 'No AWX configuration found at %s.' % required_settings_paths
+        msg += '\\nDefine the AWX_SETTINGS_FILE environment variable to '
+        msg += 'specify an alternate path.'
+        raise ImproperlyConfigured(msg)
+'''
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["unchanged", "missing", "duplicate", "predicate", "environment", "paths", "rejection"],
+)
+def test_awx_dynaconf_patch_requires_exact_production_check(
+    tmp_path: Path, mutation: str
+) -> None:
+    patch = runpy.run_path(str(ROOT / "images/runtime-security/patch_awx_dynaconf.py"))["patch"]
+    source = tmp_path / "functions.py"
+    original = AWX_PRODUCTION_CHECK
+    if mutation == "missing":
+        original = ""
+    elif mutation == "duplicate":
+        original *= 2
+    elif mutation == "predicate":
+        original = original.replace("path in os.path.dirname(f)", "True")
+    elif mutation == "environment":
+        original = original.replace('"production" not in', '"production" in')
+    elif mutation == "paths":
+        original = original.replace("os.path.dirname(settings_file_path)", '"/tmp"')
+    elif mutation == "rejection":
+        original = original.replace("raise ImproperlyConfigured(msg)", "return")
+    source.write_text(original)
+    if mutation == "unchanged":
+        patch(source)
+        assert source.read_text() == original.replace(
+            "settings._loaded_files", "settings.__core__.config.loaded_files"
+        )
+        with pytest.raises(ValueError, match="Unexpected AWX"):
+            patch(source)
+    else:
+        with pytest.raises(ValueError, match="Unexpected AWX"):
+            patch(source)
+        assert source.read_text() == original
+
+
+def test_final_awx_image_checks_production_settings_after_dynaconf_patch() -> None:
+    dockerfile = (ROOT / "images/runtime-security/DAB.Dockerfile").read_text()
+    assert dockerfile.index('"${PYTHON}" /tmp/aax-patch-awx-dynaconf.py') < dockerfile.index(
+        "AWX_MODE=production"
+    )
+    assert "DJANGO_SETTINGS_MODULE=awx.settings" in dockerfile
+    assert 'AWX_SETTINGS_FILE="$settings_file"' in dockerfile
+    assert "settings.AAX_TEST" in dockerfile
+    assert "AWX_SETTINGS_DIR=/tmp/aax-missing-settings-dir" in dockerfile  # pragma: allowlist secret
+    assert "grep -F 'No AWX configuration found at'" in dockerfile
+
+
 @pytest.mark.parametrize(
     ("options", "valid"),
     [("required=True, allow_null=False", True),

@@ -108,6 +108,11 @@ security update. These are downstream builds, not unmodified upstream releases:
   revision. Its OAuth application serializer explicitly requires an organization,
   preserving the pre-3.16 behavior while allowing REST framework 3.18.2.
   The build runs the upstream OAuth provider tests before producing a wheel.
+- AWX's production settings check is adapted to Dynaconf 3.3.5's relocated
+  loaded-file list. The patch preserves the required configuration-file check
+  and fails on unexpected source changes. The final AWX image must load a real
+  production-mode settings file during its build; defaults-mode UI tests alone
+  do not exercise this path.
 - Hub rebuilds Galaxy NG, pulpcore and pulp-glue source wheels to allow the
   patched REST framework, yarl, requests and multidict versions. Pulpcore's
   REST framework cap is widened alongside Galaxy NG's. Changed source wheels
