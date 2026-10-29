@@ -32,6 +32,40 @@ IMAGES = [
 ]
 
 
+@pytest.mark.parametrize("occurrences", [0, 1, 2])
+def test_awx_dynaconf_patch_requires_exact_production_check(
+    tmp_path: Path, occurrences: int
+) -> None:
+    patch = runpy.run_path(str(ROOT / "images/runtime-security/patch_awx_dynaconf.py"))["patch"]
+    source = tmp_path / "functions.py"
+    original = "if 'production' not in settings.current_env.lower():\n    return\n"
+    original += "any(path in os.path.dirname(f) for f in settings._loaded_files)\n" * occurrences
+    source.write_text(original)
+    if occurrences == 1:
+        patch(source)
+        assert source.read_text() == original.replace(
+            "settings._loaded_files", "settings.__core__.config.loaded_files"
+        )
+        with pytest.raises(ValueError, match="Unexpected AWX"):
+            patch(source)
+    else:
+        with pytest.raises(ValueError, match="Unexpected AWX"):
+            patch(source)
+        assert source.read_text() == original
+
+
+def test_final_awx_image_checks_production_settings_after_dynaconf_patch() -> None:
+    dockerfile = (ROOT / "images/runtime-security/DAB.Dockerfile").read_text()
+    assert dockerfile.index('"${PYTHON}" /tmp/aax-patch-awx-dynaconf.py') < dockerfile.index(
+        "AWX_MODE=production"
+    )
+    assert "DJANGO_SETTINGS_MODULE=awx.settings" in dockerfile
+    assert 'AWX_SETTINGS_FILE="$settings_file"' in dockerfile
+    assert "settings.AAX_TEST" in dockerfile
+    assert "AWX_SETTINGS_DIR=/tmp/aax-missing-settings-dir" in dockerfile  # pragma: allowlist secret
+    assert "grep -F 'No AWX configuration found at'" in dockerfile
+
+
 @pytest.mark.parametrize(
     ("options", "valid"),
     [("required=True, allow_null=False", True),
