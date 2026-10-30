@@ -138,8 +138,8 @@ Use the deployment's database name and trusted origin. The explicit JSON origin
 also avoids passing a legacy CSV value to AWX's settings loader:
 
 ```sh
-docker compose --profile controller stop awx-web
-docker compose --profile controller exec -T \
+docker compose --profile controller stop awx-web &&
+if docker compose --profile controller exec -T \
   -e 'AWX_CSRF_TRUSTED_ORIGINS=["https://awx.ambitiouscake.com"]' \
   awx-task awx-manage shell <<'PY'
 from django.apps import apps
@@ -172,7 +172,12 @@ executor.loader.check_consistent_history(connection)
 assert not executor.migration_plan(executor.loader.graph.leaf_nodes())
 print("Legacy OAuth upgrade passed; domain counts unchanged")
 PY
-docker compose --profile controller start awx-web
+then
+  docker compose --profile controller start awx-web
+else
+  printf '%s\n' 'OAuth repair failed; leave awx-web stopped and investigate.' >&2
+  false
+fi
 ```
 
 The dependency-only state is necessary: rendering the full legacy state before
