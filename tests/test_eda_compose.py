@@ -6,6 +6,8 @@ from pathlib import Path
 import secrets
 import subprocess
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -35,6 +37,8 @@ def _compose_config() -> dict:
         [
             "docker",
             "compose",
+            "--env-file",
+            os.devnull,
             "--profile",
             "controller",
             "--profile",
@@ -106,3 +110,16 @@ def test_public_eda_session_writes_have_an_explicit_trusted_origin() -> None:
         assert json.loads(services[name]["environment"]["EDA_CSRF_TRUSTED_ORIGINS"]) == [
             "https://awx.ambitiouscake.com"
         ]
+
+
+def test_rulebook_readiness_timeout_preserves_default_and_allows_slow_hosts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for configured, expected in ((None, "60"), ("300", "300")):
+        if configured is None:
+            monkeypatch.delenv("EDA_RULEBOOK_READINESS_TIMEOUT_SECONDS", raising=False)
+        else:
+            monkeypatch.setenv("EDA_RULEBOOK_READINESS_TIMEOUT_SECONDS", configured)
+        services = _compose_config()["services"]
+        for name in ("eda-controller", "eda-worker", "eda-activation-worker", "eda-ws"):
+            assert services[name]["environment"]["EDA_RULEBOOK_READINESS_TIMEOUT_SECONDS"] == expected
