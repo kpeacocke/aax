@@ -23,6 +23,7 @@ x-eda-runtime-environment: &eda-runtime-environment
   EDA_REDIS_PORT: "6379"
   EDA_SECRET_KEY: ${EDA_SECRET_KEY:-${SECRET_KEY}}
   EDA_ALLOWED_HOSTS: ${EDA_ALLOWED_HOSTS:-'["localhost","127.0.0.1","eda-controller","eda-ws","gateway","awx.ambitiouscake.com"]'}
+  EDA_CSRF_TRUSTED_ORIGINS: '${EDA_CSRF_TRUSTED_ORIGINS:-["https://awx.ambitiouscake.com"]}'
   EDA_RESOURCE_SERVER__URL: ${EDA_RESOURCE_SERVER_URL:-"@none None"}
   EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT: "true"
   EDA_CONTROLLER_URL: ${EDA_CONTROLLER_URL:-https://awx.ambitiouscake.com}
