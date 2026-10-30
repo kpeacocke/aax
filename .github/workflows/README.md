@@ -44,6 +44,10 @@ AAX Git revision and runs a persistent debug activation through the API and
 WebSocket callbacks. Fresh persisted logs are required after worker restart
 and stack recreation with volumes retained. Its receipt binds all three scanned
 EDA image identities and the Git revision; missing recovery proof blocks promotion.
+Every check watermarks the logs already persisted after its transition and
+requires a later marker from the current Running instance. The receipt must
+contain `last_log_id > log_watermark`; stale pre-transition logs and missing
+watermarks block promotion.
 A published image or successful webhook is not proof that
 the production stack is upgraded: deployment must select the successful lane's
 immutable tag and verify the actual services and activation behavior.

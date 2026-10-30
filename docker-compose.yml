@@ -952,7 +952,7 @@ services:
       <<: *eda-runtime-environment
       EDA_PODMAN_SOCKET_URL: ${EDA_PODMAN_SOCKET_URL:-tcp://eda-podman:8888}
       EDA_PODMAN_MEM_LIMIT: ${EDA_PODMAN_MEM_LIMIT:-512m}
-      EDA_PODMAN_EXTRA_ARGS: ${EDA_PODMAN_EXTRA_ARGS:-"@json {}"}
+      EDA_PODMAN_EXTRA_ARGS: "${EDA_PODMAN_EXTRA_ARGS:-@json {}}"
     depends_on:
       eda-controller:
         condition: service_healthy

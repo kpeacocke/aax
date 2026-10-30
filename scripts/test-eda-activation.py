@@ -180,28 +180,46 @@ def prepare(api: API, args) -> dict:
 
 
 def check(api: API, state: dict, timeout: int) -> dict:
-    activation = poll(
-        lambda: api.request("GET", f"activations/{state['activation_id']}/"),
-        lambda a: a["status"].lower() == "running", timeout, "Activation",
-    )
-    if not activation["is_enabled"]:
-        raise RuntimeError("Acceptance activation is not enabled")
-    if activation["git_hash"] != state["git_hash"]:
-        raise RuntimeError("Activation is not running the recorded Git revision")
-    instances = activation["instances"]
-    if not instances:
-        raise RuntimeError("Running activation has no instance")
-    instance = max(instances, key=lambda i: i["id"])
+    def read_activation():
+        activation = api.request("GET", f"activations/{state['activation_id']}/")
+        if not activation["is_enabled"]:
+            raise RuntimeError("Acceptance activation is not enabled")
+        if activation["status"].lower() == "running" and activation["git_hash"] != state["git_hash"]:
+            raise RuntimeError("Activation is not running the recorded Git revision")
+        if activation["status"].lower() in ("failed", "error"):
+            raise RuntimeError("Activation failed; inspect EDA status and instance logs")
+        if activation["instances"]:
+            latest = max(activation["instances"], key=lambda i: i["id"])
+            if latest["status"].lower() == "running" and latest["git_hash"] != state["git_hash"]:
+                raise RuntimeError("Activation instance has a different Git revision")
+        return activation
+
     deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
+    activation = read_activation()
+    # Checks start after the transition; exclude every log already persisted now.
+    watermark = state["last_log_id"]
+    for instance in activation["instances"]:
         logs = api.results(f"activation-instances/{instance['id']}/logs/")
-        markers = [log for log in logs if state["marker"] in log["log"]
-                   and log["id"] > state["last_log_id"]]
-        if markers:
-            return {**state, "instance_id": instance["id"], "status": "running",
-                    "last_log_id": max(log["id"] for log in markers)}
+        watermark = max(watermark, max((log["id"] for log in logs), default=0))
+    while time.monotonic() < deadline:
+        activation = read_activation()
+        if activation["status"].lower() == "running" and activation["instances"]:
+            instance = max(activation["instances"], key=lambda i: i["id"])
+            if instance["status"].lower() == "running":
+                logs = api.results(f"activation-instances/{instance['id']}/logs/")
+                markers = [log for log in logs if state["marker"] in log["log"]
+                           and log["id"] > watermark]
+                if markers:
+                    confirmed = read_activation()
+                    current = max(confirmed["instances"], key=lambda i: i["id"], default=None)
+                    if (confirmed["status"].lower() == "running" and current is not None
+                            and current["id"] == instance["id"]
+                            and current["status"].lower() == "running"):
+                        return {**state, "instance_id": instance["id"], "status": "running",
+                                "log_watermark": watermark,
+                                "last_log_id": max(log["id"] for log in markers)}
         time.sleep(3)
-    raise TimeoutError("Running activation did not deliver a fresh debug marker to EDA logs")
+    raise TimeoutError("Activation did not reach Running with a fresh debug marker in EDA logs")
 
 
 def main(argv=None):

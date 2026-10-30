@@ -401,7 +401,7 @@ def bundle_evidence(path: Path) -> dict[str, str]:
     (reports / "eda-controller-recovery.log").write_text("AAX_CONTROLLER_ACTIVATION_RECOVERY_PASSED\n")
     (reports / "eda-controller-acceptance.json").write_text(json.dumps({
         "status": "running", "git_hash": env["GITHUB_SHA"],
-        "activation_id": 1, "instance_id": 2, "last_log_id": 3,
+        "activation_id": 1, "instance_id": 2, "last_log_id": 3, "log_watermark": 2,
     }))
     packages = json.loads((ROOT / "images/rpm-security/sources.json").read_text())
     source_bytes = b"pinned signed source RPM"
@@ -625,6 +625,7 @@ def test_publication_verifies_same_trivy_identities_as_scan_gate(
     "empty-native", "substituted-source-rpm",
     "empty-sbom", "missing-dab-provenance", "mutable-dab-provenance",
     "missing-controller-result", "missing-recovery-marker", "wrong-controller-git",
+    "missing-log-watermark", "stale-controller-log",
 ])
 def test_incomplete_or_substituted_evidence_blocks_all_registry_writes(
     tmp_path: Path, damage: str
@@ -653,6 +654,14 @@ def test_incomplete_or_substituted_evidence_blocks_all_registry_writes(
         report = tmp_path / "bundle-reports/eda-controller-acceptance.json"
         result = json.loads(report.read_text())
         result["git_hash"] = "b" * 40
+        report.write_text(json.dumps(result))
+    elif damage in ("missing-log-watermark", "stale-controller-log"):
+        report = tmp_path / "bundle-reports/eda-controller-acceptance.json"
+        result = json.loads(report.read_text())
+        if damage == "missing-log-watermark":
+            del result["log_watermark"]
+        else:
+            result["last_log_id"] = result["log_watermark"]
         report.write_text(json.dumps(result))
     elif damage == "empty-native":
         (tmp_path / "native-rpms.tar.gz").write_bytes(b"")

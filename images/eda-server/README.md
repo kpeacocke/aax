@@ -150,7 +150,11 @@ digest. It drives the real authenticated HTTP API, imports a pinned Git ref,
 creates an activation, and requires a fresh event marker in persisted EDA logs.
 Run `--phase prepare` followed by `--phase check` with the same state file.
 Repeat `check` after worker restart and stack redeploy to require new logs,
-not an old successful status. Keep the state file in a persistent operator-owned
+not an old successful status. Each check first watermarks all persisted instance
+logs, follows replacement instances, and requires a later marker while the
+current instance is still Running with the recorded Git revision. Logs produced
+between an earlier successful check and shutdown cannot satisfy recovery.
+Keep the state file in a persistent operator-owned
 location. `--phase disable` disables only the activation recorded in that file.
 
 For remote HTTPS use, supply `EDA_TEST_USERNAME` and `EDA_TEST_PASSWORD` through

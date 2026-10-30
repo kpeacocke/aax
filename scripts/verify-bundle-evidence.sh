@@ -59,5 +59,7 @@ jq -e --arg revision "$GITHUB_SHA" '
   .status == "running" and .git_hash == $revision and
   (.activation_id | type == "number" and . > 0) and
   (.instance_id | type == "number" and . > 0) and
-  (.last_log_id | type == "number" and . > 0)
+  (.log_watermark | type == "number" and . >= 0) and
+  (.last_log_id | type == "number" and . > 0) and
+  .last_log_id > .log_watermark
 ' bundle-reports/eda-controller-acceptance.json >/dev/null
