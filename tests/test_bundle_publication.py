@@ -5,6 +5,7 @@ import hashlib
 import io
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import runpy
@@ -291,6 +292,21 @@ def test_hub_patch_selection_checks_before_applying(tmp_path: Path, layout: str)
         f"-C {tmp_path} apply --check {ROOT / 'images/hub-security' / patch}",
         f"-C {tmp_path} apply {ROOT / 'images/hub-security' / patch}",
     ]
+
+
+@pytest.mark.parametrize("patch_name", ["galaxy.patch", "galaxy-pyproject.patch"])
+def test_galaxy_metadata_requires_current_maintained_dab(patch_name: str) -> None:
+    patch = (ROOT / "images/hub-security" / patch_name).read_text()
+    runtime = (ROOT / "scripts/patch-bundle-image.sh").read_text()
+    suffix = re.search(r'd\.version\.split\("\+"\)\[0\]\+"(\+aax\.\d+)"', runtime)
+    assert suffix is not None
+    dependency = re.search(
+        r'^\+.*"django-ansible-base\[jwt-consumer,feature-flags\]==([^"]+)"',
+        patch, re.MULTILINE,
+    )
+    assert dependency is not None
+    assert dependency.group(1) == "2026.10.9.0.dev104" + suffix.group(1)
+    assert re.search(r'^\+.*version.*\+aax\.3', patch, re.MULTILINE)
 
 
 @pytest.mark.parametrize("version", ["2026.9.17.0.dev74+aax.1", "2026.10.9.0.dev104+aax.1"])
