@@ -90,6 +90,12 @@ For Portainer with a separate Docker host filesystem, set `AAX_AWX_CACHE_FILE`
 to an existing absolute host path containing the repository's `compat/awx-cache.py`.
 The default relative path is appropriate for ordinary local Compose.
 
+Set `EDA_CSRF_TRUSTED_ORIGINS` to a JSON list of the exact public HTTPS origins
+used for EDA session authentication (default: `["https://awx.ambitiouscake.com"]`).
+The reverse proxy terminates TLS before forwarding HTTP to EDA, so the public
+origin must be explicitly trusted for session-authenticated API writes. Keep
+CSRF checks enabled; do not use a wildcard or trust arbitrary origins.
+
 ## Standalone AWX bearer tokens
 
 Current upstream AWX no longer includes its old personal-token implementation.

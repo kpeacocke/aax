@@ -98,3 +98,11 @@ def test_websocket_and_default_workers_keep_restricted_runtime_security() -> Non
     assert websocket["environment"]["EDA_WORKER_KIND"] == "websocket"
     assert websocket["environment"]["EDA_WEBSOCKET_SSL_VERIFY"] == "yes"
     assert "ports" not in websocket
+
+
+def test_public_eda_session_writes_have_an_explicit_trusted_origin() -> None:
+    services = _compose_config()["services"]
+    for name in ("eda-controller", "eda-worker", "eda-activation-worker", "eda-ws"):
+        assert json.loads(services[name]["environment"]["EDA_CSRF_TRUSTED_ORIGINS"]) == [
+            "https://awx.ambitiouscake.com"
+        ]
