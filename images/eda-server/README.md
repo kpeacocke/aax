@@ -111,6 +111,69 @@ Fresh project/log volumes inherit ownership for EDA's unprivileged UID 1001
 from the image. Existing externally provisioned volumes must already be writable
 by that UID; do not grant the workers runtime root privileges to repair storage.
 
+### Upgrading a legacy AWX OAuth migration history
+
+An upgraded AWX database can retain `oauth2_provider.0001_initial` while the
+newly enabled `dab_oauth2_provider.0001_initial` dependency is absent. Ordinary
+`migrate` then reports `InconsistentMigrationHistory`; fresh databases do not
+exercise this case. Back up the database, stop AWX web, and confirm no jobs are
+active before proceeding. Keep the updated task service running with OAuth
+enabled. Do not fake migrations or delete the legacy migration records.
+
+For this exact case, the following guarded repair applies the real initial
+migration using its dependency state, then runs the ordinary migration command.
+It refuses an unexpected plan, existing DAB tables or changed domain counts.
+Validate it against an isolated copy of the legacy database first. On Alexandria
+this passed with unchanged users, jobs, projects, inventories and templates;
+historical job-event partitions were excluded only from the isolated test copy,
+not the production backup or production migration.
+
+Use the deployment's database name and trusted origin. The explicit JSON origin
+also avoids passing a legacy CSV value to AWX's settings loader:
+
+```sh
+docker compose --profile controller stop awx-web
+docker compose --profile controller exec -T \
+  -e 'AWX_CSRF_TRUSTED_ORIGINS=["https://awx.ambitiouscake.com"]' \
+  awx-task awx-manage shell <<'PY'
+from django.apps import apps
+from django.core.management import call_command
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
+from awx.main.models import User, Job, Project, Inventory, JobTemplate, UnifiedJob
+
+assert connection.settings_dict["NAME"] == "awx", "Unexpected database"
+assert not UnifiedJob.objects.filter(status__in=["pending", "waiting", "running"]).exists()
+models = (User, Job, Project, Inventory, JobTemplate)
+before = {model.__name__: model.objects.count() for model in models}
+executor = MigrationExecutor(connection)
+target = ("dab_oauth2_provider", "0001_initial")
+plan = executor.migration_plan([target])
+assert [(m.app_label, m.name, backwards) for m, backwards in plan] == [
+    (*target, False)
+], "Unexpected migration plan"
+assert ("oauth2_provider", "0001_initial") in executor.loader.applied_migrations
+tables = {m._meta.db_table for m in apps.get_app_config(target[0]).get_models()}
+assert len(tables) == 4 and not tables.intersection(connection.introspection.table_names())
+assert [type(op).__name__ for op in plan[0][0].operations] == ["CreateModel"] * 4 + ["AddField"]
+state = executor.loader.project_state(nodes=[target], at_end=False)
+executor.apply_migration(state, plan[0][0], fake=False, fake_initial=False)
+MigrationExecutor(connection).loader.check_consistent_history(connection)
+call_command("migrate", interactive=False)
+assert before == {model.__name__: model.objects.count() for model in models}
+executor = MigrationExecutor(connection)
+executor.loader.check_consistent_history(connection)
+assert not executor.migration_plan(executor.loader.graph.leaf_nodes())
+print("Legacy OAuth upgrade passed; domain counts unchanged")
+PY
+docker compose --profile controller start awx-web
+```
+
+The dependency-only state is necessary: rendering the full legacy state before
+creating the DAB models also fails on the toolkit's swapped-model references.
+After a successful repair, ordinary startup migrations work again; do not rerun
+this one-time command on an already migrated database.
+
 ## Legacy Synology execution compatibility
 
 The activation worker is already a Compose container. Rulebook activations are
