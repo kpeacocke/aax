@@ -135,7 +135,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Download frozen sources
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: bundle-input-sources-${{ github.run_attempt }}
       - name: Restore exact upstream sources
@@ -179,7 +179,7 @@ jobs:
       - *buildx
       - *login
       - name: Download retained build inputs
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: bundle-input-*-${{ github.run_attempt }}
           merge-multiple: true
@@ -225,18 +225,18 @@ jobs:
       - *buildx
       - *login
       - name: Download retained image build inputs
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: bundle-input-*-${{ github.run_attempt }}
           merge-multiple: true
       - name: Download exact scanned Receptor dependency
         if: matrix.image == 'awx-ee'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: bundle-gate-receptor-${{ github.run_attempt }}
       - name: Download exact scanned rulebook dependency
         if: matrix.image == 'eda-decision-environment'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: bundle-gate-ansible-rulebook-${{ github.run_attempt }}
       - name: Restore shared artifacts and this image only
@@ -278,7 +278,7 @@ jobs:
       - name: Install bundle scanner
         uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
         with:
-          version: v0.70.0
+          version: v0.76.1
       - name: Install supplemental OS scanner
         run: |
           set -euo pipefail
@@ -307,17 +307,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p bundle-sarif
-          for name in "$BUNDLE_IMAGE"; do
-            for scanner in trivy grype; do
-              source="bundle-reports/$name.sarif"
-              if [[ "$scanner" == grype ]]; then
-                source="bundle-reports/$name-grype.sarif"
-              fi
-              [[ -f "$source" ]] || continue
-              jq --arg id "devel-bundle/$scanner/$name/" \
-                '.runs |= map(.automationDetails.id = $id)' \
-                "$source" > "bundle-sarif/$scanner-$name.sarif"
-            done
+          name="$BUNDLE_IMAGE"
+          for scanner in trivy grype; do
+            source="bundle-reports/$name.sarif"
+            if [[ "$scanner" == grype ]]; then
+              source="bundle-reports/$name-grype.sarif"
+            fi
+            [[ -f "$source" ]] || continue
+            jq --arg id "devel-bundle/$scanner/$name/" \
+              '.runs |= map(.automationDetails.id = $id)' \
+              "$source" > "bundle-sarif/$scanner-$name.sarif"
           done
       - name: Upload bundle security findings
         if: always() && hashFiles('bundle-sarif/*.sarif') != ''
@@ -354,7 +353,7 @@ jobs:
       - *checkout
       - *login
       - name: Download scanned runtime candidates
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: bundle-gate-eda-*-${{ github.run_attempt }}
           merge-multiple: true
@@ -363,6 +362,7 @@ jobs:
           set -euo pipefail
           bash scripts/bundle-candidate.sh pull eda-podman gated
           bash scripts/bundle-candidate.sh pull eda-decision-environment gated
+          bash scripts/bundle-candidate.sh pull eda-controller gated
       - name: Require nested VFS disk budget
         run: |
           set -euo pipefail
@@ -393,7 +393,7 @@ jobs:
             --network "$network" --dns 1.1.1.1 \
             -v "$volume:/var/lib/containers/storage" eda-podman:devel
           ready=false
-          for attempt in $(seq 1 30); do
+          for _attempt in $(seq 1 30); do
             if docker exec aax-eda-podman-test curl --fail --silent http://127.0.0.1:8888/_ping; then
               ready=true
               break
@@ -422,6 +422,23 @@ jobs:
           jq -n --slurpfile podman candidate-maps/gated/eda-podman.json \
             --slurpfile decision candidate-maps/gated/eda-decision-environment.json \
             '{podman: $podman[0], decision: $decision[0]}' > bundle-reports/runtime-gate.json
+      - name: Prove controller activation and persistent restart recovery
+        run: |
+          set -euo pipefail
+          EDA_TEST_IMAGE="$(jq -er '.repository + "@" + .digest' candidate-maps/gated/eda-controller.json)"
+          EDA_TEST_PODMAN_IMAGE="$(jq -er '.repository + "@" + .digest' candidate-maps/gated/eda-podman.json)"
+          EDA_TEST_DECISION_IMAGE="$(jq -er '.repository + "@" + .digest' candidate-maps/gated/eda-decision-environment.json)"
+          export EDA_TEST_IMAGE EDA_TEST_PODMAN_IMAGE EDA_TEST_DECISION_IMAGE
+          export EDA_TEST_GIT_REF="$GITHUB_SHA"
+          EDA_TEST_SECRET="$(openssl rand -hex 32)"
+          echo "::add-mask::$EDA_TEST_SECRET"
+          export EDA_TEST_SECRET
+          bash scripts/test-eda-stack.sh | tee bundle-reports/eda-controller-recovery.log
+          jq -n --slurpfile podman candidate-maps/gated/eda-podman.json \
+            --slurpfile decision candidate-maps/gated/eda-decision-environment.json \
+            --slurpfile controller candidate-maps/gated/eda-controller.json \
+            '{podman: $podman[0], decision: $decision[0], controller: $controller[0]}' \
+            > bundle-reports/runtime-gate.json
       - name: Preserve runtime evidence on failure
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -430,9 +447,13 @@ jobs:
           path: |
             candidate-maps/gated/eda-podman.json
             candidate-maps/gated/eda-decision-environment.json
+            candidate-maps/gated/eda-controller.json
             bundle-reports/nested-runtime.log
             bundle-reports/eda-rulebook-smoke.log
             bundle-reports/runtime-gate.json
+            bundle-reports/eda-controller-acceptance.json
+            bundle-reports/eda-controller-acceptance.log
+            bundle-reports/eda-controller-recovery.log
           if-no-files-found: error
           retention-days: 90
 
@@ -445,7 +466,7 @@ jobs:
       - *buildx
       - *login
       - name: Download all exact candidate identities and evidence
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: bundle-*-${{ github.run_attempt }}
           merge-multiple: true

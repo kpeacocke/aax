@@ -3,4 +3,4 @@ pytest-asyncio==1.4.0
 django-extensions==4.1
 django-debug-toolbar==8.0.0
 psycopg[binary]==3.3.6
-openapi-spec-validator==0.8.1
+openapi-spec-validator==0.8.3

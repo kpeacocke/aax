@@ -383,7 +383,7 @@ def bundle_evidence(path: Path) -> dict[str, str]:
     for name in ("awx", "galaxy-ng", "eda-controller"):
         (reports / f"{name}-dab-source.json").write_text(json.dumps({
             "service": name, "repository": "https://github.com/ansible/django-ansible-base",
-            "revision": "c" * 40, "version": "1.2.3+aax.2",
+            "revision": "c" * 40, "version": "1.2.3+aax.3",
         }))
     (reports / "sources.json").write_text(json.dumps({
         "aax_revision": env["GITHUB_SHA"], "image_tag": env["IMAGE_TAG"],
@@ -391,10 +391,18 @@ def bundle_evidence(path: Path) -> dict[str, str]:
     }))
     (reports / "runtime-gate.json").write_text(json.dumps({
         key: json.loads((path / "candidate-maps/gated" / f"{name}.json").read_text())
-        for key, name in (("podman", "eda-podman"), ("decision", "eda-decision-environment"))
+        for key, name in (
+            ("podman", "eda-podman"), ("decision", "eda-decision-environment"),
+            ("controller", "eda-controller"),
+        )
     }))
     (reports / "eda-rulebook-smoke.log").write_text("AAX_DECISION_SECURITY_SMOKE_PASSED\n")
     (reports / "nested-runtime.log").write_text("HTTPS/range debug passed\n")
+    (reports / "eda-controller-recovery.log").write_text("AAX_CONTROLLER_ACTIVATION_RECOVERY_PASSED\n")
+    (reports / "eda-controller-acceptance.json").write_text(json.dumps({
+        "status": "running", "git_hash": env["GITHUB_SHA"],
+        "activation_id": 1, "instance_id": 2, "last_log_id": 3,
+    }))
     packages = json.loads((ROOT / "images/rpm-security/sources.json").read_text())
     source_bytes = b"pinned signed source RPM"
     for spec in packages.values():
@@ -509,9 +517,13 @@ def test_runtime_artifact_preserves_workspace_relative_evidence_layout() -> None
     assert set(paths) == {
         Path("candidate-maps/gated/eda-podman.json"),
         Path("candidate-maps/gated/eda-decision-environment.json"),
+        Path("candidate-maps/gated/eda-controller.json"),
         Path("bundle-reports/nested-runtime.log"),
         Path("bundle-reports/eda-rulebook-smoke.log"),
         Path("bundle-reports/runtime-gate.json"),
+        Path("bundle-reports/eda-controller-acceptance.json"),
+        Path("bundle-reports/eda-controller-acceptance.log"),
+        Path("bundle-reports/eda-controller-recovery.log"),
     }
     assert preserve["if"] == "always()"
 
@@ -558,6 +570,52 @@ def test_candidate_transfer_records_exact_manifest_and_rejects_substitution(
         assert identity["run_attempt"] == "1"
 
 
+@pytest.mark.parametrize("identity", ["config", "manifest", "unrelated", "wrong-config"])
+def test_candidate_pull_verifies_config_before_accepting_docker_identity(
+    tmp_path: Path, identity: str,
+) -> None:
+    env = bundle_evidence(tmp_path)
+    descriptor = json.loads((tmp_path / "candidate-maps/gated/awx.json").read_text())
+    docker = tmp_path / "docker"
+    docker.write_text(
+        '#!/bin/bash\nset -eu\n'
+        'case "$1 $2" in\n'
+        '  "buildx imagetools") jq -n --arg id "$CONFIG_ID" \'{config: {digest: $id}}\' ;;\n'
+        '  "image inspect") echo "$LOADED_ID" ;;\n'
+        'esac\n'
+    )
+    docker.chmod(0o755)
+    config = descriptor["image_id"]
+    loaded = descriptor["digest"] if identity == "manifest" else config
+    if identity == "unrelated":
+        loaded = "sha256:" + "f" * 64
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/bundle-candidate.sh"), "pull", "awx", "gated"],
+        cwd=tmp_path,
+        env={**env, "PATH": f"{tmp_path}:{os.environ['PATH']}", "LOADED_ID": loaded,
+             "CONFIG_ID": "sha256:" + "e" * 64 if identity == "wrong-config" else config},
+        capture_output=True, text=True, timeout=30,
+    )
+    assert (result.returncode == 0) == (identity in ("config", "manifest")), result.stderr
+
+
+@pytest.mark.parametrize("identity", ["config", "manifest"])
+def test_publication_verifies_same_trivy_identities_as_scan_gate(
+    tmp_path: Path, identity: str,
+) -> None:
+    env = bundle_evidence(tmp_path)
+    descriptor = json.loads((tmp_path / "candidate-maps/gated/awx.json").read_text())
+    report = tmp_path / "bundle-reports/awx.json"
+    data = json.loads(report.read_text())
+    data["Metadata"]["ImageID"] = descriptor["digest" if identity == "manifest" else "image_id"]
+    report.write_text(json.dumps(data))
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/verify-bundle-evidence.sh")], cwd=tmp_path,
+        env=env, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+
+
 @pytest.mark.parametrize("damage", [
     "missing-map", "extra-map", "empty-map", "mutable-digest", "wrong-run", "wrong-attempt",
     "wrong-owner", "wrong-name", "wrong-stage", "wrong-aax", "missing-raw", "missing-tool",
@@ -566,6 +624,7 @@ def test_candidate_transfer_records_exact_manifest_and_rejects_substitution(
     "mismatched-runtime", "missing-runtime", "missing-range-debug", "fixable-vulnerability",
     "empty-native", "substituted-source-rpm",
     "empty-sbom", "missing-dab-provenance", "mutable-dab-provenance",
+    "missing-controller-result", "missing-recovery-marker", "wrong-controller-git",
 ])
 def test_incomplete_or_substituted_evidence_blocks_all_registry_writes(
     tmp_path: Path, damage: str
@@ -585,9 +644,16 @@ def test_incomplete_or_substituted_evidence_blocks_all_registry_writes(
         "missing-runtime": tmp_path / "bundle-reports/runtime-gate.json",
         "missing-range-debug": tmp_path / "bundle-reports/eda-rulebook-smoke.log",
         "missing-dab-provenance": tmp_path / "bundle-reports/awx-dab-source.json",
+        "missing-controller-result": tmp_path / "bundle-reports/eda-controller-acceptance.json",
+        "missing-recovery-marker": tmp_path / "bundle-reports/eda-controller-recovery.log",
     }
     if damage in paths:
         paths[damage].unlink()
+    elif damage == "wrong-controller-git":
+        report = tmp_path / "bundle-reports/eda-controller-acceptance.json"
+        result = json.loads(report.read_text())
+        result["git_hash"] = "b" * 40
+        report.write_text(json.dumps(result))
     elif damage == "empty-native":
         (tmp_path / "native-rpms.tar.gz").write_bytes(b"")
     elif damage == "empty-sbom":
@@ -713,11 +779,13 @@ def test_branch_dispatch_retains_candidates_without_any_promotion(tmp_path: Path
     assert "retains candidates" in result.stdout
 
 
-@pytest.mark.parametrize("fail_scanner,mismatch,fixable", [
-    (False, False, False), (True, False, False), (False, True, False), (False, False, True),
-])
+@pytest.mark.parametrize(
+    "fail_scanner,mismatch,fixable",
+    [(False, False, False), (True, False, False), (False, True, False), (False, False, True)],
+)
+@pytest.mark.parametrize("trivy_identity", ["config", "digest", "invalid"])
 def test_exact_digest_scans_require_both_scanners_before_receipt(
-    tmp_path: Path, fail_scanner: bool, mismatch: bool, fixable: bool
+    tmp_path: Path, fail_scanner: bool, mismatch: bool, fixable: bool, trivy_identity: str
 ) -> None:
     env = bundle_evidence(tmp_path)
     receipt = tmp_path / "bundle-reports/awx-gate.json"
@@ -727,6 +795,16 @@ def test_exact_digest_scans_require_both_scanners_before_receipt(
     (binary / "trivy").write_text(
         '#!/bin/bash\nset -eu\n'
         'echo "$*" >> "$SCANNER_LOG"\n'
+        'if [[ "$1" == convert ]]; then\n'
+        '  while [[ "$1" != --output ]]; do shift; done\n'
+        '  printf \'{"version":"2.1.0","runs":[]}\\n\' > "$2"\n'
+        '  exit 0\n'
+        'fi\n'
+        'if [[ "$*" == *"--format cyclonedx"* ]]; then\n'
+        '  while [[ "$1" != --output ]]; do shift; done\n'
+        '  cp "$CYCLONEDX_SOURCE" "$2"\n'
+        '  exit 0\n'
+        'fi\n'
         'if [[ "$1" != image ]]; then exit 0; fi\n'
         'while [[ "$1" != --output ]]; do shift; done\n'
         'cp "$TRIVY_SOURCE" "$2"\n'
@@ -742,29 +820,66 @@ def test_exact_digest_scans_require_both_scanners_before_receipt(
         executable.chmod(0o755)
     trivy_source = tmp_path / "trivy-source.json"
     data = json.loads((tmp_path / "bundle-reports/awx.json").read_text())
+    descriptor = json.loads((tmp_path / "candidate-maps/gated/awx.json").read_text())
+    reference = descriptor["repository"] + "@" + descriptor["digest"]
+    if trivy_identity == "digest":
+        data["Metadata"]["ImageID"] = descriptor["digest"]
+    elif trivy_identity == "invalid":
+        data["Metadata"]["ImageID"] = "sha256:" + "f" * 64
     if fixable:
         data["Results"] = [{"Vulnerabilities": [{
             "VulnerabilityID": "BLOCK", "Severity": "CRITICAL", "FixedVersion": "1",
         }]}]
     trivy_source.write_text(json.dumps(data))
+    cdx_source = tmp_path / "cyclonedx-source.json"
+    cdx_source.write_text(json.dumps({
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.6",
+        "metadata": {"component": {"type": "container", "name": reference}},
+        "components": [{
+            "bom-ref": "pkg:pypi/example-vulnerable@1.0",
+            "name": "example-vulnerable",
+            "version": "1.0",
+        }],
+        "vulnerabilities": [{
+            "id": "TEST-CVE",
+            "affects": [{"ref": "pkg:pypi/example-vulnerable@1.0"}],
+        }],
+    }))
     grype_source = tmp_path / "grype-source.json"
+    config_image_id = descriptor["image_id"]
     grype_source.write_text(json.dumps(grype_report(
-        "sha256:" + "f" * 64 if mismatch else data["Metadata"]["ImageID"]
+        "sha256:" + "f" * 64 if mismatch else config_image_id
     )))
     log = tmp_path / "scanner.log"
     result = subprocess.run(
         ["bash", str(ROOT / "scripts/scan-bundle-image.sh"), "awx"], cwd=tmp_path,
         env={**env, "PATH": f"{binary}:{os.environ['PATH']}", "RUNNER_TEMP": str(binary),
              "SCANNER_LOG": str(log), "TRIVY_SOURCE": str(trivy_source),
+             "CYCLONEDX_SOURCE": str(cdx_source),
              "GRYPE_SOURCE": str(grype_source), "FAIL_SCANNER": str(fail_scanner).lower()},
         capture_output=True, text=True, timeout=30,
     )
-    assert (result.returncode == 0) == (not (fail_scanner or mismatch or fixable)), result.stderr
-    assert receipt.exists() == (not (fail_scanner or mismatch or fixable))
+    should_fail = fail_scanner or mismatch or fixable or trivy_identity == "invalid"
+    assert (result.returncode == 0) == (not should_fail), result.stderr
+    assert receipt.exists() == (not should_fail)
     commands = log.read_text().splitlines()
-    reference = "ghcr.io/testowner/aax-awx@sha256:" + f"{1:064x}"
     assert any(reference in command and "--image-src docker" in command for command in commands)
+    cdx_command = next(command for command in commands if "--format cyclonedx" in command)
+    assert "--scanners vuln" in cdx_command and reference in cdx_command
     assert any(f"docker:{reference}" in command for command in commands)
+    cdx_report = json.loads((tmp_path / "bundle-reports/awx.cdx.json").read_text())
+    assert cdx_report["bomFormat"] == "CycloneDX"
+    assert cdx_report["metadata"]["component"]["name"] == reference
+    assert cdx_report["components"][0]["name"] == "example-vulnerable"
+    assert cdx_report["vulnerabilities"][0]["affects"][0]["ref"] == (
+        "pkg:pypi/example-vulnerable@1.0"
+    )
+    assert cdx_report["vulnerabilities"][0]["affects"][0]["ref"] == (
+        cdx_report["components"][0]["bom-ref"]
+    )
+    assert any("convert --format sarif" in command for command in commands)
+    assert (tmp_path / "bundle-reports/awx.sarif").exists()
 
 
 @pytest.mark.parametrize(
@@ -811,6 +926,55 @@ def test_bundle_scan_precedes_publication() -> None:
     assert '"docker:$reference"' in scan and '--output "bundle-reports/$name.json" "$reference"' in scan
     assert ".Metadata.ImageID == $id" in scan and ".source.target.imageID == $id" in scan
     assert "sha256sum --check -" in script("Install supplemental OS scanner")
+
+
+def test_artifact_and_trivy_cli_pins_match_supported_runtimes() -> None:
+    download = (
+        "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333"
+    )
+    upload = "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9"
+    downloads = list({
+        id(step): step for step in STEPS
+        if step.get("uses", "").startswith("actions/download-artifact@")
+    }.values())
+    uploads = [step for step in STEPS if step.get("uses", "").startswith("actions/upload-artifact@")]
+    assert len(downloads) == 7
+    assert all(step["uses"] == download for step in downloads)
+    assert all(step["uses"] == upload for step in uploads)
+    assert all(job["runs-on"] == "ubuntu-24.04" for job in JOBS.values())
+    assert all("${{ github.run_attempt }}" in str(step["with"]) for step in downloads)
+    named_downloads = [step["with"] for step in downloads if "name" in step.get("with", {})]
+    pattern_downloads = [step["with"] for step in downloads if "pattern" in step.get("with", {})]
+    assert len(named_downloads) == 3
+    assert len(pattern_downloads) == 4
+    assert sorted(item["pattern"] for item in pattern_downloads) == sorted([
+        "bundle-input-*-${{ github.run_attempt }}",
+        "bundle-input-*-${{ github.run_attempt }}",
+        "bundle-gate-eda-*-${{ github.run_attempt }}",
+        "bundle-*-${{ github.run_attempt }}",
+    ])
+    assert all(item.get("merge-multiple") is True for item in pattern_downloads)
+    assert all("path" not in item for item in downloads)
+    assert any("bundle-input-sources-" in item["name"] for item in named_downloads)
+    assert any("bundle-gate-receptor-" in item["name"] for item in named_downloads)
+    assert any("bundle-gate-ansible-rulebook-" in item["name"] for item in named_downloads)
+
+    expected_trivy = "v0.76.1"
+    workflows = (
+        ".github/workflows/ci.yml",
+        ".github/workflows/release.yml",
+        ".github/workflows/publish-images.yml",
+        ".github/workflows/publish-devel.yml",
+    )
+    for path in workflows:
+        workflow = yaml.safe_load((ROOT / path).read_text())
+        for job in workflow["jobs"].values():
+            for step in job.get("steps", []):
+                uses = step.get("uses", "")
+                if uses.startswith("aquasecurity/trivy-action@"):
+                    assert step.get("with", {}).get("version") == expected_trivy, path
+                elif uses.startswith("aquasecurity/setup-trivy@"):
+                    assert step.get("with", {}).get("version") == expected_trivy, path
 
 
 def test_nested_podman_uses_explicit_local_decision_environment() -> None:
@@ -977,7 +1141,7 @@ def test_runtime_security_updates_precede_exact_image_scans(tmp_path: Path) -> N
     docker = tmp_path / "docker"
     docker.write_text(
         '#!/bin/bash\nprintf "%s\\n" "$*" >> "$DOCKER_LOG"\n'
-        'if [[ "$1" == run ]]; then printf "%040d 2026.10.21.1.dev2+aax.2\\n" 1; fi\n'
+        'if [[ "$1" == run ]]; then printf "%040d 2026.10.21.1.dev2+aax.3\\n" 1; fi\n'
     )
     docker.chmod(0o755)
     (tmp_path / "scripts").symlink_to(ROOT / "scripts", target_is_directory=True)
@@ -1015,7 +1179,7 @@ def test_runtime_security_updates_precede_exact_image_scans(tmp_path: Path) -> N
             command for command in commands if f"-t aax/dab-security:{name} " in command
         )
         assert "DAB_REVISION=" + "0" * 39 + "1" in source_build
-        assert "DAB_VERSION=2026.10.21.1.dev2+aax.2" in source_build
+        assert "DAB_VERSION=2026.10.21.1.dev2+aax.3" in source_build
         assert any(f"DAB_IMAGE=aax/dab-security:{name}" in command for command in commands)
         evidence = json.loads((tmp_path / f"bundle-reports/{name}-dab-source.json").read_text())
         assert evidence["revision"] == "0" * 39 + "1"

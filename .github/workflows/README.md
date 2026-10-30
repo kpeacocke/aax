@@ -21,7 +21,9 @@ Main-channel and release publication follow this sequence:
    rejects mutable tags and applies the strict vulnerability-report gate.
 3. Give every SARIF run a stable lane/image/architecture/run-index identity.
    Upload only normalized SARIF; retain the original scanner JSON and SARIF as
-   artifacts even when scanning, gating or uploading fails. A shared upload
+   artifacts even when scanning, gating or uploading fails. Download-artifact
+   uses pinned Node 24 v8.0.2 on ubuntu-24.04 runners and interoperates with
+   the workflow's pinned upload-artifact v7.0.2. A shared upload
    `category` must not collapse the architecture identities.
 4. Promote the scanned digest, never rebuild it. Descendant execution images
    use the exact scanned base digest. Release descendants are also signed and
@@ -37,9 +39,20 @@ scanner helper with clean, vulnerable, failed and malformed scanner responses,
 including multiple SARIF runs per architecture.
 
 The upstream bundle additionally needs its source-patch builds and nested
-Podman/rulebook test. A published image or successful webhook is not proof that
+Podman/rulebook test. A fresh isolated controller stack then imports the exact
+AAX Git revision and runs a persistent debug activation through the API and
+WebSocket callbacks. Fresh persisted logs are required after worker restart
+and stack recreation with volumes retained. Its receipt binds all three scanned
+EDA image identities and the Git revision; missing recovery proof blocks promotion.
+A published image or successful webhook is not proof that
 the production stack is upgraded: deployment must select the successful lane's
 immutable tag and verify the actual services and activation behavior.
+
+The pip source build replaces its obsolete unpinned INITools index fixture with
+`packaging==26.3`, forcing the index download even when packaging is installed.
+The original download/archive provenance assertions remain. This removes the
+legacy MIT-classifier build warning without suppressing setuptools diagnostics
+or changing the runtime package's license.
 
 ## Explicit production deployment
 

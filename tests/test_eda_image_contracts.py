@@ -69,6 +69,29 @@ def test_eda_entrypoint_dispatches_both_workers_and_asgi() -> None:
     assert "daphne -b 0.0.0.0 -p 8000 aap_eda.asgi:application" in entrypoint
 
 
+def test_fresh_eda_volumes_are_writable_without_runtime_privileges() -> None:
+    dockerfile = (ROOT / "images/eda-server/Dockerfile").read_text()
+    assert "chown 1001:0 /home/eda/projects /var/log/eda" in dockerfile
+    assert dockerfile.index("USER 0") < dockerfile.index("chown 1001:0") < dockerfile.index("USER 1001")
+
+
+@pytest.mark.parametrize("occurrences", [0, 1, 2])
+def test_pip_index_fixture_preserves_provenance_assertions(tmp_path: Path, occurrences: int) -> None:
+    module = runpy.run_path(str(ROOT / "images/ee-base/pip-security/update-index-fixture.py"))
+    path = tmp_path / "test_req.py"
+    path.write_text(module["ORIGINAL"] * occurrences)
+    if occurrences == 1:
+        module["patch"](path)
+        assert '"packaging==26.3"' in path.read_text()
+        assert "resolver.ignore_installed = True" in path.read_text()
+        assert "assert req.download_info.archive_info" in path.read_text()
+        with pytest.raises(ValueError, match="Unexpected pip"):
+            module["patch"](path)
+    else:
+        with pytest.raises(ValueError, match="Unexpected pip"):
+            module["patch"](path)
+
+
 def test_image_contracts_run_in_every_policy_command() -> None:
     for path in (".github/workflows/ci.yml", ".github/workflows/release.yml", "Makefile"):
         assert "tests/test_eda_image_contracts.py" in (ROOT / path).read_text()
@@ -131,3 +154,21 @@ def test_acceptance_check_requires_fresh_marker_and_git_identity() -> None:
     activation["git_hash"] = "changed"
     with pytest.raises(RuntimeError, match="Git revision"):
         module["check"](Client(), state, 1)
+
+
+@pytest.mark.parametrize("occurrences", [0, 1, 2])
+def test_dab_openapi_upgrade_requires_exact_constraint(tmp_path: Path, occurrences: int) -> None:
+    patch = runpy.run_path(str(ROOT / "images/dab-security/patch-openapi-referencing.py"))["patch"]
+    source = tmp_path / "requirements.in"
+    old = "referencing<0.37.0  # consistent with pin from jsonschema-path, via openapi-spec-validator"
+    original = "drf-spectacular<1.0\n" + (old + "\n") * occurrences
+    source.write_text(original)
+    if occurrences == 1:
+        patch(source)
+        assert "referencing>=0.37.0,<0.38.0" in source.read_text()
+        with pytest.raises(ValueError, match="Unexpected DAB"):
+            patch(source)
+    else:
+        with pytest.raises(ValueError, match="Unexpected DAB"):
+            patch(source)
+        assert source.read_text() == original

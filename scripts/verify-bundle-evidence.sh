@@ -15,7 +15,9 @@ for name in "${names[@]}"; do
   descriptor="candidate-maps/gated/$name.json"
   cmp "$descriptor" "bundle-reports/$name-gate.json"
   image_id="$(jq -r .image_id "$descriptor")"
-  jq -e --arg id "$image_id" '.Metadata.ImageID == $id' "bundle-reports/$name.json" >/dev/null
+  digest="$(jq -r .digest "$descriptor")"
+  jq -e --arg id "$image_id" --arg digest "$digest" \
+    '.Metadata.ImageID == $id or .Metadata.ImageID == $digest' "bundle-reports/$name.json" >/dev/null
   jq -e --arg id "$image_id" '.source.target.imageID == $id' "bundle-reports/$name-grype.json" >/dev/null
   jq -e '.bomFormat == "CycloneDX" and (.components | type == "array" and length > 0)' \
     "bundle-reports/$name.cdx.json" >/dev/null
@@ -30,7 +32,7 @@ for name in awx galaxy-ng eda-controller; do
   jq -e --arg service "$name" '
     .service == $service and .repository == "https://github.com/ansible/django-ansible-base" and
     (.revision | type == "string" and test("^[0-9a-f]{40}$")) and
-    (.version | type == "string" and endswith("+aax.2"))
+    (.version | type == "string" and endswith("+aax.3"))
   ' "bundle-reports/$name-dab-source.json" >/dev/null
 done
 for name in pip-security go-security; do
@@ -47,7 +49,15 @@ for package in $(jq -er 'keys[]' images/rpm-security/sources.json); do
   test -n "$(find "$directory/srpms" -name '*.rpm' -size +0c -print -quit)"
   test -n "$(find "$directory/rpms" -name '*.rpm' -size +0c -print -quit)"
 done
-jq -s -e '.[0] == {podman: .[1], decision: .[2]}' bundle-reports/runtime-gate.json \
-  candidate-maps/gated/eda-podman.json candidate-maps/gated/eda-decision-environment.json >/dev/null
+jq -s -e '.[0] == {podman: .[1], decision: .[2], controller: .[3]}' bundle-reports/runtime-gate.json \
+  candidate-maps/gated/eda-podman.json candidate-maps/gated/eda-decision-environment.json \
+  candidate-maps/gated/eda-controller.json >/dev/null
 grep -Fq AAX_DECISION_SECURITY_SMOKE_PASSED bundle-reports/eda-rulebook-smoke.log
 test -s bundle-reports/nested-runtime.log
+grep -Fq AAX_CONTROLLER_ACTIVATION_RECOVERY_PASSED bundle-reports/eda-controller-recovery.log
+jq -e --arg revision "$GITHUB_SHA" '
+  .status == "running" and .git_hash == $revision and
+  (.activation_id | type == "number" and . > 0) and
+  (.instance_id | type == "number" and . > 0) and
+  (.last_log_id | type == "number" and . > 0)
+' bundle-reports/eda-controller-acceptance.json >/dev/null
