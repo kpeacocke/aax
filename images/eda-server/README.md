@@ -96,6 +96,14 @@ The reverse proxy terminates TLS before forwarding HTTP to EDA, so the public
 origin must be explicitly trusted for session-authenticated API writes. Keep
 CSRF checks enabled; do not use a wildcard or trust arbitrary origins.
 
+`EDA_RULEBOOK_READINESS_TIMEOUT_SECONDS` retains upstream's 60-second default.
+On slow legacy hosts, JVM startup and WebSocket callback processing can exceed
+that window even when a rulebook successfully launches an AWX job. After
+confirming callback reachability and inspecting activation logs, a bounded
+300-second window is appropriate for the approved Synology profile. This does
+not disable readiness checks or TLS verification; an unresponsive activation
+still fails after the configured interval.
+
 ## Standalone AWX bearer tokens
 
 Current upstream AWX no longer includes its old personal-token implementation.

@@ -30,6 +30,7 @@ x-eda-runtime-environment: &eda-runtime-environment
   EDA_CONTROLLER_SSL_VERIFY: ${EDA_CONTROLLER_SSL_VERIFY:-true}
   EDA_WEBSOCKET_BASE_URL: ${EDA_WEBSOCKET_BASE_URL:-wss://awx.ambitiouscake.com/eda/ws}
   EDA_WEBSOCKET_SSL_VERIFY: ${EDA_WEBSOCKET_SSL_VERIFY:-yes}
+  EDA_RULEBOOK_READINESS_TIMEOUT_SECONDS: ${EDA_RULEBOOK_READINESS_TIMEOUT_SECONDS:-60}
 
 services:
   ee-base:
