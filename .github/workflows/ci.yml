@@ -116,7 +116,7 @@ jobs:
       - name: Run repository policy tests
         run: |
           pip install PyYAML Jinja2 'ansible-core~=2.18.0'
-          pytest -q tests/test_repo_policy.py tests/test_docs_contract.py tests/test_bundle_publication.py tests/test_hub_bootstrap.py tests/test_eda_image_contracts.py tests/test_home_automation.py tests/test_mdns_validation.py tests/test_runner_paths.py tests/test_maintenance_precedence.py
+          pytest -q tests/test_repo_policy.py tests/test_docs_contract.py tests/test_bundle_publication.py tests/test_hub_bootstrap.py tests/test_eda_image_contracts.py tests/test_awx_oauth.py tests/test_home_automation.py tests/test_mdns_validation.py tests/test_runner_paths.py tests/test_maintenance_precedence.py
 
   test-images:
     name: Test Docker Images
@@ -147,8 +147,8 @@ jobs:
         run: |
           docker build \
             --build-arg VERSION=1.0.0 \
-            --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
-            --build-arg VCS_REF=${GITHUB_SHA} \
+            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --build-arg VCS_REF="${GITHUB_SHA}" \
             -f ./images/ee-base/Dockerfile \
             -t aax/ee-base:1.0.0 \
             ./images/ee-base
@@ -159,8 +159,8 @@ jobs:
           docker build \
             --build-arg BASE_IMAGE=aax/ee-base:1.0.0 \
             --build-arg VERSION=1.0.0 \
-            --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
-            --build-arg VCS_REF=${GITHUB_SHA} \
+            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --build-arg VCS_REF="${GITHUB_SHA}" \
             -f ./images/${{ matrix.image }}/Dockerfile \
             -t aax/${{ matrix.image }}:1.0.0 \
             ./images/${{ matrix.image }}
@@ -198,8 +198,8 @@ jobs:
         run: |
           docker build \
             --build-arg VERSION=1.0.0 \
-            --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
-            --build-arg VCS_REF=${GITHUB_SHA} \
+            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --build-arg VCS_REF="${GITHUB_SHA}" \
             -f ./images/ee-base/Dockerfile \
             -t aax/ee-base:1.0.0 \
             ./images/ee-base
@@ -210,8 +210,8 @@ jobs:
           docker build \
             --build-arg BASE_IMAGE=aax/ee-base:1.0.0 \
             --build-arg VERSION=1.0.0 \
-            --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
-            --build-arg VCS_REF=${GITHUB_SHA} \
+            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --build-arg VCS_REF="${GITHUB_SHA}" \
             -f ./images/${{ matrix.image }}/Dockerfile \
             -t aax/${{ matrix.image }}:1.0.0 \
             ./images/${{ matrix.image }}
@@ -224,6 +224,7 @@ jobs:
           output: trivy-${{ matrix.image }}.sarif
           severity: LOW,MEDIUM,HIGH,CRITICAL
           vuln-type: "os,library"
+          version: v0.76.1
 
       - name: Generate SBOM with Syft
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3

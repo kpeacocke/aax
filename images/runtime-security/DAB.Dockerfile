@@ -9,17 +9,22 @@ ARG PYTHON=/var/lib/awx/venv/awx/bin/python
 USER root
 COPY --from=dab /wheels /tmp/aax-dab-wheels
 COPY patch_awx_dynaconf.py /tmp/aax-patch-awx-dynaconf.py
+COPY patch_awx_oauth.py /tmp/aax-patch-awx-oauth.py
 RUN "${PYTHON}" -m pip install --no-cache-dir --upgrade /tmp/aax-dab-wheels/*.whl \
       djangorestframework==3.18.2 && \
     "${PYTHON}" /tmp/aax-patch-awx-dynaconf.py && \
+    "${PYTHON}" /tmp/aax-patch-awx-oauth.py && \
     "${PYTHON}" -m pip check && \
     "${PYTHON}" -c 'import autobahn.twisted.websocket' && \
-    rm /tmp/aax-dab-wheels/*.whl /tmp/aax-patch-awx-dynaconf.py
+    rm /tmp/aax-dab-wheels/*.whl /tmp/aax-patch-awx-dynaconf.py /tmp/aax-patch-awx-oauth.py
 RUN settings_file="$(mktemp /tmp/aax-production-settings-XXXXXX.py)" && \
     printf 'AAX_TEST = True\n' > "$settings_file" && \
     AWX_MODE=production DJANGO_SETTINGS_MODULE=awx.settings AWX_SETTINGS_FILE="$settings_file" \
       SKIP_SECRET_KEY_CHECK=yes SKIP_PG_VERSION_CHECK=yes AWX_SKIP_CREDENTIAL_TYPES_DISCOVER=yes \
       "${PYTHON}" -c 'from django.conf import settings; assert settings.AAX_TEST' && \
+    AAX_AWX_OAUTH2_ENABLED=true AWX_MODE=production DJANGO_SETTINGS_MODULE=awx.settings AWX_SETTINGS_FILE="$settings_file" \
+      SKIP_SECRET_KEY_CHECK=yes SKIP_PG_VERSION_CHECK=yes AWX_SKIP_CREDENTIAL_TYPES_DISCOVER=yes \
+      "${PYTHON}" -c 'import django; django.setup(); from django.conf import settings; from django.urls import resolve; assert "ansible_base.oauth2_provider" in settings.INSTALLED_APPS; assert settings.OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL == "dab_oauth2_provider.OAuth2AccessToken"; assert settings.REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"][0] == "ansible_base.oauth2_provider.authentication.LoggedOAuth2Authentication"; assert resolve("/api/v2/tokens/").url_name == "token-list"' && \
     if AWX_MODE=production DJANGO_SETTINGS_MODULE=awx.settings \
       AWX_SETTINGS_FILE=/tmp/aax-missing-settings.py AWX_SETTINGS_DIR=/tmp/aax-missing-settings-dir \
       SKIP_SECRET_KEY_CHECK=yes SKIP_PG_VERSION_CHECK=yes AWX_SKIP_CREDENTIAL_TYPES_DISCOVER=yes \

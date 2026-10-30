@@ -14,6 +14,7 @@ vendoring sync -v
 python -m pip install --no-cache-dir --group test
 PYTHONPATH=src python -W error -c 'from pip._vendor import msgpack, urllib3; from pip._internal.metadata import select_backend; assert select_backend().NAME == "importlib"'
 cp /patches/test_importlib_only.py tests/unit/test_aax_importlib_only.py
+python /patches/update-index-fixture.py tests/unit/test_req.py
 PYTHONPATH=src python -m pytest -q tests/unit/test_aax_importlib_only.py
 PYTHONPATH=src python -m pytest -q tests/unit/test_packaging.py tests/unit/test_req.py
 python -m build --wheel --outdir /wheels

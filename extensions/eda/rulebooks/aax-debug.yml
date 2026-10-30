@@ -1,0 +1,12 @@
+---
+- name: AAX persistent activation acceptance
+  hosts: all
+  sources:
+    - ansible.eda.tick:
+        delay: 5
+  rules:
+    - name: Record a live event through the EDA WebSocket
+      condition: event.i >= 1
+      action:
+        debug:
+          msg: "{{ aax_acceptance_marker }}"

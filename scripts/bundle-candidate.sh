@@ -40,8 +40,10 @@ case "$action" in
       reference="$(jq -r '.repository + "@" + .digest' "$descriptor")"
       docker pull "$reference"
       docker tag "$reference" "$name:devel"
-      [[ "$(docker image inspect --format '{{.Id}}' "$name:devel")" == \
-        "$(jq -r .image_id "$descriptor")" ]]
+      config="$(docker buildx imagetools inspect --raw "$reference" | jq -er '.config.digest')"
+      [[ "$config" == "$(jq -r .image_id "$descriptor")" ]]
+      loaded="$(docker image inspect --format '{{.Id}}' "$name:devel")"
+      [[ "$loaded" == "$config" || "$loaded" == "$(jq -r .digest "$descriptor")" ]]
     fi
     ;;
   *) echo "Unknown candidate action: $action" >&2; exit 1 ;;

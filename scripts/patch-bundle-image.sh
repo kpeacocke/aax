@@ -36,7 +36,7 @@ esac
 if [[ "$name" == awx || "$name" == galaxy-ng || "$name" == eda-controller ]]; then
   read -r revision version < <(
     docker run --rm --entrypoint "$python" "$name:devel" -c \
-      'import importlib.metadata as m,json; d=m.distribution("django-ansible-base"); print(json.loads(d.read_text("direct_url.json"))["vcs_info"]["commit_id"], d.version.split("+")[0]+"+aax.2")'
+      'import importlib.metadata as m,json; d=m.distribution("django-ansible-base"); print(json.loads(d.read_text("direct_url.json"))["vcs_info"]["commit_id"], d.version.split("+")[0]+"+aax.3")'
   )
   [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || {
     echo "Missing exact DAB source revision for $name" >&2

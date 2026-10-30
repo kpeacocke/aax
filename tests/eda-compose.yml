@@ -1,0 +1,116 @@
+name: aax-eda-acceptance
+
+x-environment: &environment
+  EDA_DB_HOST: postgres
+  EDA_DB_NAME: eda
+  EDA_DB_USER: eda
+  EDA_DB_PASSWORD: ${EDA_TEST_SECRET:?An ephemeral EDA_TEST_SECRET is required}
+  EDA_REDIS_HOST: redis
+  EDA_SECRET_KEY: ${EDA_TEST_SECRET}
+  EDA_ALLOWED_HOSTS: '["localhost","127.0.0.1","controller","ws"]'
+  EDA_RESOURCE_SERVER__URL: "@none None"
+  EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT: "true"
+  EDA_WEBSOCKET_BASE_URL: ws://ws:8000
+  EDA_WEBSOCKET_SSL_VERIFY: "no"
+  EDA_CONTROLLER_SSL_VERIFY: "true"
+
+x-service: &service
+  image: ${EDA_TEST_IMAGE:-eda-controller:devel}
+  platform: linux/amd64
+  environment: *environment
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  volumes:
+    - projects:/home/eda/projects
+    - logs:/var/log/eda
+    - ../scripts/test-eda-activation.py:/acceptance/test-eda-activation.py:ro
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: eda
+      POSTGRES_USER: eda
+      POSTGRES_PASSWORD: ${EDA_TEST_SECRET}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eda -d eda"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    volumes: [database:/var/lib/postgresql/data]
+
+  redis:
+    image: redis:7.4
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  controller:
+    <<: *service
+    command: [api]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/_healthz', timeout=3).read()"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  worker:
+    <<: *service
+    command: [worker]
+    depends_on:
+      controller:
+        condition: service_healthy
+
+  activation:
+    <<: *service
+    command: [activation-worker]
+    environment:
+      <<: *environment
+      EDA_PODMAN_SOCKET_URL: tcp://podman:8888
+      EDA_PODMAN_MEM_LIMIT: 512m
+      # Explicitly exercise the approved legacy profile, not an automatic fallback.
+      EDA_PODMAN_EXTRA_ARGS: '@json {"network_mode":"host","cap_drop":["ALL"],"no_new_privileges":true,"seccomp_profile_path":"unconfined"}'
+    depends_on:
+      controller:
+        condition: service_healthy
+      podman:
+        condition: service_healthy
+
+  ws:
+    <<: *service
+    command: [ws]
+    environment:
+      <<: *environment
+      EDA_WORKER_KIND: websocket
+    depends_on:
+      controller:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/_healthz', timeout=3).read()"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  podman:
+    image: ${EDA_TEST_PODMAN_IMAGE:-eda-podman:devel}
+    privileged: true
+    volumes: [containers:/var/lib/containers/storage]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8888/_ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  database:
+  projects:
+  logs:
+  containers:

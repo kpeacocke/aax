@@ -1,0 +1,18 @@
+---
+- name: AAX scoped AWX action acceptance
+  hosts: all
+  sources:
+    - ansible.eda.range:
+        limit: 1
+    - ansible.eda.tick:
+        delay: 30
+  rules:
+    - name: Launch the explicitly scoped readiness template once
+      condition: event.i == 0
+      action:
+        run_job_template:
+          name: RustberryPi - Readiness check
+          organization: "{{ awx_organization }}"
+          job_args:
+            extra_vars:
+              aax_eda_acceptance_marker: "{{ aax_acceptance_marker }}"

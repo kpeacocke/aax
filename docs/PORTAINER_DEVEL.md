@@ -154,8 +154,14 @@ shared local Docker are never pruned by this workflow.
 
 ### CentOS Stream and native package coverage
 
-Trivy does not cover CentOS Stream OS packages. The bundle also uses
-checksum-pinned Grype to cover RPMs and Go code embedded in native tools.
+Trivy CLI 0.76.1 scans each immutable bundle candidate. Its separate JSON
+vulnerability report remains the source for SARIF conversion and the strict
+Trivy gate; the CycloneDX report explicitly enables the `vuln` scanner so
+vulnerability references accompany the complete package inventory. Both
+reports are bound to the exact candidate digest, and Grype remains the
+supplemental OS-coverage scanner. Trivy does not cover CentOS Stream OS
+packages. The bundle also uses checksum-pinned Grype to cover RPMs and Go code
+embedded in native tools.
 Missing OS coverage fails the gate unless the supplemental report identifies
 the exact same image ID; a clean language-only scan is not OS clearance.
 

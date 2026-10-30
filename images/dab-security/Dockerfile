@@ -1,6 +1,6 @@
 FROM python:3.15-slim-bookworm AS builder
 ARG DAB_REVISION=ef2ceb250322272451ce220d10c20947898d36d3
-ARG DAB_VERSION=2026.10.9.0.dev104+aax.2
+ARG DAB_VERSION=2026.10.9.0.dev104+aax.3
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
       git build-essential libldap2-dev libsasl2-dev libssl-dev zlib1g-dev && \
@@ -14,7 +14,9 @@ RUN git init && git remote add origin https://github.com/ansible/django-ansible-
 COPY oauth-organization.patch /tmp/oauth-organization.patch
 COPY requirements-test.txt /tmp/requirements-test.txt
 COPY apply-oauth-patch.py /tmp/apply-oauth-patch.py
-RUN python /tmp/apply-oauth-patch.py /tmp/oauth-organization.patch
+COPY patch-openapi-referencing.py /tmp/patch-openapi-referencing.py
+RUN python /tmp/apply-oauth-patch.py /tmp/oauth-organization.patch && \
+    python /tmp/patch-openapi-referencing.py requirements/requirements_api_documentation.in
 ENV SETUPTOOLS_SCM_PRETEND_VERSION_FOR_DJANGO_ANSIBLE_BASE=${DAB_VERSION}
 # BuildKit retains the download cache outside the resulting image.
 # hadolint ignore=DL3042

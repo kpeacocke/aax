@@ -55,8 +55,11 @@ AWX tokens in Compose, `.env.example`, or Git.
 
 3. Sign in to EDA and create or confirm the organization. In AWX, use a
    dedicated service user with **Execute only** permission on the intended job
-   template; create its token in EDA under `users/me/awx-tokens`. Do not grant
-   this account broader AWX permissions.
+   template. Create a `write`-scope personal token through AWX's
+   `/api/v2/tokens/` endpoint, then register that token in EDA under
+   `users/me/awx-tokens`. The scope permits launching jobs but cannot expand
+   the service user's template permissions. Do not grant this account broader
+   AWX permissions.
 4. Register the published decision environment
    `ghcr.io/kpeacocke/aax-eda-decision-environment:<immutable-bundle-tag>`.
    Publication patches its application-user Python environment and replaces its
@@ -86,3 +89,89 @@ above.
 For Portainer with a separate Docker host filesystem, set `AAX_AWX_CACHE_FILE`
 to an existing absolute host path containing the repository's `compat/awx-cache.py`.
 The default relative path is appropriate for ordinary local Compose.
+
+## Standalone AWX bearer tokens
+
+Current upstream AWX no longer includes its old personal-token implementation.
+The maintained AWX bundle enables the upstream django-ansible-base OAuth2
+provider when `AAX_AWX_OAUTH2_ENABLED=true`, as configured for both AWX services
+in Compose. Normal migrations create its separate token tables. Existing user,
+project and job data is retained. Scope permission checks apply even to AWX
+views that override their default permission classes: a `read` token cannot
+launch jobs or create users, including when its owner is an administrator.
+
+This enables bearer-token integration, not shared AWX/EDA passwords or SSO.
+An explicit source-bound adaptation avoids loading DAB's optional external
+authentication models when that application is absent; standalone local users
+have no DAB external-provider association. When that application is installed,
+the original external-account restriction remains. Platform deployments with
+`RESOURCE_SERVER__URL` configured still enforce upstream JWT-only authentication.
+
+Fresh project/log volumes inherit ownership for EDA's unprivileged UID 1001
+from the image. Existing externally provisioned volumes must already be writable
+by that UID; do not grant the workers runtime root privileges to repair storage.
+
+## Legacy Synology execution compatibility
+
+The activation worker is already a Compose container. Rulebook activations are
+separate containers created through the private Podman service; all of them
+still share the NAS kernel. On Alexandria's Linux 4.4.302, the default netavark
+network fails with `Protocol not available`, and the default nested seccomp
+filter fails with `prctl: Invalid argument`.
+
+Normal Linux hosts must retain the default `EDA_PODMAN_EXTRA_ARGS="@json {}"`.
+Only after explicit operator approval, a legacy Synology deployment can test:
+
+```dotenv
+EDA_PODMAN_EXTRA_ARGS='@json {"network_mode":"host","cap_drop":["ALL"],"no_new_privileges":true,"seccomp_profile_path":"unconfined"}'
+```
+
+Here `host` means the **Podman service container's network namespace**, not the
+NAS host network. The outer Podman service must remain on its private Compose
+network with no published ports and no Docker socket mount. The worker remains
+unprivileged with `cap_drop: [ALL]` and `no-new-privileges`. Nested activations
+also drop every capability and retain `no-new-privileges`.
+
+This mode removes nested network separation and syscall filtering. Activations
+can reach the private Podman API from that shared namespace, so only trusted,
+reviewed rulebooks and decision images are suitable. Do not silently select
+this mode on kernel detection, or describe it as equivalent to normal isolation.
+Prefer a supported modern execution host when untrusted rules must run.
+
+## Controller-driven acceptance
+
+The Git project must contain `extensions/eda/rulebooks` or `rulebooks`;
+`tests/fixtures` alone is not discovered by EDA project import. This repository
+provides a persistent tick/debug canary and a separate one-shot AWX readiness
+rulebook in `extensions/eda/rulebooks`.
+
+Use `scripts/test-eda-activation.py` with the exact scanned decision-image
+digest. It drives the real authenticated HTTP API, imports a pinned Git ref,
+creates an activation, and requires a fresh event marker in persisted EDA logs.
+Run `--phase prepare` followed by `--phase check` with the same state file.
+Repeat `check` after worker restart and stack redeploy to require new logs,
+not an old successful status. Each check first watermarks all persisted instance
+logs, follows replacement instances, and requires a later marker while the
+current instance is still Running with the recorded Git revision. Logs produced
+between an earlier successful check and shutdown cannot satisfy recovery.
+Keep the state file in a persistent operator-owned
+location. `--phase disable` disables only the activation recorded in that file.
+
+For remote HTTPS use, supply `EDA_TEST_USERNAME` and `EDA_TEST_PASSWORD` through
+the authorized operator environment, never command-line arguments. Inside the
+controller, an administrator with container-console access can instead use
+`--local-user <existing-admin>` against the loopback API. This creates a
+temporary authenticated session, deletes it on exit, and does not reset or
+read the user's password. It is not a shared AWX/EDA login implementation.
+
+AWX action acceptance additionally requires `--phase launch`,
+`--awx-token-id` and `--awx-organization`. Use a dedicated test identity scoped
+to template 58, not the later Hailo identity restricted to template 66.
+Correlate the rulebook's `aax_eda_acceptance_marker` extra variable with a
+successful AWX job and its service-user attribution. Disable this one-shot
+activation before recovery tests so it cannot launch another job on restart.
+
+The RustberryPi/Hailo collection remains externally blocked until RustberryPi
+publishes a standalone, versioned collection and compatible Python dependencies.
+Do not package uncommitted RustberryPi sources or claim Hailo readiness based on
+the generic acceptance rulebooks.
