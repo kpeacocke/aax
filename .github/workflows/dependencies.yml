@@ -11,6 +11,10 @@ permissions:
   pull-requests: write
   issues: write
 
+concurrency:
+  group: dependency-management-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   check-updates:
     name: Check for Updates
@@ -28,10 +32,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pip-audit safety
+          pip install pip-audit
 
       - name: Audit Python dependencies
-        id: audit
+        id: audit-command
         run: |
           set -euo pipefail
           status=0
@@ -44,56 +48,39 @@ jobs:
             echo "::error::Dependency audit failed (exit $status)"
             exit "$status"
           fi
-          if jq -e '[.dependencies[].vulns[]] | length > 0' audit-results.json >/dev/null; then
-            echo "vulnerabilities=true" >> $GITHUB_OUTPUT
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          direct_status=0
+          pip-audit --disable-pip --no-deps \
+            -r images/ee-base/requirements.txt \
+            -r images/ee-builder/requirements.txt \
+            -r images/dev-tools/requirements.txt \
+            --format json --output audit-direct-results.json || direct_status=$?
+          if [ "$direct_status" -gt 1 ]; then
+            echo "::error::Direct dependency audit failed (exit $direct_status)"
+            exit "$direct_status"
           fi
+          echo "direct-status=$direct_status" >> "$GITHUB_OUTPUT"
 
-      - name: Create issue for vulnerabilities
-        if: steps.audit.outputs.vulnerabilities == 'true'
+      - name: Validate audit and reconcile dependency issues
+        id: audit
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const fs = require('fs');
-            const audit = JSON.parse(fs.readFileSync('audit-results.json', 'utf8'));
-
-            const body = `## 🔒 Security Vulnerabilities Detected
-
-            Automated scan found vulnerabilities in Python dependencies.
-
-            \`\`\`json
-            ${JSON.stringify(audit, null, 2)}
-            \`\`\`
-
-            Please review and update affected packages.`;
-
-            const title = '🔒 Security: Vulnerable dependencies detected';
-            const issues = await github.paginate(github.rest.issues.listForRepo, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'security,dependencies',
-              per_page: 100
+            await require('./.github/scripts/reconcile-dependency-audit.cjs')({
+              github, context, core
             });
-            const existing = issues.find(issue => !issue.pull_request && issue.title === title);
-            const params = {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title,
-              body: body,
-              labels: ['security', 'dependencies']
-            };
-            if (existing) {
-              await github.rest.issues.update({...params, issue_number: existing.number});
-            } else {
-              await github.rest.issues.create(params);
-            }
+        env:
+          AUDIT_EXIT_STATUS: ${{ steps.audit-command.outputs.status }}
+          AUDIT_DIRECT_EXIT_STATUS: ${{ steps.audit-command.outputs.direct-status }}
 
       - name: Preserve dependency audit
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dependency-audit
-          path: audit-results.json
+          path: |
+            audit-results.json
+            audit-direct-results.json
           if-no-files-found: error
 
       - name: Fail on vulnerable dependencies

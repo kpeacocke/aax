@@ -12,3 +12,12 @@ data:
   PYTHONUNBUFFERED: "1"
   PIP_NO_CACHE_DIR: "1"
   PIP_ROOT_USER_ACTION: "ignore"
+  EDA_ALLOWED_HOSTS: '["localhost","127.0.0.1","eda-controller","eda-ws","gateway","awx.ambitiouscake.com"]'
+  EDA_CSRF_TRUSTED_ORIGINS: '["https://awx.ambitiouscake.com"]'
+  EDA_RESOURCE_SERVER__URL: "@none None"
+  EDA_ALLOW_LOCAL_RESOURCE_MANAGEMENT: "true"
+  EDA_CONTROLLER_URL: "https://awx.ambitiouscake.com"
+  EDA_CONTROLLER_SSL_VERIFY: "true"
+  EDA_WEBSOCKET_BASE_URL: "wss://awx.ambitiouscake.com/eda/ws"
+  EDA_WEBSOCKET_SSL_VERIFY: "yes"
+  EDA_RULEBOOK_READINESS_TIMEOUT_SECONDS: "60"

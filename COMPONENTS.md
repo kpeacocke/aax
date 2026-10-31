@@ -139,8 +139,8 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
 #### 3.5. Event-Driven Ansible Controller
 
 - **Official Description:** The interface for event-driven automation and introduces automated resolution of IT requests. Helps you connect to sources of events and act on those events by using rulebooks.
-- **AAX Implementation:** [ansible-rulebook](https://github.com/ansible/ansible-rulebook) v1.3.2
-- **Services:** eda-controller, eda-postgres, eda-redis
+- **AAX Implementation:** upstream Event-Driven Ansible server image built from its pinned upstream container
+- **Services:** eda-controller, eda-worker, eda-activation-worker, eda-ws, eda-podman, eda-postgres, eda-redis
 - **Features:**
   - Event source integration (webhooks, monitoring systems, message queues)
   - Rulebook execution and management via REST API
@@ -152,7 +152,7 @@ This document maps all official Red Hat Ansible Automation Platform (AAP) 2.6 co
   - Real-time event streaming via WebSocket
 - **Deployment:** Docker Compose (`docker-compose.yml`, `eda` profile)
 - **Access:** REST API on `http://localhost:15000`
-- **Documentation:** [images/eda-controller/EDA.md](./images/eda-controller/EDA.md) with rulebook examples and AWX integration patterns
+- **Documentation:** [docs/EDA.md](./docs/EDA.md) with runtime topology and deployment guidance
 
 ---
 
@@ -204,7 +204,7 @@ Source baseline:
 - Current AAX Compose services in [docker-compose.yml](docker-compose.yml)
 - Controller docs in [controller/CONTROLLER.md](controller/CONTROLLER.md)
 - Hub docs in [hub/HUB.md](hub/HUB.md)
-- EDA docs in [images/eda-controller/EDA.md](images/eda-controller/EDA.md)
+- EDA docs in [docs/EDA.md](docs/EDA.md)
 - Architecture docs in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## Executive Summary
@@ -258,7 +258,7 @@ For the main platform building blocks, yes.
 | Automation Controller                  | AWX                                     | [controller/CONTROLLER.md](controller/CONTROLLER.md), [docker-compose.yml](docker-compose.yml)         |
 | Private Automation Hub UI / API        | Galaxy NG                               | [hub/HUB.md](hub/HUB.md), [docker-compose.yml](docker-compose.yml)                                     |
 | Private Automation Hub content backend | Pulp                                    | [hub/HUB.md](hub/HUB.md), [docker-compose.yml](docker-compose.yml)                                     |
-| Event-driven automation engine         | ansible-rulebook / EDA controller stack | [images/eda-controller/EDA.md](images/eda-controller/EDA.md), [docker-compose.yml](docker-compose.yml) |
+| Event-driven automation engine         | upstream EDA server / controller stack | [docs/EDA.md](docs/EDA.md), [docker-compose.yml](docker-compose.yml) |
 | Distributed execution / mesh           | Receptor                                | [controller/CONTROLLER.md](controller/CONTROLLER.md), [docker-compose.yml](docker-compose.yml)         |
 | Execution environment build pipeline   | ansible-builder                         | `ee-builder`, [README.md](README.md)                                                                   |
 | Execution environment runtime          | ansible-core plus EE images             | `ee-base`, `dev-tools`, controller defaults                                                            |
@@ -336,11 +336,15 @@ What is not equivalent to AAP:
 
 `Mapped`
 
-The EDA controller is present in AAX and documented in [images/eda-controller/EDA.md](images/eda-controller/EDA.md). This is not “coming soon” anymore and should be treated as implemented in the comparison.
+The maintained upstream EDA server is present in AAX and documented in [docs/EDA.md](docs/EDA.md). This is not “coming soon” anymore and should be treated as implemented in the comparison.
 
 Current AAX services:
 
 - `eda-controller`
+- `eda-worker`
+- `eda-activation-worker`
+- `eda-ws`
+- `eda-podman`
 - `eda-postgres`
 - `eda-redis`
 
@@ -439,7 +443,7 @@ This document corrects a few problems that existed in the older comparison:
 - [docker-compose.yml](docker-compose.yml)
 - [controller/CONTROLLER.md](controller/CONTROLLER.md)
 - [hub/HUB.md](hub/HUB.md)
-- [images/eda-controller/EDA.md](images/eda-controller/EDA.md)
+- [docs/EDA.md](docs/EDA.md)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [docs/HA-DEPLOYMENT.md](docs/HA-DEPLOYMENT.md)
 

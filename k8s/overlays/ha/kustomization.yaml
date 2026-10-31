@@ -19,21 +19,32 @@ resources:
 
 images:
   - name: aax/ee-base
-    newTag: 1.0.0
+    newName: ghcr.io/kpeacocke/aax-ee-base
+    digest: sha256:da037843b4933b04ce8afdec8bee0cd15e572781202a5bbb33803860954c032a
   - name: aax/ee-builder
-    newTag: 1.0.0
+    newName: ghcr.io/kpeacocke/aax-ee-builder
+    digest: sha256:53fcb57d14a5469c1f961e9d7eeee58658c0f722a686b36ad3b702c9884c322f
   - name: aax/dev-tools
-    newTag: 1.0.0
+    newName: ghcr.io/kpeacocke/aax-dev-tools
+    digest: sha256:45c64ba430f40d646a2aaa654bbf64b03958b625c2c425db7166c6d2036a53c9
   - name: aax/awx
-    newTag: 1.0.0
+    newName: ghcr.io/kpeacocke/aax-awx
+    digest: sha256:38f596949d90d60ac528960e809269acb3a24948c2370abdd4956746106b3986
   - name: aax/pulp
-    newTag: 1.0.0
+    newName: ghcr.io/kpeacocke/aax-pulp
+    digest: sha256:0ef0c978ddd4c429e74594394228d870c8b89f8bcefa05f150c414f36966396e
   - name: aax/galaxy-ng
-    newTag: 1.0.0
+    newName: ghcr.io/kpeacocke/aax-galaxy-ng
+    digest: sha256:0ef0c978ddd4c429e74594394228d870c8b89f8bcefa05f150c414f36966396e
   - name: aax/eda-controller
-    newTag: 1.0.0
+    newName: ghcr.io/kpeacocke/aax-eda-controller
+    digest: sha256:4fbca373c153927f36ef3bd5da75373b33a2308a5d84cfdc2de49aa4c6436bd2
+  - name: aax/eda-podman
+    newName: ghcr.io/kpeacocke/aax-eda-podman
+    digest: sha256:f4ecb48c28b2dc149d099aab3bc5f583440cb0609b53592e83114c4956c9e9bb
   - name: aax/gateway
-    newTag: 1.0.0
+    newName: ghcr.io/kpeacocke/aax-gateway
+    digest: sha256:a7a71e6bedc6e456556a550a45adb4432bc2587bbda566559b328afd87fedc13
 
 patches:
   - path: replicas-awx-web.yaml
@@ -61,10 +72,30 @@ patches:
       kind: Deployment
       name: pulp-content
       namespace: aax
+  - path: replicas-pulp-worker.yaml
+    target:
+      kind: Deployment
+      name: pulp-worker
+      namespace: aax
   - path: replicas-eda-controller.yaml
     target:
       kind: Deployment
       name: eda-controller
+      namespace: aax
+  - path: replicas-eda-worker.yaml
+    target:
+      kind: Deployment
+      name: eda-worker
+      namespace: aax
+  - path: replicas-eda-activation-worker.yaml
+    target:
+      kind: Deployment
+      name: eda-activation-worker
+      namespace: aax
+  - path: replicas-eda-ws.yaml
+    target:
+      kind: Deployment
+      name: eda-ws
       namespace: aax
   - path: replicas-gateway.yaml
     target:

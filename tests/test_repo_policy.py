@@ -1,7 +1,12 @@
 """Repository policy checks for deployment defaults and security baselines."""
 
 from pathlib import Path
+import json
+import os
 import re
+import subprocess
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -9,6 +14,163 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def _read(relative_path: str) -> str:
     return (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+
+
+def _reconcile_audit(
+    tmp_path: Path, audit: object, status: str, issues: list[dict],
+    direct_audit: object | None = None, direct_status: str | None = None,
+    ref: str = "refs/heads/main",
+) -> dict:
+    (tmp_path / "audit-results.json").write_text(json.dumps(audit))
+    (tmp_path / "audit-direct-results.json").write_text(
+        json.dumps(audit if direct_audit is None else direct_audit)
+    )
+    for image in ("ee-base", "ee-builder", "dev-tools"):
+        directory = tmp_path / "images" / image
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "requirements.txt").write_text("package==1.0\n")
+    script = REPO_ROOT / ".github/scripts/reconcile-dependency-audit.cjs"
+    harness = r"""
+const reconcile = require(process.argv[1]);
+const calls = [];
+const output = {};
+const issues = JSON.parse(process.env.TEST_ISSUES);
+const github = {
+  paginate: async (_method, params) => { calls.push(['list', params]); return issues; },
+  rest: { issues: {
+    listForRepo: () => {},
+    update: async params => { calls.push(['update', params]); },
+    create: async params => { calls.push(['create', params]); return {data: {number: 123}}; },
+    createComment: async params => { calls.push(['comment', params]); }
+  }}
+};
+const context = {
+  repo: {owner: 'owner', repo: 'repo'}, sha: 'verified-commit',
+  serverUrl: 'https://github.com', runId: 456, ref: process.env.TEST_REF
+};
+reconcile({github, context, core: {setOutput: (key, value) => {output[key] = value;}}})
+  .then(() => console.log(JSON.stringify({calls, output})))
+  .catch(error => {
+    console.log(JSON.stringify({calls, output, error: error.message}));
+    process.exitCode = 1;
+  });
+"""
+    result = subprocess.run(
+        ["node", "-e", harness, str(script)],
+        cwd=tmp_path,
+        env={
+            **os.environ, "AUDIT_EXIT_STATUS": status, "TEST_ISSUES": json.dumps(issues),
+            "AUDIT_DIRECT_EXIT_STATUS": status if direct_status is None else direct_status,
+            "TEST_REF": ref,
+        },
+        capture_output=True, text=True, timeout=30,
+    )
+    parsed = json.loads(result.stdout)
+    assert result.returncode == (1 if "error" in parsed else 0), result.stderr
+    return parsed
+
+
+@pytest.mark.parametrize("status,vulns", [
+    ("0", []),
+    ("1", [{"id": "CVE-test", "fix_versions": ["2.0"]}]),
+])
+def test_dependency_issue_lifecycle(tmp_path: Path, status: str, vulns: list[dict]) -> None:
+    title = "\U0001f512 Security: Vulnerable dependencies detected"
+    issues = [
+        {"number": 2, "title": title},
+        {"number": 9, "title": title},
+        {"number": 3, "title": "Unrelated security issue"},
+        {"number": 4, "title": title, "pull_request": {"url": "not-an-issue"}},
+    ]
+    audit = {"dependencies": [{"name": "package", "version": "1.0", "vulns": vulns}]}
+    result = _reconcile_audit(tmp_path, audit, status, issues)
+    assert result["output"] == {"vulnerabilities": str(status == "1").lower()}
+    updates = [call[1] for call in result["calls"] if call[0] == "update"]
+    assert {update["issue_number"] for update in updates} == {2, 9}
+    assert not any(call[0] == "create" for call in result["calls"])
+    comments = [call[1] for call in result["calls"] if call[0] == "comment"]
+    if status == "0":
+        assert all(update["state_reason"] == "completed" for update in updates)
+        assert all("actions/runs/456" in comment["body"] for comment in comments)
+        assert all("does not certify other" in comment["body"] for comment in comments)
+    else:
+        canonical = next(update for update in updates if update["issue_number"] == 9)
+        assert "CVE-test" in canonical["body"] and "workflow remains failing" in canonical["body"]
+        duplicate = next(update for update in updates if update["issue_number"] == 2)
+        assert duplicate["state_reason"] == "not_planned"
+        assert comments[0]["issue_number"] == 2 and "#9" in comments[0]["body"]
+
+
+def test_dependency_issue_created_only_for_genuine_findings(tmp_path: Path) -> None:
+    audit = {"dependencies": [{"name": "package", "version": "1.0", "vulns": []}]}
+    clean = _reconcile_audit(tmp_path, audit, "0", [])
+    assert [call[0] for call in clean["calls"]] == ["list"]
+    audit["dependencies"][0]["vulns"] = [{"id": "CVE-test", "fix_versions": []}]
+    vulnerable = _reconcile_audit(tmp_path, audit, "1", [])
+    assert [call[0] for call in vulnerable["calls"]] == ["list", "create"]
+    assert vulnerable["output"]["vulnerabilities"] == "true"
+
+
+@pytest.mark.parametrize("status,vulns", [
+    ("0", []),
+    ("1", [{"id": "CVE-test", "fix_versions": []}]),
+])
+def test_branch_audits_cannot_mutate_main_dependency_issues(
+    tmp_path: Path, status: str, vulns: list[dict],
+) -> None:
+    audit = {"dependencies": [{"name": "package", "version": "1.0", "vulns": vulns}]}
+    result = _reconcile_audit(tmp_path, audit, status, [], ref="refs/heads/fix/example")
+    assert result["calls"] == []
+    assert result["output"] == {"vulnerabilities": str(status == "1").lower()}
+
+
+def test_direct_pin_findings_are_not_lost_by_resolver_audit(tmp_path: Path) -> None:
+    resolved = {"dependencies": [{"name": "transitive", "version": "1", "vulns": []}]}
+    direct = {"dependencies": [{"name": "package", "version": "1.0", "vulns": [
+        {"id": "CVE-bootstrap", "fix_versions": ["2.0"]}
+    ]}]}
+    result = _reconcile_audit(tmp_path, resolved, "0", [], direct, "1")
+    assert result["output"]["vulnerabilities"] == "true"
+    created = next(call[1] for call in result["calls"] if call[0] == "create")
+    assert "CVE-bootstrap" in created["body"]
+
+
+def test_incomplete_direct_pin_inventory_cannot_close_issues(tmp_path: Path) -> None:
+    incomplete = {"dependencies": [{"name": "transitive", "version": "1", "vulns": []}]}
+    result = _reconcile_audit(tmp_path, incomplete, "0", [])
+    assert "omitted required pin package==1.0" in result["error"]
+    assert result["calls"] == [] and result["output"] == {}
+
+
+@pytest.mark.parametrize("audit,status", [
+    ({}, "0"),
+    ({"dependencies": []}, "0"),
+    ({"dependencies": [{"name": "p", "version": "1"}]}, "0"),
+    ({"dependencies": [{"name": "p", "version": "1", "vulns": [], "skip_reason": "offline"}]}, "0"),
+    ({"dependencies": [{"name": "p", "version": "1", "vulns": [{"id": "CVE-test"}]}]}, "1"),
+    ({"dependencies": [{"name": "p", "version": "1", "vulns": []}]}, "1"),
+    ({"dependencies": [{"name": "p", "version": "1", "vulns": []}]}, "2"),
+    ({"dependencies": [{"name": "p", "version": "1", "vulns": []}]}, ""),
+    ({"dependencies": [{"name": "p", "version": "1", "vulns": [
+        {"id": "CVE-test", "fix_versions": ["2"]}
+    ]}]}, "0"),
+])
+def test_invalid_audits_cannot_close_issues(tmp_path: Path, audit: object, status: str) -> None:
+    result = _reconcile_audit(tmp_path, audit, status, [])
+    assert "error" in result
+    assert result["calls"] == []
+    assert result["output"] == {}
+
+
+def test_dependency_workflow_validates_before_reporting_and_retains_failure_gate() -> None:
+    content = _read(".github/workflows/dependencies.yml")
+    assert "reconcile-dependency-audit.cjs" in content
+    assert "AUDIT_EXIT_STATUS: ${{ steps.audit-command.outputs.status }}" in content
+    assert "AUDIT_DIRECT_EXIT_STATUS: ${{ steps.audit-command.outputs.direct-status }}" in content
+    assert "--disable-pip --no-deps" in content and "audit-direct-results.json" in content
+    assert "if: steps.audit.outputs.vulnerabilities == 'true'\n        run: exit 1" in content
+    assert "if: always()" in content and "name: dependency-audit" in content
+    assert "group: dependency-management-${{ github.ref }}" in content
 
 
 def _compose_env_var_names(compose_text: str) -> set[str]:
@@ -120,7 +282,7 @@ def test_ci_workflow_does_not_use_latest_image_tags() -> None:
 
 
 def test_runtime_files_do_not_contain_weak_secret_fallbacks() -> None:
-    """Runtime entrypoints and compose config should not ship weak secret fallbacks."""
+    """Maintained runtime and Kubernetes config must not add weak secret fallbacks."""
     checks = {
         "docker-compose.yml": [
             ":-password}",
@@ -142,9 +304,6 @@ def test_runtime_files_do_not_contain_weak_secret_fallbacks() -> None:
             "os.getenv('SECRET_KEY', 'awxsecret')",
             "BROADCAST_WEBSOCKET_SECRET = os.getenv('SECRET_KEY', 'awxsecret')",
         ],
-        "images/pulp/settings.py": [
-            "change-me-to-a-long-random-string",
-        ],
         "k8s/awx-settings-configmap.yaml": [
             "awxsecret_change_me",
             "awxpass",
@@ -161,6 +320,9 @@ def test_runtime_files_do_not_contain_weak_secret_fallbacks() -> None:
                 failures.append(f"{relative_path}: {token}")
 
     assert failures == [], "Weak runtime defaults remain:\n" + "\n".join(failures)
+    assert "CHANGE_ME_PULP_SECRET_KEY" not in _read("images/galaxy-runtime/entrypoint.py")
+    assert "key: PULP_SECRET_KEY" in _read("k8s/hub-stack.yaml")
+    assert "key: SECRET_KEY" in _read("k8s/eda-stack.yaml")
 
 
 def test_kubernetes_hub_allowed_hosts_are_not_wildcard() -> None:
@@ -374,7 +536,6 @@ def test_hub_and_pulp_compose_secrets_are_required() -> None:
     content = _read("docker-compose.yml")
     required_tokens = [
         "${HUB_DB_PASSWORD:?HUB_DB_PASSWORD must be set",
-        "${HUB_ADMIN_PASSWORD:?HUB_ADMIN_PASSWORD must be set",
         "${GALAXY_SECRET_KEY:?GALAXY_SECRET_KEY must be set",
         '"${PULP_SECRET_KEY:?PULP_SECRET_KEY must be set',
     ]
@@ -462,31 +623,60 @@ def test_eda_healthchecks_validate_dependencies() -> None:
         assert token in k8s_eda
 
 
-def test_hub_static_assets_are_shared_between_pulp_api_and_galaxy_ng() -> None:
-    """Hub static assets should be collected into the shared volume served by galaxy-ng."""
+def test_hub_static_assets_are_not_hidden_by_kubernetes_pvc() -> None:
+    """Keep the legacy assets claim but use image-baked assets in Kubernetes."""
     compose = _read("docker-compose.yml")
-    galaxy_settings = _read("images/galaxy-ng/settings.py")
-    pulp_settings = _read("images/pulp/settings.py")
+    devel_compose = _read("docker-compose.devel.yml")
+    hub_stack = _read("k8s/hub-stack.yaml")
+    persistent_volumes = _read("k8s/persistent-volumes.yaml")
 
     assert compose.count("hub_assets:/app/static") >= 2
-    assert 'STATIC_ROOT = Path("/app/static")' in galaxy_settings
-    assert "STATIC_ROOT = Path('/app/static')" in pulp_settings
+    assert devel_compose.count("hub_pulp_certs:/etc/pulp/certs") == 4
+    for role in ("pulp-api", "pulp-content", "pulp-worker", "galaxy-ng"):
+        assert f"  {role}:" in devel_compose
+    assert "name: hub-assets" in persistent_volumes
+    assert "hub-assets" not in hub_stack
+    assert "mountPath: /app/static" not in hub_stack
+    assert hub_stack.count("PULP_DB_ENCRYPTION_KEY") == 4
+    assert hub_stack.count("/var/lib/pulp/db-encryption.key") == 4
+    for setting in (
+        "PULP_DEFAULT_FILE_STORAGE",
+        "PULP_MEDIA_ROOT",
+        "PULP_REDIRECT_TO_OBJECT_STORAGE",
+        "PULP_SETTINGS",
+    ):
+        assert hub_stack.count(setting) == 4
 
 
-def test_hub_admin_password_is_not_reset_on_every_restart() -> None:
-    """Pulp API bootstrap should only seed the admin password during initial creation."""
-    entrypoint = _read("images/pulp/entrypoint.sh")
+def test_hub_admin_is_created_interactively_not_from_dead_environment() -> None:
+    """The maintained Hub runtime uses its real interactive admin command."""
+    hub_stack = _read("k8s/hub-stack.yaml")
+    docs = _read("k8s/K8S.md")
 
-    assert "user, created = User.objects.get_or_create(" in entrypoint
-    assert "if created:" in entrypoint
-    assert "    user.set_password(password)" in entrypoint
+    assert "HUB_ADMIN_PASSWORD" not in hub_stack
+    assert "GALAXY_ADMIN_PASSWORD" not in hub_stack
+    assert "HUB_ADMIN_PASSWORD" not in _read("k8s/secret.yaml")
+    assert "django-admin createsuperuser" in docs
+    assert "does not create an administrator from an" in docs
+    assert "environment variable" in docs
 
 
-def test_galaxy_wsgi_redirect_covers_ui_path_without_trailing_slash() -> None:
-    """Legacy /ui requests should redirect even when the slash is omitted."""
-    wrapper = _read("images/galaxy-ng/aax_wsgi.py")
+def test_hub_manifests_use_upstream_entrypoint_commands() -> None:
+    """Hub workloads dispatch through the maintained upstream entrypoint."""
+    hub_stack = _read("k8s/hub-stack.yaml")
 
-    assert 'path == "/ui"' in wrapper
+    assert 'args: ["run", "api"]' in hub_stack
+    assert 'args: ["run", "content-app"]' in hub_stack
+    assert 'args: ["run", "worker"]' in hub_stack
+
+
+def test_gateway_routes_hub_api_paths_to_maintained_galaxy_service() -> None:
+    """The gateway preserves Hub API routing without the retired WSGI wrapper."""
+    gateway = _read("images/gateway/nginx.conf")
+
+    assert "location /api/galaxy/" in gateway
+    assert "location /api/automation-hub/" in gateway
+    assert gateway.count("http://galaxy-ng:8000") >= 2
 
 
 def test_release_workflow_records_digest_and_signing_provenance() -> None:

@@ -70,7 +70,7 @@ jobs:
       - name: Run hadolint
         uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
-          dockerfile: ${{ matrix.image == 'pulp' && 'images/pulp/Dockerfile.pulp' || format('images/{0}/Dockerfile', matrix.image) }}
+          dockerfile: ${{ format('images/{0}/Dockerfile', matrix.image) }}
           failure-threshold: error
 
       - name: Build base image

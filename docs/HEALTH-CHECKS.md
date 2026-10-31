@@ -292,9 +292,9 @@ awx-web               aax/awx:1.0.0                   Up (healthy)
 ee-base               aax/ee-base:1.0.0               Up (healthy)
 ee-builder            aax/ee-builder:1.0.0            Up (healthy)
 dev-tools             aax/dev-tools:1.0.0             Up (healthy)
-galaxy-ng             aax/galaxy-ng:1.0.0             Up (healthy)
-pulp                  aax/pulp:1.0.0                  Up (healthy)
-eda-controller        aax/eda-controller:1.0.0        Up (healthy)
+galaxy-ng             ghcr.io/kpeacocke/aax-galaxy-ng:devel       Up (healthy)
+pulp                  ghcr.io/kpeacocke/aax-pulp:devel            Up (healthy)
+eda-controller        ghcr.io/kpeacocke/aax-eda-controller:devel  Up (healthy)
 ```
 
 **Check logs for health check failures:**
