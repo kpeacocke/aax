@@ -17,7 +17,7 @@ Quick navigation to the main documentation.
 
 - Controller stack: [controller/CONTROLLER.md](../controller/CONTROLLER.md)
 - Private hub: [hub/HUB.md](../hub/HUB.md)
-- EDA controller: [images/eda-controller/EDA.md](../images/eda-controller/EDA.md)
+- EDA controller: [EDA.md](EDA.md)
 - Kubernetes deployment: [k8s/K8S.md](../k8s/K8S.md)
 
 ## Operations & Deployment

@@ -282,7 +282,7 @@ def test_ci_workflow_does_not_use_latest_image_tags() -> None:
 
 
 def test_runtime_files_do_not_contain_weak_secret_fallbacks() -> None:
-    """Runtime entrypoints and compose config should not ship weak secret fallbacks."""
+    """Maintained runtime and Kubernetes config must not add weak secret fallbacks."""
     checks = {
         "docker-compose.yml": [
             ":-password}",
@@ -304,9 +304,6 @@ def test_runtime_files_do_not_contain_weak_secret_fallbacks() -> None:
             "os.getenv('SECRET_KEY', 'awxsecret')",
             "BROADCAST_WEBSOCKET_SECRET = os.getenv('SECRET_KEY', 'awxsecret')",
         ],
-        "images/pulp/settings.py": [
-            "change-me-to-a-long-random-string",
-        ],
         "k8s/awx-settings-configmap.yaml": [
             "awxsecret_change_me",
             "awxpass",
@@ -323,6 +320,9 @@ def test_runtime_files_do_not_contain_weak_secret_fallbacks() -> None:
                 failures.append(f"{relative_path}: {token}")
 
     assert failures == [], "Weak runtime defaults remain:\n" + "\n".join(failures)
+    assert "CHANGE_ME_PULP_SECRET_KEY" not in _read("images/galaxy-runtime/entrypoint.py")
+    assert "key: PULP_SECRET_KEY" in _read("k8s/hub-stack.yaml")
+    assert "key: SECRET_KEY" in _read("k8s/eda-stack.yaml")
 
 
 def test_kubernetes_hub_allowed_hosts_are_not_wildcard() -> None:
@@ -536,7 +536,6 @@ def test_hub_and_pulp_compose_secrets_are_required() -> None:
     content = _read("docker-compose.yml")
     required_tokens = [
         "${HUB_DB_PASSWORD:?HUB_DB_PASSWORD must be set",
-        "${HUB_ADMIN_PASSWORD:?HUB_ADMIN_PASSWORD must be set",
         "${GALAXY_SECRET_KEY:?GALAXY_SECRET_KEY must be set",
         '"${PULP_SECRET_KEY:?PULP_SECRET_KEY must be set',
     ]
@@ -624,31 +623,60 @@ def test_eda_healthchecks_validate_dependencies() -> None:
         assert token in k8s_eda
 
 
-def test_hub_static_assets_are_shared_between_pulp_api_and_galaxy_ng() -> None:
-    """Hub static assets should be collected into the shared volume served by galaxy-ng."""
+def test_hub_static_assets_are_not_hidden_by_kubernetes_pvc() -> None:
+    """Keep the legacy assets claim but use image-baked assets in Kubernetes."""
     compose = _read("docker-compose.yml")
-    galaxy_settings = _read("images/galaxy-ng/settings.py")
-    pulp_settings = _read("images/pulp/settings.py")
+    devel_compose = _read("docker-compose.devel.yml")
+    hub_stack = _read("k8s/hub-stack.yaml")
+    persistent_volumes = _read("k8s/persistent-volumes.yaml")
 
     assert compose.count("hub_assets:/app/static") >= 2
-    assert 'STATIC_ROOT = Path("/app/static")' in galaxy_settings
-    assert "STATIC_ROOT = Path('/app/static')" in pulp_settings
+    assert devel_compose.count("hub_pulp_certs:/etc/pulp/certs") == 4
+    for role in ("pulp-api", "pulp-content", "pulp-worker", "galaxy-ng"):
+        assert f"  {role}:" in devel_compose
+    assert "name: hub-assets" in persistent_volumes
+    assert "hub-assets" not in hub_stack
+    assert "mountPath: /app/static" not in hub_stack
+    assert hub_stack.count("PULP_DB_ENCRYPTION_KEY") == 4
+    assert hub_stack.count("/var/lib/pulp/db-encryption.key") == 4
+    for setting in (
+        "PULP_DEFAULT_FILE_STORAGE",
+        "PULP_MEDIA_ROOT",
+        "PULP_REDIRECT_TO_OBJECT_STORAGE",
+        "PULP_SETTINGS",
+    ):
+        assert hub_stack.count(setting) == 4
 
 
-def test_hub_admin_password_is_not_reset_on_every_restart() -> None:
-    """Pulp API bootstrap should only seed the admin password during initial creation."""
-    entrypoint = _read("images/pulp/entrypoint.sh")
+def test_hub_admin_is_created_interactively_not_from_dead_environment() -> None:
+    """The maintained Hub runtime uses its real interactive admin command."""
+    hub_stack = _read("k8s/hub-stack.yaml")
+    docs = _read("k8s/K8S.md")
 
-    assert "user, created = User.objects.get_or_create(" in entrypoint
-    assert "if created:" in entrypoint
-    assert "    user.set_password(password)" in entrypoint
+    assert "HUB_ADMIN_PASSWORD" not in hub_stack
+    assert "GALAXY_ADMIN_PASSWORD" not in hub_stack
+    assert "HUB_ADMIN_PASSWORD" not in _read("k8s/secret.yaml")
+    assert "django-admin createsuperuser" in docs
+    assert "does not create an administrator from an" in docs
+    assert "environment variable" in docs
 
 
-def test_galaxy_wsgi_redirect_covers_ui_path_without_trailing_slash() -> None:
-    """Legacy /ui requests should redirect even when the slash is omitted."""
-    wrapper = _read("images/galaxy-ng/aax_wsgi.py")
+def test_hub_manifests_use_upstream_entrypoint_commands() -> None:
+    """Hub workloads dispatch through the maintained upstream entrypoint."""
+    hub_stack = _read("k8s/hub-stack.yaml")
 
-    assert 'path == "/ui"' in wrapper
+    assert 'args: ["run", "api"]' in hub_stack
+    assert 'args: ["run", "content-app"]' in hub_stack
+    assert 'args: ["run", "worker"]' in hub_stack
+
+
+def test_gateway_routes_hub_api_paths_to_maintained_galaxy_service() -> None:
+    """The gateway preserves Hub API routing without the retired WSGI wrapper."""
+    gateway = _read("images/gateway/nginx.conf")
+
+    assert "location /api/galaxy/" in gateway
+    assert "location /api/automation-hub/" in gateway
+    assert gateway.count("http://galaxy-ng:8000") >= 2
 
 
 def test_release_workflow_records_digest_and_signing_provenance() -> None:

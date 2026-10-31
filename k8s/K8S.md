@@ -8,27 +8,28 @@ The deployment consists of:
 
 - **Namespace**: `aax` - Isolated namespace for all resources
 - **ConfigMap**: Shared environment configuration
-- **PersistentVolumeClaims**: Storage for workspaces and build artifacts
-- **Deployments**: Three main services (ee-base, ee-builder, dev-tools)
-- **Services**: ClusterIP services for inter-pod communication
+- **PersistentVolumeClaims**: Existing AWX, Hub, and EDA data claims plus workspace/build storage
+- **Deployments**: AWX, Hub/Pulp, EDA, gateway, and development-tool workloads
+- **Services**: ClusterIP services for inter-pod communication, including EDA API, WebSocket, and private Podman endpoints
 
 ## Prerequisites
 
 - Kubernetes cluster (v1.24+)
 - kubectl CLI tool configured
-- Container images built and available:
+- Development-tool images built and available:
   - `aax/ee-base:1.0.0`
   - `aax/ee-builder:1.0.0`
   - `aax/dev-tools:1.0.0`
-- Storage class `standard` available (or modify in `persistent-volumes.yaml`)
+- Storage class `hostpath` available (or update `persistent-volumes.yaml` for the cluster)
+- Registry access to the pinned AAX bundle images in the Kustomize image map
 
 ## Quick Start
 
 ### Deploy with kubectl
 
 ```bash
-# Create namespace and resources
-kubectl apply -f k8s/
+# Apply the Kustomize base so image names and tags are transformed
+kubectl apply -k k8s/
 
 # Check deployment status
 kubectl get all -n aax
@@ -37,6 +38,7 @@ kubectl get all -n aax
 kubectl logs -n aax -l app=ee-base
 kubectl logs -n aax -l app=ee-builder
 kubectl logs -n aax -l app=dev-tools
+kubectl logs -n aax -l app=eda-controller
 ```
 
 ### Deploy with Kustomize
@@ -47,6 +49,58 @@ kubectl apply -k k8s/
 
 # View generated manifests without applying
 kubectl kustomize k8s/
+```
+
+### Maintained Hub and EDA images
+
+The manifests use the published `ghcr.io/kpeacocke/aax-*` image names after
+Kustomize applies the image map. `aax-pulp`, `aax-galaxy-ng`,
+`aax-eda-controller`, and `aax-eda-podman` are built from the upstream sources
+and runtime wrappers documented by `scripts/build-bundle-image.sh`; the legacy
+`images/pulp`, `images/galaxy-ng`, and `images/eda-controller` build paths have
+been retired. The base, HA, and production overlays pin each image to a verified
+registry digest. The `aax-pulp` reference is the published compatibility alias
+for the same maintained Galaxy image digest; the bundle publisher derives it
+from the `galaxy-ng` candidate.
+
+The Hub roles use the upstream entrypoint commands (`run api`, `run
+content-app`, `run worker`). The Pulp encryption-key path points into the
+existing `hub-pulp-storage` claim so it reuses `/var/lib/pulp/db-encryption.key`
+instead of generating a new key and losing access to encrypted database fields.
+The existing Hub, EDA, and AWX PVC names are intentionally unchanged. Back up
+the application databases and persistent volumes before applying image or
+schema upgrades; do not prune the namespace as part of this migration.
+The existing `hub-assets` claim is retained for rollback/data preservation, but
+the maintained Hub image serves its baked-in static assets and the workloads
+must not mount that claim over `/app/static`.
+
+The EDA stack runs API, background-worker, activation-worker, and WebSocket
+roles from the maintained EDA image. Activations use a separate privileged
+Podman service with persisted container storage. See [EDA runtime guidance](../docs/EDA.md)
+for the required network and public-URL settings.
+
+### Production credentials
+
+The production overlay removes the sample `aax-secrets` Secret. Provision that
+Secret out of band before applying the overlay, retaining the existing
+`SECRET_KEY`, Hub database/Pulp credentials, AWX, and EDA database credentials.
+The EDA runtime maps `EDA_SECRET_KEY` to `SECRET_KEY`. No external-secret
+provider is assumed by these manifests.
+
+The maintained Hub entrypoint does not create an administrator from an
+environment variable. Create the initial Hub administrator interactively using
+the upstream Django command after the API pod is ready:
+
+```bash
+kubectl exec -n aax -it deploy/pulp-api -- django-admin createsuperuser
+```
+
+Do not pass the password on the command line or store it in the Kubernetes
+Secret.
+
+```bash
+kubectl kustomize --load-restrictor LoadRestrictionsNone k8s/overlays/production/ \
+  | kubectl apply -f -
 ```
 
 ## Resource Overview
@@ -74,10 +128,22 @@ Data:
 
 | PVC            | Size | Access Mode   | Purpose                                 |
 | -------------- | ---- | ------------- | --------------------------------------- |
-| workspace      | 10Gi | ReadWriteMany | Shared workspace for Ansible operations |
-| ee-builds      | 20Gi | ReadWriteMany | Execution environment build outputs     |
-| ee-definitions | 5Gi  | ReadWriteMany | EE definition files                     |
-| dev-workspace  | 10Gi | ReadWriteMany | Development workspace                   |
+| workspace      | 10Gi | ReadWriteOnce | Shared workspace for Ansible operations |
+| ee-builds      | 20Gi | ReadWriteOnce | Execution environment build outputs     |
+| ee-definitions | 5Gi  | ReadWriteOnce | EE definition files                     |
+| dev-workspace  | 10Gi | ReadWriteOnce | Development workspace                   |
+| hub-pulp-storage | 20Gi | ReadWriteOnce | Pulp content and existing encryption key |
+| hub-assets | 5Gi | ReadWriteOnce | Retained legacy Hub assets; not mounted by maintained workloads |
+| eda-postgres-data | 10Gi | ReadWriteOnce | EDA database |
+| eda-projects | 10Gi | ReadWriteOnce | EDA projects |
+| eda-logs | 5Gi | ReadWriteOnce | EDA logs |
+| eda-podman-storage | 20Gi | ReadWriteOnce | EDA activation container storage |
+
+The HA overlay schedules multiple replicas that share Hub and EDA data. Use a
+storage class and access mode that support the desired cross-node topology;
+do not change an already-bound claim's name or delete it to alter storage
+access. For multi-node HA, provision appropriate shared storage before
+enabling the overlay.
 
 ### Deployments
 
@@ -227,12 +293,9 @@ kubectl describe pod -n aax <pod-name>
 
 ### Pod Security
 
-All deployments enforce:
-
-- Non-root user (UID 1000)
-- No privilege escalation
-- Dropped capabilities
-- Security context constraints
+Application containers run as configured by their maintained images. The
+`eda-podman` workload is intentionally privileged for nested Podman; keep it
+internal to the cluster and use a CNI that enforces the included NetworkPolicy.
 
 ### Docker Socket Mounting (ee-builder)
 

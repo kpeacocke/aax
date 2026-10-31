@@ -571,7 +571,8 @@ services:
     command: awx-task
 
   galaxy-ng:
-    image: aax/galaxy-ng:1.0.0
+    image: ghcr.io/kpeacocke/aax-galaxy-ng:${DEVEL_IMAGE_TAG:-devel}
+    command: ["run", "api"]
     environment:
       POSTGRES_HOST: rds-endpoint.amazonaws.com
       POSTGRES_PORT: 5432
@@ -588,7 +589,7 @@ services:
       - awx-network
 
   pulp-worker:
-    image: aax/pulp:1.0.0
+    image: ghcr.io/kpeacocke/aax-pulp:${DEVEL_IMAGE_TAG:-devel}
     environment:
       POSTGRES_HOST: rds-endpoint.amazonaws.com
       POSTGRES_PORT: 5432
@@ -601,7 +602,7 @@ services:
       - /mnt/aax-content:/var/lib/pulp
     networks:
       - awx-network
-    command: pulpcore-worker
+    command: ["run", "worker"]
     deploy:
       replicas: 3  # Scale to multiple workers
 

@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: awx-postgres
-          image: postgres:15
+          image: postgres:15@sha256:64b99032e218b66b1d1a6334995056e1aa57f50a0c522cc856e72dff0e4b0d63
           imagePullPolicy: IfNotPresent
           env:
             - name: POSTGRES_DB
@@ -99,7 +99,7 @@ spec:
     spec:
       containers:
         - name: awx-redis
-          image: redis:7
+          image: redis:7@sha256:b6b6e3dc0c0952737748e55d5d885272840c7e42ba41ab1d5489f693419882f5
           imagePullPolicy: IfNotPresent
           command: ["redis-server", "--appendonly", "yes"]
           ports:
@@ -376,7 +376,7 @@ spec:
     spec:
       containers:
         - name: awx-receptor
-          image: quay.io/ansible/receptor:devel
+          image: quay.io/ansible/receptor@sha256:42dbacc9aab60618b74789c54d034726d2f8e32372d83ef0908a5ff2a2e90083
           imagePullPolicy: IfNotPresent
           command: ["receptor", "--config", "/etc/receptor/receptor.conf"]
           ports:
@@ -455,7 +455,7 @@ spec:
     spec:
       containers:
         - name: receptor-hop
-          image: quay.io/ansible/receptor:devel
+          image: quay.io/ansible/receptor@sha256:42dbacc9aab60618b74789c54d034726d2f8e32372d83ef0908a5ff2a2e90083
           imagePullPolicy: IfNotPresent
           command: ["receptor", "--config", "/etc/receptor/receptor.conf"]
           ports:
@@ -534,7 +534,7 @@ spec:
     spec:
       containers:
         - name: receptor-execution
-          image: quay.io/ansible/receptor:devel
+          image: quay.io/ansible/receptor@sha256:42dbacc9aab60618b74789c54d034726d2f8e32372d83ef0908a5ff2a2e90083
           imagePullPolicy: IfNotPresent
           command: ["receptor", "--config", "/etc/receptor/receptor.conf"]
           ports:

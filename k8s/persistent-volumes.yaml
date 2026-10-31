@@ -206,3 +206,19 @@ spec:
     requests:
       storage: 5Gi
   storageClassName: hostpath
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: eda-podman-storage
+  namespace: aax
+  labels:
+    app.kubernetes.io/name: eda-podman-storage
+    app.kubernetes.io/part-of: aax
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: hostpath

@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: hub-postgres
-          image: postgres:16-alpine
+          image: postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
           imagePullPolicy: IfNotPresent
           env:
             - name: POSTGRES_DB
@@ -97,7 +97,7 @@ spec:
     spec:
       containers:
         - name: hub-redis
-          image: redis:7-alpine
+          image: redis:7-alpine@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f
           imagePullPolicy: IfNotPresent
           command: ["redis-server", "--appendonly", "yes"]
           ports:
@@ -160,36 +160,50 @@ spec:
         - name: pulp-api
           image: aax/pulp:1.0.0
           imagePullPolicy: IfNotPresent
-          args: ["pulpcore-api"]
+          args: ["run", "api"]
           env:
-            - name: POSTGRES_HOST
+            - name: PULP_DB_HOST
               value: hub-postgres
-            - name: POSTGRES_PORT
+            - name: PULP_DB_PORT
               value: "5432"
-            - name: POSTGRES_DB
+            - name: PULP_DB_NAME
               value: hub
-            - name: POSTGRES_USER
+            - name: PULP_DB_USER
               value: galaxy
-            - name: POSTGRES_PASSWORD
+            - name: PULP_DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: aax-secrets
                   key: HUB_DB_PASSWORD
-            - name: REDIS_HOST
+            - name: PULP_REDIS_HOST
               value: hub-redis
-            - name: REDIS_PORT
+            - name: PULP_REDIS_PORT
               value: "6379"
             - name: PULP_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: aax-secrets
                   key: PULP_SECRET_KEY
-            - name: PULP_ALLOWED_HOSTS
+            - name: PULP_DB_ENCRYPTION_KEY
+              value: /var/lib/pulp/db-encryption.key
+            - name: WITH_MIGRATIONS
+              value: "1"
+            - name: ALLOWED_HOSTS
               value: localhost,127.0.0.1,pulp-api,pulp-content,galaxy-ng,gateway
             - name: PULP_CONTENT_ORIGIN
               value: http://pulp-content:24816
             - name: PULP_ANSIBLE_API_HOSTNAME
               value: http://galaxy-ng:8000
+            - name: PULP_DEFAULT_FILE_STORAGE
+              value: pulpcore.app.models.storage.FileSystem
+            - name: PULP_MEDIA_ROOT
+              value: /var/lib/pulp/media
+            - name: PULP_REDIRECT_TO_OBJECT_STORAGE
+              value: "false"
+            - name: PULP_LOGGING_LEVEL
+              value: INFO
+            - name: GUNICORN_PORT
+              value: "24817"
             - name: PULP_SETTINGS
               value: /etc/pulp/settings.py
             - name: DJANGO_SETTINGS_MODULE
@@ -257,36 +271,50 @@ spec:
         - name: pulp-content
           image: aax/pulp:1.0.0
           imagePullPolicy: IfNotPresent
-          args: ["pulpcore-content"]
+          args: ["run", "content-app"]
           env:
-            - name: POSTGRES_HOST
+            - name: PULP_DB_HOST
               value: hub-postgres
-            - name: POSTGRES_PORT
+            - name: PULP_DB_PORT
               value: "5432"
-            - name: POSTGRES_DB
+            - name: PULP_DB_NAME
               value: hub
-            - name: POSTGRES_USER
+            - name: PULP_DB_USER
               value: galaxy
-            - name: POSTGRES_PASSWORD
+            - name: PULP_DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: aax-secrets
                   key: HUB_DB_PASSWORD
-            - name: REDIS_HOST
+            - name: PULP_REDIS_HOST
               value: hub-redis
-            - name: REDIS_PORT
+            - name: PULP_REDIS_PORT
               value: "6379"
             - name: PULP_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: aax-secrets
                   key: PULP_SECRET_KEY
-            - name: PULP_ALLOWED_HOSTS
+            - name: PULP_DB_ENCRYPTION_KEY
+              value: /var/lib/pulp/db-encryption.key
+            - name: WAIT_FOR_MIGRATIONS
+              value: "1"
+            - name: ALLOWED_HOSTS
               value: localhost,127.0.0.1,pulp-api,pulp-content,galaxy-ng,gateway
             - name: PULP_CONTENT_ORIGIN
               value: http://pulp-content:24816
             - name: PULP_ANSIBLE_API_HOSTNAME
               value: http://galaxy-ng:8000
+            - name: PULP_DEFAULT_FILE_STORAGE
+              value: pulpcore.app.models.storage.FileSystem
+            - name: PULP_MEDIA_ROOT
+              value: /var/lib/pulp/media
+            - name: PULP_REDIRECT_TO_OBJECT_STORAGE
+              value: "false"
+            - name: PULP_LOGGING_LEVEL
+              value: INFO
+            - name: GUNICORN_PORT
+              value: "24816"
             - name: PULP_SETTINGS
               value: /etc/pulp/settings.py
             - name: DJANGO_SETTINGS_MODULE
@@ -354,36 +382,48 @@ spec:
         - name: pulp-worker
           image: aax/pulp:1.0.0
           imagePullPolicy: IfNotPresent
-          args: ["pulpcore-worker"]
+          args: ["run", "worker"]
           env:
-            - name: POSTGRES_HOST
+            - name: PULP_DB_HOST
               value: hub-postgres
-            - name: POSTGRES_PORT
+            - name: PULP_DB_PORT
               value: "5432"
-            - name: POSTGRES_DB
+            - name: PULP_DB_NAME
               value: hub
-            - name: POSTGRES_USER
+            - name: PULP_DB_USER
               value: galaxy
-            - name: POSTGRES_PASSWORD
+            - name: PULP_DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: aax-secrets
                   key: HUB_DB_PASSWORD
-            - name: REDIS_HOST
+            - name: PULP_REDIS_HOST
               value: hub-redis
-            - name: REDIS_PORT
+            - name: PULP_REDIS_PORT
               value: "6379"
             - name: PULP_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: aax-secrets
                   key: PULP_SECRET_KEY
-            - name: PULP_ALLOWED_HOSTS
+            - name: PULP_DB_ENCRYPTION_KEY
+              value: /var/lib/pulp/db-encryption.key
+            - name: WAIT_FOR_MIGRATIONS
+              value: "1"
+            - name: ALLOWED_HOSTS
               value: localhost,127.0.0.1,pulp-api,pulp-content,galaxy-ng,gateway
             - name: PULP_CONTENT_ORIGIN
               value: http://pulp-content:24816
             - name: PULP_ANSIBLE_API_HOSTNAME
               value: http://galaxy-ng:8000
+            - name: PULP_DEFAULT_FILE_STORAGE
+              value: pulpcore.app.models.storage.FileSystem
+            - name: PULP_MEDIA_ROOT
+              value: /var/lib/pulp/media
+            - name: PULP_REDIRECT_TO_OBJECT_STORAGE
+              value: "false"
+            - name: PULP_LOGGING_LEVEL
+              value: INFO
             - name: PULP_SETTINGS
               value: /etc/pulp/settings.py
             - name: DJANGO_SETTINGS_MODULE
@@ -433,45 +473,44 @@ spec:
         - name: galaxy-ng
           image: aax/galaxy-ng:1.0.0
           imagePullPolicy: IfNotPresent
+          args: ["run", "api"]
           env:
-            - name: POSTGRES_HOST
+            - name: PULP_DB_HOST
               value: hub-postgres
-            - name: POSTGRES_PORT
+            - name: PULP_DB_PORT
               value: "5432"
-            - name: POSTGRES_DB
+            - name: PULP_DB_NAME
               value: hub
-            - name: POSTGRES_USER
+            - name: PULP_DB_USER
               value: galaxy
-            - name: POSTGRES_PASSWORD
+            - name: PULP_DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: aax-secrets
                   key: HUB_DB_PASSWORD
-            - name: REDIS_HOST
+            - name: PULP_REDIS_HOST
               value: hub-redis
-            - name: REDIS_PORT
+            - name: PULP_REDIS_PORT
               value: "6379"
-            - name: PULP_API_ROOT
-              value: http://pulp-api:24817
+            - name: PULP_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: PULP_SECRET_KEY
+            - name: PULP_DB_ENCRYPTION_KEY
+              value: /var/lib/pulp/db-encryption.key
+            - name: WAIT_FOR_MIGRATIONS
+              value: "1"
             - name: PULP_CONTENT_ORIGIN
               value: http://pulp-content:24816
             - name: PULP_ANSIBLE_API_HOSTNAME
               value: http://galaxy-ng:8000
-            - name: GALAXY_ADMIN_USERNAME
-              value: admin
-            - name: GALAXY_ADMIN_EMAIL
-              value: admin@example.com
-            - name: GALAXY_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: aax-secrets
-                  key: HUB_ADMIN_PASSWORD
-            - name: HUB_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: aax-secrets
-                  key: HUB_ADMIN_PASSWORD
             - name: GALAXY_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: GALAXY_SECRET_KEY
+            - name: SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: aax-secrets
@@ -484,29 +523,37 @@ spec:
               value: "true"
             - name: GALAXY_AUTO_SIGN_COLLECTIONS
               value: "false"
-            - name: DJANGO_SETTINGS_MODULE
-              value: galaxy_ng.app.settings
-            - name: DJANGO_DEBUG
+            - name: PULP_DEFAULT_FILE_STORAGE
+              value: pulpcore.app.models.storage.FileSystem
+            - name: PULP_MEDIA_ROOT
+              value: /var/lib/pulp/media
+            - name: PULP_REDIRECT_TO_OBJECT_STORAGE
               value: "false"
             - name: PULP_LOGGING_LEVEL
               value: INFO
+            - name: PULP_SETTINGS
+              value: /etc/pulp/settings.py
+            - name: DJANGO_SETTINGS_MODULE
+              value: pulpcore.app.settings
+            - name: DJANGO_DEBUG
+              value: "false"
+            - name: GUNICORN_PORT
+              value: "8000"
           ports:
             - containerPort: 8000
               name: http
           volumeMounts:
             - name: hub-pulp-storage
               mountPath: /var/lib/pulp
-            - name: hub-assets
-              mountPath: /app/static
           readinessProbe:
             httpGet:
-              path: /api/galaxy/
+              path: /api/automation-hub/
               port: 8000
             initialDelaySeconds: 45
             periodSeconds: 15
           livenessProbe:
             httpGet:
-              path: /api/galaxy/
+              path: /api/automation-hub/
               port: 8000
             initialDelaySeconds: 90
             periodSeconds: 30
@@ -514,9 +561,6 @@ spec:
         - name: hub-pulp-storage
           persistentVolumeClaim:
             claimName: hub-pulp-storage
-        - name: hub-assets
-          persistentVolumeClaim:
-            claimName: hub-assets
 ---
 apiVersion: v1
 kind: Service

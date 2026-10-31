@@ -16,9 +16,9 @@ export DEVEL_AWX_IMAGE="${DEVEL_AWX_IMAGE:-aax/awx}"
 export DEVEL_AWX_EE_IMAGE="${DEVEL_AWX_EE_IMAGE:-aax/awx-ee}"
 export DEVEL_RECEPTOR_IMAGE="${DEVEL_RECEPTOR_IMAGE:-aax/receptor}"
 export DEVEL_GATEWAY_IMAGE="${DEVEL_GATEWAY_IMAGE:-aax/gateway}"
-export DEVEL_PULP_IMAGE="${DEVEL_PULP_IMAGE:-aax-pulp}"
-export DEVEL_GALAXY_IMAGE="${DEVEL_GALAXY_IMAGE:-aax-galaxy-ng}"
-export DEVEL_EDA_IMAGE="${DEVEL_EDA_IMAGE:-aax/eda-controller}"
+export DEVEL_PULP_IMAGE="${DEVEL_PULP_IMAGE:-ghcr.io/kpeacocke/aax-pulp}"
+export DEVEL_GALAXY_IMAGE="${DEVEL_GALAXY_IMAGE:-ghcr.io/kpeacocke/aax-galaxy-ng}"
+export DEVEL_EDA_IMAGE="${DEVEL_EDA_IMAGE:-ghcr.io/kpeacocke/aax-eda-controller}"
 if [[ "${DEVEL_IMAGE_TAG:-}" == "devel-<commit-sha>" ]]; then
   export DEVEL_IMAGE_TAG=devel
 fi

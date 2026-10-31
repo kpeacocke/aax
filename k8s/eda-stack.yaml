@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
         - name: eda-postgres
-          image: postgres:15
+          image: postgres:15@sha256:64b99032e218b66b1d1a6334995056e1aa57f50a0c522cc856e72dff0e4b0d63
           imagePullPolicy: IfNotPresent
           env:
             - name: POSTGRES_DB
@@ -99,7 +99,7 @@ spec:
     spec:
       containers:
         - name: eda-redis
-          image: redis:7
+          image: redis:7@sha256:b6b6e3dc0c0952737748e55d5d885272840c7e42ba41ab1d5489f693419882f5
           imagePullPolicy: IfNotPresent
           command: ["redis-server", "--appendonly", "yes"]
           ports:
@@ -162,7 +162,16 @@ spec:
         - name: eda-controller
           image: aax/eda-controller:1.0.0
           imagePullPolicy: IfNotPresent
+          args: ["api"]
+          envFrom:
+            - configMapRef:
+                name: aax-config
           env:
+            - name: EDA_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: SECRET_KEY
             - name: EDA_DB_HOST
               value: eda-postgres
             - name: EDA_DB_PORT
@@ -219,14 +228,14 @@ spec:
                           sock.close()
 
                   urllib.request.urlopen(
-                      f"http://127.0.0.1:{os.getenv('EDA_PORT', '5000')}/health",
+                      f"http://127.0.0.1:{os.getenv('EDA_PORT', '5000')}/_healthz",
                       timeout=2,
                   )
             initialDelaySeconds: 20
             periodSeconds: 15
           livenessProbe:
             httpGet:
-              path: /health
+              path: /_healthz
               port: 5000
             initialDelaySeconds: 40
             periodSeconds: 30
@@ -250,3 +259,313 @@ spec:
     - name: http
       port: 5000
       targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eda-worker
+  namespace: aax
+  labels:
+    app: eda-worker
+    app.kubernetes.io/name: eda-worker
+    app.kubernetes.io/component: eda
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eda-worker
+  template:
+    metadata:
+      labels:
+        app: eda-worker
+        app.kubernetes.io/name: eda-worker
+        app.kubernetes.io/component: eda
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: eda-worker
+          image: aax/eda-controller:1.0.0
+          imagePullPolicy: IfNotPresent
+          args: ["worker"]
+          envFrom:
+            - configMapRef:
+                name: aax-config
+          env:
+            - name: EDA_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: SECRET_KEY
+            - name: EDA_DB_HOST
+              value: eda-postgres
+            - name: EDA_DB_PORT
+              value: "5432"
+            - name: EDA_DB_NAME
+              value: eda
+            - name: EDA_DB_USER
+              value: eda
+            - name: EDA_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: EDA_DB_PASSWORD
+            - name: EDA_REDIS_HOST
+              value: eda-redis
+            - name: EDA_REDIS_PORT
+              value: "6379"
+          volumeMounts:
+            - name: eda-projects
+              mountPath: /home/eda/projects
+            - name: eda-logs
+              mountPath: /var/log/eda
+      volumes:
+        - name: eda-projects
+          persistentVolumeClaim:
+            claimName: eda-projects
+        - name: eda-logs
+          persistentVolumeClaim:
+            claimName: eda-logs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eda-activation-worker
+  namespace: aax
+  labels:
+    app: eda-activation-worker
+    app.kubernetes.io/name: eda-activation-worker
+    app.kubernetes.io/component: eda
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eda-activation-worker
+  template:
+    metadata:
+      labels:
+        app: eda-activation-worker
+        app.kubernetes.io/name: eda-activation-worker
+        app.kubernetes.io/component: eda
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: eda-activation-worker
+          image: aax/eda-controller:1.0.0
+          imagePullPolicy: IfNotPresent
+          args: ["activation-worker"]
+          envFrom:
+            - configMapRef:
+                name: aax-config
+          env:
+            - name: EDA_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: SECRET_KEY
+            - name: EDA_DB_HOST
+              value: eda-postgres
+            - name: EDA_DB_PORT
+              value: "5432"
+            - name: EDA_DB_NAME
+              value: eda
+            - name: EDA_DB_USER
+              value: eda
+            - name: EDA_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: EDA_DB_PASSWORD
+            - name: EDA_REDIS_HOST
+              value: eda-redis
+            - name: EDA_REDIS_PORT
+              value: "6379"
+            - name: EDA_PODMAN_SOCKET_URL
+              value: tcp://eda-podman:8888
+            - name: EDA_PODMAN_MEM_LIMIT
+              value: 512m
+            - name: EDA_PODMAN_EXTRA_ARGS
+              value: "{}"
+          volumeMounts:
+            - name: eda-projects
+              mountPath: /home/eda/projects
+            - name: eda-logs
+              mountPath: /var/log/eda
+      volumes:
+        - name: eda-projects
+          persistentVolumeClaim:
+            claimName: eda-projects
+        - name: eda-logs
+          persistentVolumeClaim:
+            claimName: eda-logs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eda-ws
+  namespace: aax
+  labels:
+    app: eda-ws
+    app.kubernetes.io/name: eda-ws
+    app.kubernetes.io/component: eda
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eda-ws
+  template:
+    metadata:
+      labels:
+        app: eda-ws
+        app.kubernetes.io/name: eda-ws
+        app.kubernetes.io/component: eda
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: eda-ws
+          image: aax/eda-controller:1.0.0
+          imagePullPolicy: IfNotPresent
+          args: ["ws"]
+          envFrom:
+            - configMapRef:
+                name: aax-config
+          env:
+            - name: EDA_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: SECRET_KEY
+            - name: EDA_DB_HOST
+              value: eda-postgres
+            - name: EDA_DB_PORT
+              value: "5432"
+            - name: EDA_DB_NAME
+              value: eda
+            - name: EDA_DB_USER
+              value: eda
+            - name: EDA_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: aax-secrets
+                  key: EDA_DB_PASSWORD
+            - name: EDA_REDIS_HOST
+              value: eda-redis
+            - name: EDA_REDIS_PORT
+              value: "6379"
+            - name: EDA_WORKER_KIND
+              value: websocket
+          ports:
+            - containerPort: 8000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /_healthz
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /_healthz
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eda-ws
+  namespace: aax
+spec:
+  selector:
+    app: eda-ws
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eda-podman
+  namespace: aax
+  labels:
+    app: eda-podman
+    app.kubernetes.io/name: eda-podman
+    app.kubernetes.io/component: eda
+    app.kubernetes.io/part-of: aax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eda-podman
+  template:
+    metadata:
+      labels:
+        app: eda-podman
+        app.kubernetes.io/name: eda-podman
+        app.kubernetes.io/component: eda
+        app.kubernetes.io/part-of: aax
+    spec:
+      containers:
+        - name: eda-podman
+          image: aax/eda-podman:1.0.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 8888
+              name: api
+          volumeMounts:
+            - name: eda-podman-storage
+              mountPath: /var/lib/containers/storage
+          readinessProbe:
+            httpGet:
+              path: /_ping
+              port: 8888
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /_ping
+              port: 8888
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: eda-podman-storage
+          persistentVolumeClaim:
+            claimName: eda-podman-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eda-podman
+  namespace: aax
+spec:
+  selector:
+    app: eda-podman
+  ports:
+    - name: api
+      port: 8888
+      targetPort: 8888
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: eda-podman-client
+  namespace: aax
+spec:
+  podSelector:
+    matchLabels:
+      app: eda-podman
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: eda-activation-worker
+      ports:
+        - protocol: TCP
+          port: 8888

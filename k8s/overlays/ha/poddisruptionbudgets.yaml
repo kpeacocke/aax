@@ -41,3 +41,47 @@ spec:
   selector:
     matchLabels:
       app: eda-controller
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: eda-worker-pdb
+  namespace: aax
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: eda-worker
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: eda-activation-worker-pdb
+  namespace: aax
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: eda-activation-worker
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: eda-ws-pdb
+  namespace: aax
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: eda-ws
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pulp-worker-pdb
+  namespace: aax
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pulp-worker

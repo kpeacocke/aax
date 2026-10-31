@@ -187,7 +187,8 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 
 | Variable                            | Default                                         | Description                                  |
 | ----------------------------------- | ----------------------------------------------- | -------------------------------------------- |
-| `GALAXY_DOCKER_IMAGE`               | `aax/galaxy-ng:1.0.0`                           | Galaxy NG image                              |
+| `AAX_IMAGE_PREFIX`                  | `ghcr.io/kpeacocke`                             | Registry/owner prefix for published AAX images |
+| `DEVEL_IMAGE_TAG`                   | `devel`                                         | Shared Hub/EDA devel bundle tag              |
 | `GALAXY_ADMIN_USERNAME`             | `admin`                                         | Galaxy admin username                        |
 | `HUB_ADMIN_PASSWORD`                | `REPLACE_WITH_STRONG_HUB_ADMIN_PASSWORD`        | **Required.** Galaxy admin password          |
 | `GALAXY_ADMIN_EMAIL`                | `admin@example.com`                             | Galaxy admin email                           |
@@ -206,10 +207,9 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 
 | Variable                    | Default                               | Description                                       |
 | --------------------------- | ------------------------------------- | ------------------------------------------------- |
-| `PULP_DOCKER_IMAGE`         | `aax/pulp:1.0.0`                      | Pulp image                                        |
 | `HUB_DB_PASSWORD`           | `REPLACE_WITH_STRONG_HUB_DB_PASSWORD` | **Required.** Shared Hub/Pulp PostgreSQL password |
 | `PULP_SECRET_KEY`           | `CHANGE_ME_PULP_SECRET_KEY`           | **Required.** Pulp secret key                     |
-| `PULP_ALLOWED_HOSTS`        | `localhost,127.0.0.1,[::1]`           | Allowed hosts for Pulp endpoints                  |
+| `ALLOWED_HOSTS`             | `localhost,127.0.0.1,[::1]`           | Allowed hosts for Pulp endpoints                  |
 | `PULP_CONTENT_ORIGIN`       | `http://pulp-content:24816`           | Internal content origin URL used by Hub/Pulp      |
 | `PULP_ANSIBLE_API_HOSTNAME` | `http://galaxy-ng:8000`               | Internal API hostname used by Hub/Galaxy links    |
 | `PULP_WORKERS`              | `2`                                   | Number of Pulp worker processes                   |
@@ -224,6 +224,7 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 | `EDA_DB_NAME`      | `eda`                                 | EDA PostgreSQL database name                                        |
 | `EDA_DB_USER`      | `eda`                                 | EDA PostgreSQL database user                                        |
 | `EDA_DB_PASSWORD`  | `REPLACE_WITH_STRONG_EDA_DB_PASSWORD` | **Required.** EDA database password (must not be empty)             |
+| `EDA_SECRET_KEY`   | `SECRET_KEY`                          | EDA signing key; preserve it when reusing an existing EDA database  |
 | `EDA_PORT`         | `5000`                                | Host port exposed for EDA controller API/UI                         |
 | `EDA_LOG_LEVEL`    | `INFO`                                | EDA controller logging level                                        |
 | `EDA_SKIP_DB_WAIT` | `false`                               | Skip startup wait for database readiness (dev troubleshooting only) |
@@ -231,6 +232,9 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 | `EDA_DB_PORT`      | `5432`                                | Container-level DB port used by compose runtime                     |
 | `EDA_REDIS_HOST`   | `eda-redis`                           | Container-level Redis host used by compose runtime                  |
 | `EDA_REDIS_PORT`   | `6379`                                | Container-level Redis port used by compose runtime                  |
+| `EDA_CONTROLLER_URL` | `https://awx.ambitiouscake.com`     | AWX URL reachable by EDA activation workers                         |
+| `EDA_WEBSOCKET_BASE_URL` | `wss://awx.ambitiouscake.com/eda/ws` | Public EDA WebSocket URL                                    |
+| `EDA_CSRF_TRUSTED_ORIGINS` | `["https://awx.ambitiouscake.com"]` | JSON array of trusted public HTTPS origins              |
 
 ---
 
@@ -241,6 +245,7 @@ EMAIL_HOST_PASSWORD=your-app-specific-password
 | `AWX_IMAGE_TAG`        | `1.0.0`                       | AWX Docker image tag         |
 | `EE_BASE_IMAGE_TAG`    | `1.0.0`                       | EE Base Docker image tag     |
 | `EE_BUILDER_IMAGE_TAG` | `1.0.0`                       | EE Builder Docker image tag  |
+| `DEVEL_IMAGE_TAG`      | `devel`                       | Upstream bundle image tag    |
 | `POSTGRES_VERSION`     | 15 (AWX/EDA), 16-alpine (Hub) | PostgreSQL versions by stack |
 | `REDIS_VERSION`        | `7`                           | Redis version                |
 

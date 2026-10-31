@@ -5,6 +5,7 @@ Static manifest rendering checks run whenever kubectl is installed.
 Runtime cluster checks run only when kubectl can reach a cluster.
 """
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -102,6 +103,14 @@ class TestKubernetesManifestRendering:
         """Test that kustomize renders the full stack."""
         assert "kind: Namespace" in rendered_manifests
         assert "name: aax" in rendered_manifests
+
+    def test_all_overlays_pin_every_workload_image_digest(self) -> None:
+        """Base and overlays must not render mutable or nonexistent image tags."""
+        for path in ("k8s/", "k8s/overlays/ha", "k8s/overlays/production"):
+            images = re.findall(r"^\s*image:\s*(\S+)", render_kustomize(path), re.MULTILINE)
+            assert images, f"No workload images rendered for {path}"
+            unpinned = [image for image in images if not re.search(r"@sha256:[0-9a-f]{64}$", image)]
+            assert not unpinned, f"Images are not digest-pinned in {path}: {unpinned}"
 
     def test_full_stack_deployments_rendered(self, rendered_manifests: str) -> None:
         """Test that all major platform deployments are present in rendered manifests."""
