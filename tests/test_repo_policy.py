@@ -1,7 +1,12 @@
 """Repository policy checks for deployment defaults and security baselines."""
 
 from pathlib import Path
+import json
+import os
 import re
+import subprocess
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -9,6 +14,163 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def _read(relative_path: str) -> str:
     return (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+
+
+def _reconcile_audit(
+    tmp_path: Path, audit: object, status: str, issues: list[dict],
+    direct_audit: object | None = None, direct_status: str | None = None,
+    ref: str = "refs/heads/main",
+) -> dict:
+    (tmp_path / "audit-results.json").write_text(json.dumps(audit))
+    (tmp_path / "audit-direct-results.json").write_text(
+        json.dumps(audit if direct_audit is None else direct_audit)
+    )
+    for image in ("ee-base", "ee-builder", "dev-tools"):
+        directory = tmp_path / "images" / image
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "requirements.txt").write_text("package==1.0\n")
+    script = REPO_ROOT / ".github/scripts/reconcile-dependency-audit.cjs"
+    harness = r"""
+const reconcile = require(process.argv[1]);
+const calls = [];
+const output = {};
+const issues = JSON.parse(process.env.TEST_ISSUES);
+const github = {
+  paginate: async (_method, params) => { calls.push(['list', params]); return issues; },
+  rest: { issues: {
+    listForRepo: () => {},
+    update: async params => { calls.push(['update', params]); },
+    create: async params => { calls.push(['create', params]); return {data: {number: 123}}; },
+    createComment: async params => { calls.push(['comment', params]); }
+  }}
+};
+const context = {
+  repo: {owner: 'owner', repo: 'repo'}, sha: 'verified-commit',
+  serverUrl: 'https://github.com', runId: 456, ref: process.env.TEST_REF
+};
+reconcile({github, context, core: {setOutput: (key, value) => {output[key] = value;}}})
+  .then(() => console.log(JSON.stringify({calls, output})))
+  .catch(error => {
+    console.log(JSON.stringify({calls, output, error: error.message}));
+    process.exitCode = 1;
+  });
+"""
+    result = subprocess.run(
+        ["node", "-e", harness, str(script)],
+        cwd=tmp_path,
+        env={
+            **os.environ, "AUDIT_EXIT_STATUS": status, "TEST_ISSUES": json.dumps(issues),
+            "AUDIT_DIRECT_EXIT_STATUS": status if direct_status is None else direct_status,
+            "TEST_REF": ref,
+        },
+        capture_output=True, text=True, timeout=30,
+    )
+    parsed = json.loads(result.stdout)
+    assert result.returncode == (1 if "error" in parsed else 0), result.stderr
+    return parsed
+
+
+@pytest.mark.parametrize("status,vulns", [
+    ("0", []),
+    ("1", [{"id": "CVE-test", "fix_versions": ["2.0"]}]),
+])
+def test_dependency_issue_lifecycle(tmp_path: Path, status: str, vulns: list[dict]) -> None:
+    title = "\U0001f512 Security: Vulnerable dependencies detected"
+    issues = [
+        {"number": 2, "title": title},
+        {"number": 9, "title": title},
+        {"number": 3, "title": "Unrelated security issue"},
+        {"number": 4, "title": title, "pull_request": {"url": "not-an-issue"}},
+    ]
+    audit = {"dependencies": [{"name": "package", "version": "1.0", "vulns": vulns}]}
+    result = _reconcile_audit(tmp_path, audit, status, issues)
+    assert result["output"] == {"vulnerabilities": str(status == "1").lower()}
+    updates = [call[1] for call in result["calls"] if call[0] == "update"]
+    assert {update["issue_number"] for update in updates} == {2, 9}
+    assert not any(call[0] == "create" for call in result["calls"])
+    comments = [call[1] for call in result["calls"] if call[0] == "comment"]
+    if status == "0":
+        assert all(update["state_reason"] == "completed" for update in updates)
+        assert all("actions/runs/456" in comment["body"] for comment in comments)
+        assert all("does not certify other" in comment["body"] for comment in comments)
+    else:
+        canonical = next(update for update in updates if update["issue_number"] == 9)
+        assert "CVE-test" in canonical["body"] and "workflow remains failing" in canonical["body"]
+        duplicate = next(update for update in updates if update["issue_number"] == 2)
+        assert duplicate["state_reason"] == "not_planned"
+        assert comments[0]["issue_number"] == 2 and "#9" in comments[0]["body"]
+
+
+def test_dependency_issue_created_only_for_genuine_findings(tmp_path: Path) -> None:
+    audit = {"dependencies": [{"name": "package", "version": "1.0", "vulns": []}]}
+    clean = _reconcile_audit(tmp_path, audit, "0", [])
+    assert [call[0] for call in clean["calls"]] == ["list"]
+    audit["dependencies"][0]["vulns"] = [{"id": "CVE-test", "fix_versions": []}]
+    vulnerable = _reconcile_audit(tmp_path, audit, "1", [])
+    assert [call[0] for call in vulnerable["calls"]] == ["list", "create"]
+    assert vulnerable["output"]["vulnerabilities"] == "true"
+
+
+@pytest.mark.parametrize("status,vulns", [
+    ("0", []),
+    ("1", [{"id": "CVE-test", "fix_versions": []}]),
+])
+def test_branch_audits_cannot_mutate_main_dependency_issues(
+    tmp_path: Path, status: str, vulns: list[dict],
+) -> None:
+    audit = {"dependencies": [{"name": "package", "version": "1.0", "vulns": vulns}]}
+    result = _reconcile_audit(tmp_path, audit, status, [], ref="refs/heads/fix/example")
+    assert result["calls"] == []
+    assert result["output"] == {"vulnerabilities": str(status == "1").lower()}
+
+
+def test_direct_pin_findings_are_not_lost_by_resolver_audit(tmp_path: Path) -> None:
+    resolved = {"dependencies": [{"name": "transitive", "version": "1", "vulns": []}]}
+    direct = {"dependencies": [{"name": "package", "version": "1.0", "vulns": [
+        {"id": "CVE-bootstrap", "fix_versions": ["2.0"]}
+    ]}]}
+    result = _reconcile_audit(tmp_path, resolved, "0", [], direct, "1")
+    assert result["output"]["vulnerabilities"] == "true"
+    created = next(call[1] for call in result["calls"] if call[0] == "create")
+    assert "CVE-bootstrap" in created["body"]
+
+
+def test_incomplete_direct_pin_inventory_cannot_close_issues(tmp_path: Path) -> None:
+    incomplete = {"dependencies": [{"name": "transitive", "version": "1", "vulns": []}]}
+    result = _reconcile_audit(tmp_path, incomplete, "0", [])
+    assert "omitted required pin package==1.0" in result["error"]
+    assert result["calls"] == [] and result["output"] == {}
+
+
+@pytest.mark.parametrize("audit,status", [
+    ({}, "0"),
+    ({"dependencies": []}, "0"),
+    ({"dependencies": [{"name": "p", "version": "1"}]}, "0"),
+    ({"dependencies": [{"name": "p", "version": "1", "vulns": [], "skip_reason": "offline"}]}, "0"),
+    ({"dependencies": [{"name": "p", "version": "1", "vulns": [{"id": "CVE-test"}]}]}, "1"),
+    ({"dependencies": [{"name": "p", "version": "1", "vulns": []}]}, "1"),
+    ({"dependencies": [{"name": "p", "version": "1", "vulns": []}]}, "2"),
+    ({"dependencies": [{"name": "p", "version": "1", "vulns": []}]}, ""),
+    ({"dependencies": [{"name": "p", "version": "1", "vulns": [
+        {"id": "CVE-test", "fix_versions": ["2"]}
+    ]}]}, "0"),
+])
+def test_invalid_audits_cannot_close_issues(tmp_path: Path, audit: object, status: str) -> None:
+    result = _reconcile_audit(tmp_path, audit, status, [])
+    assert "error" in result
+    assert result["calls"] == []
+    assert result["output"] == {}
+
+
+def test_dependency_workflow_validates_before_reporting_and_retains_failure_gate() -> None:
+    content = _read(".github/workflows/dependencies.yml")
+    assert "reconcile-dependency-audit.cjs" in content
+    assert "AUDIT_EXIT_STATUS: ${{ steps.audit-command.outputs.status }}" in content
+    assert "AUDIT_DIRECT_EXIT_STATUS: ${{ steps.audit-command.outputs.direct-status }}" in content
+    assert "--disable-pip --no-deps" in content and "audit-direct-results.json" in content
+    assert "if: steps.audit.outputs.vulnerabilities == 'true'\n        run: exit 1" in content
+    assert "if: always()" in content and "name: dependency-audit" in content
+    assert "group: dependency-management-${{ github.ref }}" in content
 
 
 def _compose_env_var_names(compose_text: str) -> set[str]:

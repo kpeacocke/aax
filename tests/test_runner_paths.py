@@ -14,6 +14,46 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.parametrize("service", ["awx-receptor", "receptor-execution"])
+@pytest.mark.parametrize("status,diagnostic", [
+    (7, "Traceback (most recent call last):\n"),
+    (0, ""),
+    (0, "Worker warning\n"),
+])
+def test_worker_errors_cannot_corrupt_runner_protocol(
+    tmp_path: Path, service: str, status: int, diagnostic: str,
+) -> None:
+    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
+    command = compose["services"][service]["command"][-1]
+    wrapper = command.split("cat > /usr/local/bin/ansible-runner-locked << 'WEOF'\n")[1]
+    wrapper = wrapper.split("\nWEOF", 1)[0].replace("$$", "$")
+    wrapper = wrapper.replace("/tmp/aax-runner-stderr.", str(tmp_path / "runner-stderr."))
+    script = tmp_path / "worker.sh"
+    script.write_text(wrapper)
+    executable = tmp_path / "ansible-runner"
+    executable.write_text(
+        "#!/bin/sh\n"
+        "printf '%s\\n' '{\"status\":\"error\"}'\n"
+        f"printf '%s' '{diagnostic}' >&2\n"
+        f"exit {status}\n"
+    )
+    executable.chmod(0o700)
+    result = subprocess.run(
+        ["sh", str(script)],
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"},
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=10,
+    )
+    assert result.returncode == status
+    assert result.stdout == '{"status":"error"}\n'
+    diagnostics = list(tmp_path.glob("runner-stderr.*"))
+    if diagnostic:
+        assert len(diagnostics) == 1
+        assert diagnostics[0].read_text() == diagnostic
+        assert diagnostics[0].stat().st_mode & 0o777 == 0o600
+    else:
+        assert diagnostics == []
+
+
+@pytest.mark.parametrize("service", ["awx-receptor", "receptor-execution"])
 def test_inventory_input_and_output_follow_current_job(tmp_path, service):
     compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
     command = compose["services"][service]["command"][-1]

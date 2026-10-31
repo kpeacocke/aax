@@ -370,7 +370,15 @@ services:
               ;;
           esac
         done
-        exec ansible-runner worker "$$@" 2>&1
+        # Receptor combines child stdout/stderr; only stdout carries runner JSON.
+        umask 077
+        stderr_file=$$(mktemp /tmp/aax-runner-stderr.XXXXXX) || exit $$?
+        ansible-runner worker "$$@" 2>"$$stderr_file"
+        status=$$?
+        if [ ! -s "$$stderr_file" ]; then
+          rm -- "$$stderr_file"
+        fi
+        exit "$$status"
         WEOF
         cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
         #!/bin/sh
@@ -533,7 +541,15 @@ services:
               ;;
           esac
         done
-        exec ansible-runner worker "$$@" 2>&1
+        # Receptor combines child stdout/stderr; only stdout carries runner JSON.
+        umask 077
+        stderr_file=$$(mktemp /tmp/aax-runner-stderr.XXXXXX) || exit $$?
+        ansible-runner worker "$$@" 2>"$$stderr_file"
+        status=$$?
+        if [ ! -s "$$stderr_file" ]; then
+          rm -- "$$stderr_file"
+        fi
+        exit "$$status"
         WEOF
         cat > /usr/local/bin/ansible-runner-worker << 'WEOF'
         #!/bin/sh

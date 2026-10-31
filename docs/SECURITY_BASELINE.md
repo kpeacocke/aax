@@ -33,6 +33,26 @@ This document defines baseline controls for local-dev and production-like AAX op
   Main-channel multi-architecture candidates are scanned by
   digest before deployment tags are promoted. Candidate tags are not deployment tags.
 
+## Scheduled Dependency Reports
+
+The weekly Dependency Management workflow audits the combined `ee-base`,
+`ee-builder` and `dev-tools` Python requirements with `ee-base` constraints.
+It audits both the resolved dependency graph and every exact direct pin, including
+bootstrap packages such as `setuptools` that pip's temporary environment may omit
+from the resolved inventory. It validates report schemas, both audit exit statuses
+and coverage of every direct requirement before changing issues. Missing, skipped
+or malformed dependencies fail the workflow rather than being treated as clean.
+Only audits running on `main` reconcile repository issues; branch runs still
+validate both reports and fail for vulnerabilities without changing main's reports.
+
+Vulnerable results keep one current security/dependencies issue open and close
+older matching reports as duplicates, not as fixed vulnerabilities. A clean
+audit closes those historical reports with the current commit, run and artifact
+as evidence. These closures apply only to that requirements scope, not to
+upstream application images or OS packages. Image publication gates remain
+independent. The full `dependency-audit` artifact is retained on failure as well
+as success.
+
 ## Upstream Blockers
 
 A clean package resolver does not establish a clean image. In particular, pip
@@ -46,6 +66,23 @@ Distribution findings without patched vendor packages remain visible. A passing
 fixable-vulnerability gate does not certify that the image has no known issues,
 nor does it replace full-stack runtime tests. Review the exact bundle reports
 and deployed image digests before production use.
+
+### AWX worker protocol diagnostics
+
+Receptor combines command stdout and stderr into its result stream. The Compose
+workers therefore redirect runner stderr to uniquely named, mode-0600 files
+under `/tmp/aax-runner-stderr.*` on the existing shared `awx_runner_tmp` volume.
+Runner stdout remains its JSON protocol, and a nonzero worker exit still fails
+the work unit. Empty diagnostic files are removed; nonempty files are retained,
+including after a failed job, so a Python traceback cannot corrupt the protocol
+or disappear with Receptor's work-directory cleanup.
+
+When a worker fails, inspect the matching timestamped diagnostic files inside
+`awx-receptor` or `receptor-execution`. Treat their contents as sensitive: they
+may include task inputs or credentials. Never post raw files to an issue.
+Retain only the evidence needed for diagnosis and delete reviewed files by
+explicit path; these files do not have automatic age-based retention. A clean
+protocol does not mean the underlying worker exception has been repaired.
 
 ## Operator Checklist
 
