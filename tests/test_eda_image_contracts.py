@@ -16,6 +16,41 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_awx_telemetry_upgrades_are_atomic_and_runtime_checked() -> None:
+    pins = dict(line.split("==") for line in (
+        ROOT / "images/runtime-security/requirements-awx.txt"
+    ).read_text().splitlines())
+    assert pins["protobuf"] == "7.36.2"
+    assert pins["googleapis-common-protos"] == "1.76.0"
+    for name, version in pins.items():
+        if name.startswith("opentelemetry-"):
+            expected = "0.66b2" if name in {
+                "opentelemetry-instrumentation", "opentelemetry-instrumentation-logging",
+                "opentelemetry-semantic-conventions",
+            } else "1.45.2"
+            assert version == expected
+    dockerfile = (ROOT / "images/runtime-security/Dockerfile").read_text()
+    assert "--force-reinstall /tmp/aax-pip-wheels/*.whl" in dockerfile
+    assert 'assert msgpack.__version__ == "1.2.3"' in dockerfile
+    assert '"${PYTHON}" /tmp/aax-test-awx-telemetry.py grpc' in dockerfile
+    assert '"${PYTHON}" /tmp/aax-test-awx-telemetry.py http' in dockerfile
+    dependabot = yaml.safe_load((ROOT / ".github/dependabot.yml").read_text())
+    pip = next(update for update in dependabot["updates"] if update["package-ecosystem"] == "pip")
+    assert set(pip["groups"]["awx-telemetry"]["patterns"]) == {
+        "protobuf", "googleapis-common-protos", "opentelemetry-*",
+    }
+    assert {entry["dependency-name"] for entry in pip["ignore"]} == {"django"}
+
+
+def test_openapi_upgrade_preserves_guarded_referencing_adapter() -> None:
+    requirements = (ROOT / "images/dab-security/requirements-test.txt").read_text()
+    assert "openapi-spec-validator==0.8.4" in requirements
+    adapter = (ROOT / "images/dab-security/patch-openapi-referencing.py").read_text()
+    assert "compatible with openapi-spec-validator 0.8.4" in adapter
+    dockerfile = (ROOT / "images/dab-security/Dockerfile").read_text()
+    assert "test_app/tests/oauth2_provider test_app/tests/api_documentation" in dockerfile
+
+
 def test_decision_environment_pins_rulebook_and_collection() -> None:
     dockerfile = (ROOT / "images/eda-decision-environment/Dockerfile").read_text()
 

@@ -24,7 +24,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     python -m pip install '.[all]' djangorestframework==3.18.2 \
       -r /tmp/requirements-test.txt && python -m pip check
 RUN DJANGO_SETTINGS_MODULE=test_app.sqlite3settings OTEL_SDK_DISABLED=true \
-      python -m pytest -q -x -o addopts= test_app/tests/oauth2_provider && \
+      python -m pytest -q -x -o addopts= \
+        test_app/tests/oauth2_provider test_app/tests/api_documentation && \
     python -m pip wheel --no-deps --wheel-dir /wheels .
 FROM scratch
 COPY --from=builder /wheels /wheels

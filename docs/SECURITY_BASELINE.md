@@ -67,6 +67,30 @@ fixable-vulnerability gate does not certify that the image has no known issues,
 nor does it replace full-stack runtime tests. Review the exact bundle reports
 and deployed image digests before production use.
 
+### Coordinated dependency upgrades
+
+AWX's protobuf 7 upgrade includes `googleapis-common-protos` 1.76.0 and the
+complete pinned OpenTelemetry 1.45.2 / instrumentation 0.66b2 family. Upgrading
+only protobuf leaves the older exporters' exact dependency pins inconsistent.
+Dependabot groups this family together. The runtime image build requires
+`pip check` and exercises AWX's actual OTLP log handler for both gRPC and HTTP,
+including protobuf serialization, resource attributes and formatted log records.
+These probes use an in-memory collector; they do not send task data externally.
+The runtime patch stage force-installs the wheel supplied by the maintained
+pip build, even if an inherited image reports the same package version. Version
+equality alone cannot prove that a downstream wheel contains the current
+vendored security fixes.
+
+DAB's OpenAPI validator 0.8.4 uses the guarded, source-anchored `referencing`
+constraint adapter. The wheel build runs both upstream OAuth and API
+documentation tests before producing the patched wheel. Both upgrades retain
+the existing publication vulnerability gates.
+
+EDA retains Django 5.2.18: the pinned controller requires Django below 5.3,
+and its DAB integration does not support Django 6. Removing a resolver bound
+is not a framework migration. Remove the remaining Django major-version
+exclusion only after coordinated EDA/DAB source and runtime tests pass.
+
 ### AWX worker protocol diagnostics
 
 Receptor combines command stdout and stderr into its result stream. The Compose
