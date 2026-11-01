@@ -94,6 +94,8 @@ OpenJDK 17 package with official Temurin 17.0.21+9 JRE archives, verified agains
 the upstream release's architecture-specific SHA256 hashes. CentOS Stream did
 not yet offer the fixed package for CVE-2026-91415 when this change was made.
 The patched JRE is shared from the rulebook image into the decision image.
+The minimal rulebook base removes its old JVM with `microdnf`; the decision
+base uses `dnf`. Missing package managers fail the build explicitly.
 The image build verifies Java remains executable, sets its explicit library
 path, and initializes the real Drools JPY engine as the unprivileged runtime user,
 and publication still requires a real rulebook smoke test and image scan.
