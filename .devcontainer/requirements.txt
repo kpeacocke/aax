@@ -1,8 +1,8 @@
 # Development and testing tools for AAX devcontainer
 yamllint==1.38.0
 pre-commit==4.7.0
-commitizen==4.19.2
-pytest==9.1.1
+commitizen==4.19.3
+pytest==9.2.0
 pytest-timeout==2.4.0
 pytest-cov==7.1.0
 Jinja2==3.1.6

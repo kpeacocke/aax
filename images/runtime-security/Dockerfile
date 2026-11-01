@@ -12,7 +12,7 @@ COPY ${REQUIREMENTS} /tmp/aax-runtime-requirements.txt
 COPY test_awx_telemetry.py /tmp/aax-test-awx-telemetry.py
 COPY --from=pip-security /wheels /tmp/aax-pip-wheels
 RUN "${PYTHON}" -m pip install --no-cache-dir --force-reinstall /tmp/aax-pip-wheels/*.whl && \
-    "${PYTHON}" -c 'from pip._vendor import msgpack; assert msgpack.__version__ == "1.2.3"' && \
+    "${PYTHON}" -c 'from pip._vendor import msgpack; assert msgpack.__version__ == "1.2.4"' && \
     "${PYTHON}" -m pip install --no-cache-dir --upgrade -r /tmp/aax-runtime-requirements.txt && \
     "${PYTHON}" -m pip check && \
     if [ "${REQUIREMENTS}" = requirements-awx.txt ]; then \

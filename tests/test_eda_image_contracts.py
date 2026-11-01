@@ -31,7 +31,7 @@ def test_awx_telemetry_upgrades_are_atomic_and_runtime_checked() -> None:
             assert version == expected
     dockerfile = (ROOT / "images/runtime-security/Dockerfile").read_text()
     assert "--force-reinstall /tmp/aax-pip-wheels/*.whl" in dockerfile
-    assert 'assert msgpack.__version__ == "1.2.3"' in dockerfile
+    assert 'assert msgpack.__version__ == "1.2.4"' in dockerfile
     assert '"${PYTHON}" /tmp/aax-test-awx-telemetry.py grpc' in dockerfile
     assert '"${PYTHON}" /tmp/aax-test-awx-telemetry.py http' in dockerfile
     dependabot = yaml.safe_load((ROOT / ".github/dependabot.yml").read_text())
@@ -39,14 +39,17 @@ def test_awx_telemetry_upgrades_are_atomic_and_runtime_checked() -> None:
     assert set(pip["groups"]["awx-telemetry"]["patterns"]) == {
         "protobuf", "googleapis-common-protos", "opentelemetry-*",
     }
-    assert {entry["dependency-name"] for entry in pip["ignore"]} == {"django"}
+    assert {entry["dependency-name"] for entry in pip["ignore"]} == {
+        "django", "django-oauth-toolkit",
+    }
+    assert pins["django-oauth-toolkit"] == "2.3.0"
 
 
 def test_openapi_upgrade_preserves_guarded_referencing_adapter() -> None:
     requirements = (ROOT / "images/dab-security/requirements-test.txt").read_text()
-    assert "openapi-spec-validator==0.8.4" in requirements
+    assert "openapi-spec-validator==0.9.0" in requirements
     adapter = (ROOT / "images/dab-security/patch-openapi-referencing.py").read_text()
-    assert "compatible with openapi-spec-validator 0.8.4" in adapter
+    assert "compatible with openapi-spec-validator 0.9.0" in adapter
     dockerfile = (ROOT / "images/dab-security/Dockerfile").read_text()
     assert "test_app/tests/oauth2_provider test_app/tests/api_documentation" in dockerfile
 
@@ -76,7 +79,13 @@ def test_decision_environment_receives_runtime_security_patches() -> None:
 
     assert "ARG PIP_IMAGE=aax/pip-security:devel" in dockerfile
     assert "ARG DROOLS_IMAGE=ansible-rulebook:patched" in dockerfile
-    assert "dnf -y remove tracker-miners webkit2gtk3-jsc" in dockerfile
+    assert "--setopt=clean_requirements_on_remove=False" in dockerfile
+    assert "tracker-miners webkit2gtk3-jsc libX11 libX11-common libXtst" in dockerfile
+    assert "java -version" in dockerfile
+    assert "JAVA_HOME=" + "/usr/lib/jvm/jre-17-openjdk" in dockerfile
+    assert "LD_LIBRARY_PATH=" + "/usr/lib/jvm/jre-17-openjdk/lib/server" in dockerfile
+    assert "from drools.ruleset import _make_jpy_instance; assert _make_jpy_instance()" in dockerfile
+    assert "--user --force-reinstall /tmp/aax-pip-wheels/*.whl" in dockerfile
     assert "python3.12 -m pip install --no-cache-dir --user --upgrade" in dockerfile
     assert "requirements-decision-environment.txt" in dockerfile
     assert "python3.12 -m pip check" in dockerfile
@@ -94,11 +103,17 @@ def test_eda_user_site_receives_fixed_msgpack() -> None:
     dockerfile = (ROOT / "images/runtime-security/EDA.Dockerfile").read_text()
     user_site = dockerfile.split("RUN PYTHONUSERBASE=/app/.local", 1)[1]
     assert "--user --upgrade" in user_site
-    assert "msgpack==1.2.3" in user_site
+    assert "msgpack==1.2.4" in user_site
     assert "certifi==2026.10.23" in user_site
-    assert 'msgpack.__version__ == "1.2.3"' in user_site
+    assert 'msgpack.__version__ == "1.2.4"' in user_site
     assert "msgpack.unpackb(msgpack.packb" in user_site
     assert "PYTHONUSERBASE=/app/.local /usr/bin/python3.12 -m pip check" in user_site
+
+
+@pytest.mark.parametrize("runtime", ["eda", "galaxy", "awx"])
+def test_each_controller_runtime_pins_fixed_pyasn1(runtime: str) -> None:
+    pins = (ROOT / f"images/runtime-security/requirements-{runtime}.txt").read_text()
+    assert "pyasn1==0.6.5" in pins
 
 
 def test_eda_entrypoint_dispatches_both_workers_and_asgi() -> None:
