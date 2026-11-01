@@ -1,5 +1,5 @@
 PyJWT==2.15.1
-Twisted==26.10.0rc1
+Twisted==26.10.0rc2
 GitPython==3.2.1
 brotli==1.2.1
 aiohttp==3.14.5

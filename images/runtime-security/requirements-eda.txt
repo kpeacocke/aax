@@ -1,6 +1,6 @@
 Django==5.2.18
 PyJWT==2.15.1
-Twisted==26.10.0rc1
+Twisted==26.10.0rc2
 ansible-core==2.21.5
 azure-core==1.41.0
 certifi==2026.10.23
