@@ -81,15 +81,26 @@ pip build, even if an inherited image reports the same package version. Version
 equality alone cannot prove that a downstream wheel contains the current
 vendored security fixes.
 
-DAB's OpenAPI validator 0.8.4 uses the guarded, source-anchored `referencing`
+DAB's OpenAPI validator 0.9.0 uses the guarded, source-anchored `referencing`
 constraint adapter. The wheel build runs both upstream OAuth and API
 documentation tests before producing the patched wheel. Both upgrades retain
 the existing publication vulnerability gates.
+
+All controller runtimes pin the fixed `pyasn1` 0.6.5; upgrading only AWX does
+not protect EDA or Hub's separate virtual environments. The decision environment
+is headless: it excludes X11 and XTest GUI libraries while retaining the headless
+JVM and its dependencies. The image build verifies Java remains executable,
+sets the retained JRE library path, and initializes the real Drools JPY engine,
+and publication still requires a real rulebook smoke test and image scan.
 
 EDA retains Django 5.2.18: the pinned controller requires Django below 5.3,
 and its DAB integration does not support Django 6. Removing a resolver bound
 is not a framework migration. Remove the remaining Django major-version
 exclusion only after coordinated EDA/DAB source and runtime tests pass.
+The same rule applies to OAuth Toolkit: the pinned DAB source explicitly
+requires a version below 2.4.0. Retain 2.3.0 until the DAB models, migrations,
+token and scope tests support a coordinated major upgrade. A green tooling-image
+PR check does not test this application dependency relationship.
 
 ### AWX worker protocol diagnostics
 
