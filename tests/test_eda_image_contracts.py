@@ -113,6 +113,9 @@ def test_rulebook_jvm_uses_verified_patched_upstream_runtime() -> None:
     assert "sha256sum --check -" in dockerfile
     assert "Unsupported Java runtime architecture" in dockerfile
     assert "'java-17-openjdk*'" in dockerfile
+    assert "elif command -v microdnf" in dockerfile
+    assert "microdnf -y remove java-17-openjdk-headless && microdnf clean all" in dockerfile
+    assert "No supported package manager to remove the vulnerable Java runtime" in dockerfile
     assert "COPY --from=builder /jre /opt/java/openjdk" in dockerfile
     assert "from drools.ruleset import _make_jpy_instance; assert _make_jpy_instance()" in dockerfile
 

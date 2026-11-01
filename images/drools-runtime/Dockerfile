@@ -27,8 +27,15 @@ USER root
 ENV JAVA_HOME=/opt/java/openjdk \
     LD_LIBRARY_PATH=/opt/java/openjdk/lib/server \
     PATH="/opt/java/openjdk/bin:${PATH}"
-RUN dnf -y --setopt=clean_requirements_on_remove=False remove 'java-17-openjdk*' && \
-    dnf clean all
+RUN if command -v dnf >/dev/null 2>&1; then \
+      dnf -y --setopt=clean_requirements_on_remove=False remove 'java-17-openjdk*' && \
+      dnf clean all; \
+    elif command -v microdnf >/dev/null 2>&1; then \
+      microdnf -y remove java-17-openjdk-headless && microdnf clean all; \
+    else \
+      echo "No supported package manager to remove the vulnerable Java runtime" >&2; \
+      exit 1; \
+    fi
 COPY --from=builder /jre /opt/java/openjdk
 COPY --from=builder /source/drools-ansible-rulebook-integration-runtime/target/drools-ansible-rulebook-integration-runtime-2.0.1-SNAPSHOT-HA.jar /usr/local/lib/python3.12/site-packages/drools/jars/drools-ansible-rulebook-integration-runtime-2.0.1-SNAPSHOT-HA.jar
 # hadolint ignore=DL3066
