@@ -43,6 +43,8 @@ def test_awx_telemetry_upgrades_are_atomic_and_runtime_checked() -> None:
         "django", "django-oauth-toolkit",
     }
     assert pins["django-oauth-toolkit"] == "2.3.0"
+    oauth = next(entry for entry in pip["ignore"] if entry["dependency-name"] == "django-oauth-toolkit")
+    assert oauth["versions"] == [">=2.4.0"]
 
 
 def test_openapi_upgrade_preserves_guarded_referencing_adapter() -> None:
@@ -82,8 +84,10 @@ def test_decision_environment_receives_runtime_security_patches() -> None:
     assert "--setopt=clean_requirements_on_remove=False" in dockerfile
     assert "tracker-miners webkit2gtk3-jsc libX11 libX11-common libXtst" in dockerfile
     assert "java -version" in dockerfile
-    assert "JAVA_HOME=" + "/usr/lib/jvm/jre-17-openjdk" in dockerfile
-    assert "LD_LIBRARY_PATH=" + "/usr/lib/jvm/jre-17-openjdk/lib/server" in dockerfile
+    assert "JAVA_HOME=" + "/opt/java/openjdk" in dockerfile
+    assert "LD_LIBRARY_PATH=" + "/opt/java/openjdk/lib/server" in dockerfile
+    assert "'java-17-openjdk*'" in dockerfile
+    assert "COPY --from=drools /opt/java/openjdk /opt/java/openjdk" in dockerfile
     assert "from drools.ruleset import _make_jpy_instance; assert _make_jpy_instance()" in dockerfile
     assert "--user --force-reinstall /tmp/aax-pip-wheels/*.whl" in dockerfile
     assert "python3.12 -m pip install --no-cache-dir --user --upgrade" in dockerfile
@@ -97,6 +101,20 @@ def test_decision_environment_receives_runtime_security_patches() -> None:
     assert 'docker tag "$name:patched" "$name:devel"' in patch_script
     assert "--rulebook /dev/stdin --shutdown-delay 1 < tests/fixtures/eda-smoke.yml" in workflow
     assert "grep -Fq AAX_DECISION_SECURITY_SMOKE_PASSED bundle-reports/eda-rulebook-smoke.log" in workflow
+
+
+def test_rulebook_jvm_uses_verified_patched_upstream_runtime() -> None:
+    dockerfile = (ROOT / "images/drools-runtime/Dockerfile").read_text()
+    assert "temurin17-binaries/releases/download/jdk-17.0.21%2B9/" in dockerfile
+    checksums = re.findall(r"checksum=([0-9a-f]{64})", dockerfile)
+    assert len(checksums) == len(set(checksums)) == 2
+    assert "amd64) arch=x64;" in dockerfile
+    assert "arm64) arch=aarch64;" in dockerfile
+    assert "sha256sum --check -" in dockerfile
+    assert "Unsupported Java runtime architecture" in dockerfile
+    assert "'java-17-openjdk*'" in dockerfile
+    assert "COPY --from=builder /jre /opt/java/openjdk" in dockerfile
+    assert "from drools.ruleset import _make_jpy_instance; assert _make_jpy_instance()" in dockerfile
 
 
 def test_eda_user_site_receives_fixed_msgpack() -> None:

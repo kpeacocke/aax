@@ -90,8 +90,8 @@ updates:
     ignore:
       # Pinned DAB explicitly requires django-oauth-toolkit<2.4.0.
       - dependency-name: "django-oauth-toolkit"
-        update-types:
-          - "version-update:semver-major"
+        versions:
+          - ">=2.4.0"
       # Pinned EDA requires Django<5.3; its DAB dependency also requires <6.
       - dependency-name: "django"
         update-types:
