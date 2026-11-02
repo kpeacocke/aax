@@ -82,7 +82,7 @@ def test_decision_environment_receives_runtime_security_patches() -> None:
     assert "ARG PIP_IMAGE=aax/pip-security:devel" in dockerfile
     assert "ARG DROOLS_IMAGE=ansible-rulebook:patched" in dockerfile
     assert "--setopt=clean_requirements_on_remove=False" in dockerfile
-    assert "tracker-miners webkit2gtk3-jsc libX11 libX11-common libXtst" in dockerfile
+    assert "tracker-miners webkit2gtk3-jsc 'libX11*' 'libXtst*'" in dockerfile
     assert "java -version" in dockerfile
     assert "JAVA_HOME=" + "/opt/java/openjdk" in dockerfile
     assert "LD_LIBRARY_PATH=" + "/opt/java/openjdk/lib/server" in dockerfile
@@ -129,6 +129,27 @@ def test_eda_user_site_receives_fixed_msgpack() -> None:
     assert 'msgpack.__version__ == "1.2.4"' in user_site
     assert "msgpack.unpackb(msgpack.packb" in user_site
     assert "PYTHONUSERBASE=/app/.local /usr/bin/python3.12 -m pip check" in user_site
+
+
+def test_eda_controller_receives_the_scanned_patched_jre() -> None:
+    dockerfile = (ROOT / "images/runtime-security/EDA.Dockerfile").read_text()
+    workflow = yaml.safe_load((ROOT / ".github/workflows/publish-devel.yml").read_text())
+    assert "ARG DROOLS_IMAGE=ansible-rulebook:patched" in dockerfile
+    assert "FROM ${DROOLS_IMAGE} AS drools" in dockerfile
+    assert "dnf -y --setopt=clean_requirements_on_remove=False remove 'java-17-openjdk*'" in dockerfile
+    assert "COPY --from=drools /opt/java/openjdk /opt/java/openjdk" in dockerfile
+    assert "JAVA_HOME=/opt/java/openjdk" in dockerfile
+    assert "LD_LIBRARY_PATH=" + "/opt/java/openjdk/lib/server" in dockerfile
+    assert 'PATH="/opt/java/openjdk/bin:${PATH}"' in dockerfile
+    assert dockerfile.index("USER 1001") < dockerfile.index("RUN java -version")
+    for job in ("gate-foundations", "gate-images"):
+        steps = workflow["jobs"][job]["steps"]
+        download = next(step for step in steps if step["name"] == "Download exact scanned rulebook dependency")
+        assert download["if"] == "matrix.image == 'eda-decision-environment' || matrix.image == 'eda-controller'"
+        restore = next(step for step in steps if step["name"] == "Restore shared artifacts and this image only")
+        assert 'elif [[ "$BUNDLE_IMAGE" == eda-decision-environment || "$BUNDLE_IMAGE" == eda-controller ]]' in restore["run"]
+        assert "pull ansible-rulebook gated" in restore["run"]
+        assert "docker tag ansible-rulebook:devel ansible-rulebook:patched" in restore["run"]
 
 
 @pytest.mark.parametrize("runtime", ["eda", "galaxy", "awx"])
