@@ -130,6 +130,18 @@ Retain only the evidence needed for diagnosis and delete reviewed files by
 explicit path; these files do not have automatic age-based retention. A clean
 protocol does not mean the underlying worker exception has been repaired.
 
+The retained traceback for project update 1575 identified a `FileExistsError`
+in `Runner.run`: another creator could make `job_events` between its existence
+check and `os.mkdir`. The final AWX virtualenv and execution environment receive
+a guarded source patch using
+`os.makedirs(..., mode=0o700, exist_ok=True)`, after all upstream installations.
+Every patched interpreter runs a deterministic regression against its actual
+`Runner.run`, including concurrent creation, private directory permissions,
+preserved existing events, file collisions and permission failures. Only an
+existing directory is accepted; genuine filesystem errors still fail the job.
+AWX system Python does not contain `ansible-runner`; it is not an additional
+runner consumer.
+
 ## Operator Checklist
 
 - Set all required secrets before startup.
