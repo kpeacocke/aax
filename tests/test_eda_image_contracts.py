@@ -169,7 +169,23 @@ def test_eda_entrypoint_dispatches_both_workers_and_asgi() -> None:
 
     assert "dispatcherd --worker-class DefaultWorker" in entrypoint
     assert "dispatcherd --worker-class ActivationWorker" in entrypoint
-    assert "daphne -b 0.0.0.0 -p 8000 aap_eda.asgi:application" in entrypoint
+    assert "daphne -b 0.0.0.0 -p 8000 --websocket_connect_timeout 60 aap_eda.asgi:application" in entrypoint
+
+
+def test_eda_websocket_launcher_bounds_the_handshake_timeout(tmp_path: Path) -> None:
+    entrypoint = (ROOT / "images/eda-server/entrypoint.sh").read_text()
+    daphne = tmp_path / "daphne"
+    daphne.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+    daphne.chmod(0o700)
+    script = tmp_path / "entrypoint.sh"
+    script.write_text(entrypoint.replace("/app/venv/bin/daphne", str(daphne)))
+    result = subprocess.run(
+        ["bash", str(script), "ws"], check=True, capture_output=True, text=True, timeout=10,
+    )
+    assert result.stdout.splitlines() == [
+        "-b", "0.0.0.0", "-p", "8000", "--websocket_connect_timeout", "60",
+        "aap_eda.asgi:application",
+    ]
 
 
 def test_fresh_eda_volumes_are_writable_without_runtime_privileges() -> None:

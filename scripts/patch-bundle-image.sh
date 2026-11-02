@@ -89,3 +89,13 @@ case "$name" in
   receptor|eda-podman) exit 0 ;;
 esac
 docker tag "$name:patched" "$name:devel"
+for entry in \
+  'awx /var/lib/awx/venv/awx/bin/python' \
+  'awx-ee /usr/bin/python3.12'; do
+  read -r service python <<< "$entry"
+  [[ "$service" == "$name" ]] || continue
+  docker build -f images/runtime-security/Runner.Dockerfile \
+    --build-arg BASE_IMAGE="$name:devel" --build-arg PYTHON="$python" \
+    -t "$name:runner-patched" images/runtime-security
+  docker tag "$name:runner-patched" "$name:devel"
+done

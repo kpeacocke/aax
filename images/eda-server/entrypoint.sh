@@ -14,7 +14,7 @@ case "${1:-api}" in
     exec aap-eda-manage dispatcherd --worker-class ActivationWorker
     ;;
   ws)
-    exec /app/venv/bin/daphne -b 0.0.0.0 -p 8000 aap_eda.asgi:application
+    exec /app/venv/bin/daphne -b 0.0.0.0 -p 8000 --websocket_connect_timeout 60 aap_eda.asgi:application
     ;;
   *) exec "$@" ;;
 esac
