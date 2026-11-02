@@ -8,7 +8,7 @@ RUN git init /ansible-ui && \
   git -C /ansible-ui fetch --depth 1 origin ${UI_DEVEL_REVISION} && \
   git -C /ansible-ui checkout --detach FETCH_HEAD
 
-FROM python:3.12-slim AS builder
+FROM python:3.13-slim AS builder
 
 COPY --from=node-builder /usr/local/ /usr/local/
 
@@ -89,7 +89,7 @@ RUN if [ "$AWX_VERSION" = "24.6.1" ]; then \
   fi
 
 # Final stage
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 # Build arguments
 ARG AWX_VERSION=devel
