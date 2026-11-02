@@ -1,11 +1,20 @@
 ARG BASE_IMAGE=eda-controller:python-patched
 ARG DAB_IMAGE=aax/dab-security:eda
+ARG DROOLS_IMAGE=ansible-rulebook:patched
 # hadolint ignore=DL3006
 FROM ${DAB_IMAGE} AS dab
+# hadolint ignore=DL3006
+FROM ${DROOLS_IMAGE} AS drools
 # hadolint ignore=DL3006
 FROM ${BASE_IMAGE}
 # hadolint ignore=DL3066
 USER root
+ENV JAVA_HOME=/opt/java/openjdk \
+    LD_LIBRARY_PATH=/opt/java/openjdk/lib/server \
+    PATH="/opt/java/openjdk/bin:${PATH}"
+RUN dnf -y --setopt=clean_requirements_on_remove=False remove 'java-17-openjdk*' && \
+    dnf clean all
+COPY --from=drools /opt/java/openjdk /opt/java/openjdk
 COPY eda-source.patch /tmp/eda-source.patch
 COPY test_eda_crypto.py /tmp/test_eda_crypto.py
 COPY pin_eda_dab.py /tmp/pin_eda_dab.py
@@ -29,3 +38,4 @@ RUN PYTHONUSERBASE=/app/.local /usr/bin/python3.12 -m pip install \
       'import msgpack; assert msgpack.__version__ == "1.2.4"; assert msgpack.unpackb(msgpack.packb({"eda": True})) == {"eda": True}'
 # hadolint ignore=DL3066
 USER 1001
+RUN java -version

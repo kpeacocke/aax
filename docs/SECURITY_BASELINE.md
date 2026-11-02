@@ -88,16 +88,18 @@ the existing publication vulnerability gates.
 
 All controller runtimes pin the fixed `pyasn1` 0.6.5; upgrading only AWX does
 not protect EDA or Hub's separate virtual environments. The decision environment
-is headless: it excludes X11 and XTest GUI libraries while retaining the headless
-JVM and its dependencies. Both rulebook runtimes replace the vulnerable CentOS
+is headless: it excludes the complete `libX11*` (including `libX11-xcb`) and
+`libXtst*` GUI package families while retaining the headless JVM and its
+dependencies. The rulebook, decision environment and EDA controller replace the vulnerable CentOS
 OpenJDK 17 package with official Temurin 17.0.21+9 JRE archives, verified against
 the upstream release's architecture-specific SHA256 hashes. CentOS Stream did
 not yet offer the fixed package for CVE-2026-91415 when this change was made.
-The patched JRE is shared from the rulebook image into the decision image.
+The patched JRE is shared from the exact scanned rulebook image into both the
+decision image and EDA controller, including its dispatcher and WebSocket services.
 The minimal rulebook base removes its old JVM with `microdnf`; the decision
-base uses `dnf`. Missing package managers fail the build explicitly.
+and EDA controller bases use `dnf`. Missing package managers fail the build explicitly.
 The image build verifies Java remains executable, sets its explicit library
-path, and initializes the real Drools JPY engine as the unprivileged runtime user,
+path, and initializes the real Drools JPY engine in both rulebook runtimes as the unprivileged runtime user,
 and publication still requires a real rulebook smoke test and image scan.
 
 EDA retains Django 5.2.18: the pinned controller requires Django below 5.3,

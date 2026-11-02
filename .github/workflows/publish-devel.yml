@@ -235,7 +235,7 @@ jobs:
         with:
           name: bundle-gate-receptor-${{ github.run_attempt }}
       - name: Download exact scanned rulebook dependency
-        if: matrix.image == 'eda-decision-environment'
+        if: matrix.image == 'eda-decision-environment' || matrix.image == 'eda-controller'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: bundle-gate-ansible-rulebook-${{ github.run_attempt }}
@@ -244,6 +244,8 @@ jobs:
           BUNDLE_IMAGE: ${{ matrix.image }}
         run: |
           set -euo pipefail
+          rm -f bundle-sarif/trivy-ansible-rulebook.sarif bundle-sarif/grype-ansible-rulebook.sarif \
+            bundle-sarif/trivy-receptor.sarif bundle-sarif/grype-receptor.sarif
           tar -xzf upstream-sources.tar.gz
           tar -xzf native-rpms.tar.gz -C bundle-reports
           bash scripts/bundle-candidate.sh pull "$BUNDLE_IMAGE" raw
@@ -251,7 +253,7 @@ jobs:
           docker tag pip-security:devel aax/pip-security:devel
           if [[ "$BUNDLE_IMAGE" == awx-ee ]]; then
             bash scripts/bundle-candidate.sh pull receptor gated
-          elif [[ "$BUNDLE_IMAGE" == eda-decision-environment ]]; then
+          elif [[ "$BUNDLE_IMAGE" == eda-decision-environment || "$BUNDLE_IMAGE" == eda-controller ]]; then
             bash scripts/bundle-candidate.sh pull ansible-rulebook gated
             docker tag ansible-rulebook:devel ansible-rulebook:patched
           fi
@@ -319,7 +321,7 @@ jobs:
               "$source" > "bundle-sarif/$scanner-$name.sarif"
           done
       - name: Upload bundle security findings
-        if: always() && hashFiles('bundle-sarif/*.sarif') != ''
+        if: always() && hashFiles(format('bundle-sarif/*-{0}.sarif', matrix.image)) != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: bundle-sarif

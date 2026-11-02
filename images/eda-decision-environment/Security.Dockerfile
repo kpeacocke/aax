@@ -13,7 +13,7 @@ ENV JAVA_HOME=/opt/java/openjdk \
     LD_LIBRARY_PATH=/opt/java/openjdk/lib/server \
     PATH="/opt/java/openjdk/bin:${PATH}"
 RUN dnf -y --setopt=clean_requirements_on_remove=False remove \
-      tracker-miners webkit2gtk3-jsc libX11 libX11-common libXtst 'java-17-openjdk*' && \
+      tracker-miners webkit2gtk3-jsc 'libX11*' 'libXtst*' 'java-17-openjdk*' && \
     dnf clean all && \
     rm /app/.local/lib/python3.12/site-packages/drools/jars/*.jar
 COPY --from=drools /opt/java/openjdk /opt/java/openjdk
