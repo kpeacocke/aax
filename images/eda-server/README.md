@@ -29,6 +29,13 @@ configured public WebSocket base URL is
 Daphne and the corresponding token-refresh URL to the controller. Both
 `EDA_WEBSOCKET_SSL_VERIFY` and `EDA_CONTROLLER_SSL_VERIFY` remain enabled.
 
+Daphne allows a bounded 60 seconds for the WebSocket handshake. Its five-second
+default can reset a valid activation's connection while authentication and
+database callbacks are still processing on a busy legacy host, returning HTTP
+502 through the gateway. This is separate from the rulebook readiness window:
+increasing readiness alone does not extend the handshake. Authentication, TLS
+verification and finite connection timeouts remain required.
+
 Set `EDA_CONTROLLER_URL` to an HTTPS AWX URL resolvable from activation
 containers, and keep `EDA_CONTROLLER_SSL_VERIFY=true`. Nested Podman containers
 inherit the configured `EDA_PODMAN_DNS` resolver so they can resolve GitHub,
