@@ -150,6 +150,12 @@ def test_eda_controller_receives_the_scanned_patched_jre() -> None:
         assert 'elif [[ "$BUNDLE_IMAGE" == eda-decision-environment || "$BUNDLE_IMAGE" == eda-controller ]]' in restore["run"]
         assert "pull ansible-rulebook gated" in restore["run"]
         assert "docker tag ansible-rulebook:devel ansible-rulebook:patched" in restore["run"]
+        for dependency in ("ansible-rulebook", "receptor"):
+            for scanner in ("trivy", "grype"):
+                assert f"bundle-sarif/{scanner}-{dependency}.sarif" in restore["run"]
+        assert restore["run"].index("rm -f bundle-sarif/") < restore["run"].index("tar -xzf")
+        upload = next(step for step in steps if step["name"] == "Upload bundle security findings")
+        assert "hashFiles(format('bundle-sarif/*-{0}.sarif', matrix.image))" in upload["if"]
 
 
 @pytest.mark.parametrize("runtime", ["eda", "galaxy", "awx"])

@@ -244,6 +244,8 @@ jobs:
           BUNDLE_IMAGE: ${{ matrix.image }}
         run: |
           set -euo pipefail
+          rm -f bundle-sarif/trivy-ansible-rulebook.sarif bundle-sarif/grype-ansible-rulebook.sarif \
+            bundle-sarif/trivy-receptor.sarif bundle-sarif/grype-receptor.sarif
           tar -xzf upstream-sources.tar.gz
           tar -xzf native-rpms.tar.gz -C bundle-reports
           bash scripts/bundle-candidate.sh pull "$BUNDLE_IMAGE" raw
@@ -319,7 +321,7 @@ jobs:
               "$source" > "bundle-sarif/$scanner-$name.sarif"
           done
       - name: Upload bundle security findings
-        if: always() && hashFiles('bundle-sarif/*.sarif') != ''
+        if: always() && hashFiles(format('bundle-sarif/*-{0}.sarif', matrix.image)) != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: bundle-sarif
