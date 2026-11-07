@@ -26,12 +26,18 @@ USER root
 COPY --from=builder /wheels /tmp/aax-wheels
 COPY --from=dab /wheels /tmp/aax-wheels
 COPY galaxy.patch galaxy-pyproject.patch patch-galaxy.sh /tmp/
+COPY test_telemetry.py /tmp/aax-test-hub-telemetry.py
 RUN bash /tmp/patch-galaxy.sh /app /tmp && \
     /venv/bin/python -m pip wheel --no-deps --wheel-dir /tmp/aax-wheels /app && \
     /venv/bin/python -m pip install --no-cache-dir --upgrade /tmp/aax-wheels/*.whl \
       aiohttp==3.14.5 social-auth-core==6.2.0 social-auth-app-django==7.2.0 \
-      djangorestframework==3.18.2 multidict==6.9.1 oauthlib==4.0.0 tablib==3.10.0 \
+      djangorestframework==3.18.2 multidict==6.9.1 oauthlib==4.0.1 tablib==3.10.0 \
+      opentelemetry-api==1.45.2 opentelemetry-sdk==1.45.2 opentelemetry-proto==1.45.2 \
+      opentelemetry-exporter-otlp-proto-common==1.45.2 \
+      opentelemetry-exporter-otlp-proto-http==1.45.2 opentelemetry-semantic-conventions==0.66b2 \
       black==26.10.1 filelock==4.2.1 && \
-    /venv/bin/python -m pip check && rm /tmp/aax-wheels/*.whl
+    /venv/bin/python -m pip check && \
+    /venv/bin/python /tmp/aax-test-hub-telemetry.py && \
+    rm /tmp/aax-wheels/*.whl /tmp/aax-test-hub-telemetry.py
 # hadolint ignore=DL3066
 USER galaxy

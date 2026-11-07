@@ -25,7 +25,7 @@ RUN git -C /app/src apply /tmp/eda-source.patch && \
     /app/venv/bin/python -m pip install --no-cache-dir --upgrade /tmp/aax-eda-wheel/*.whl \
       cryptography==50.0.2 msal==1.39.0 pyOpenSSL==26.4.0 \
       PyNaCl==1.6.2 Pygments==2.20.0 autobahn==26.10.2 black==26.10.1 \
-      djangorestframework==3.18.2 ecdsa==0.19.2 idna==3.18 oauthlib==4.0.0 \
+      djangorestframework==3.18.2 ecdsa==0.19.2 idna==3.18 oauthlib==4.0.1 \
       httpie==3.2.4 pytest==9.0.3 requests==2.34.2 setuptools==84.2.1 && \
     /app/venv/bin/python -m pip check && \
     /app/venv/bin/python -c 'import daphne.server' && \
