@@ -1325,6 +1325,16 @@ def test_native_go_jose_pin_covers_embedded_jwk_parser_fix() -> None:
     assert "bash %{SOURCE9999} %{SOURCE9998} %{SOURCE9997}" in prepare
 
 
+def test_receptor_and_native_go_security_pins_match() -> None:
+    pins = json.loads((ROOT / "images/rpm-security/go-dependencies.json").read_text())
+    dockerfile = (ROOT / "images/receptor-runtime/Dockerfile").read_text()
+    for module in (
+        "github.com/klauspost/compress", "golang.org/x/crypto",
+        "golang.org/x/net", "golang.org/x/text",
+    ):
+        assert f"{module}@{pins[module]}" in dockerfile
+
+
 @pytest.mark.parametrize(
     ("current", "list_failure", "success"),
     [("v0.59.0", False, True), ("v0.61.0", False, False),

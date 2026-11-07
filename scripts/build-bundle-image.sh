@@ -44,7 +44,6 @@ case "$name" in
   eda-controller) docker buildx build --load -t eda-controller:devel images/eda-server ;;
   eda-podman)
     docker buildx build --load \
-      --build-arg BASE_IMAGE=quay.io/centos/centos@sha256:6f8045fc4f552544d8a401d61848bafc8d06ca7c11897c5b54a2c37fc419a20a \
       -t eda-podman:devel images/eda-podman
     ;;
   eda-decision-environment)

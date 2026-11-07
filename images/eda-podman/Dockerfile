@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=quay.io/centos/centos@sha256:6f8045fc4f552544d8a401d61848bafc8d06ca7c11897c5b54a2c37fc419a20a
+ARG BASE_IMAGE=quay.io/centos/centos@sha256:99a7748660352b7d87e5689805ddafa6209d6019d0c5b642b5354656dff02be3
 # hadolint ignore=DL3006
 FROM ${BASE_IMAGE}
 

@@ -86,6 +86,13 @@ constraint adapter. The wheel build runs both upstream OAuth and API
 documentation tests before producing the patched wheel. Both upgrades retain
 the existing publication vulnerability gates.
 
+AWX, EDA and Hub pin oauthlib 4.0.1 for CVE-2026-49272. Device-flow
+integrations must implement the updated oauthlib validator contract; a successful
+dependency installation alone does not verify custom device-flow integrations.
+Hub's OpenTelemetry API, SDK, protocol and HTTP exporter are upgraded together
+with their matching semantic conventions and a source-patched pulpcore
+dependency range to avoid incompatible runtime pins.
+
 All controller runtimes pin the fixed `pyasn1` 0.6.5; upgrading only AWX does
 not protect EDA or Hub's separate virtual environments. The decision environment
 is headless: it excludes the complete `libX11*` (including `libX11-xcb`) and
