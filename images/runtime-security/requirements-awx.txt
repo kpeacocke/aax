@@ -34,5 +34,5 @@ autobahn==26.10.2
 filelock==4.2.4
 idna==3.20
 multidict==7.2.1
-oauthlib==4.0.0
+oauthlib==4.0.1
 requests==2.34.2
