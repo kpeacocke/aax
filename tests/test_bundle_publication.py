@@ -84,6 +84,35 @@ def test_image_fix_inventory_distinguishes_missing_metadata_and_rejects_bad_expo
         summarize([alert])
 
 
+def test_image_fix_inventory_workflow_renders_patch_queue(tmp_path: Path) -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/dependencies.yml").read_text())
+    step = next(
+        step for step in workflow["jobs"]["image-fix-inventory"]["steps"]
+        if step["name"] == "Summarize patch queue"
+    )
+    report = {
+        "alert_count": 3, "advisory_package_count": 2,
+        "status_counts": {
+            "scanner_reported_fix": 1, "no_fix_reported": 1, "fix_metadata_missing": 0,
+        },
+        "findings": [
+            {"advisory": "CVE-2026-1234", "package": "expat", "severity": "high",
+             "status": "scanner_reported_fix", "reported_fixed_versions": ["2.7"], "alert_count": 2},
+            {"advisory": "CVE-2026-5678", "package": "other", "severity": "low",
+             "status": "no_fix_reported", "reported_fixed_versions": [], "alert_count": 1},
+        ],
+    }
+    (tmp_path / "image-fix-inventory.json").write_text(json.dumps(report))
+    summary = tmp_path / "summary.md"
+    subprocess.run(
+        ["bash", "-c", step["run"]], cwd=tmp_path,
+        env={**os.environ, "GITHUB_STEP_SUMMARY": str(summary)}, check=True,
+    )
+    text = summary.read_text()
+    assert "3 alerts grouped into 2 advisory/package pairs." in text
+    assert "| CVE-2026-1234 | expat | high | 2.7 | 2 |" in text
+    assert "CVE-2026-5678" not in text
+
 AWX_PRODUCTION_CHECK = '''def assert_production_settings(settings: Dynaconf, settings_dir: str, settings_file_path: str):  # pragma: no cover
     """Ensure at least one setting file has been loaded in production mode.
     Current systems will require /etc/tower/settings.py and

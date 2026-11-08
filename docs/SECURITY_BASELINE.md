@@ -116,6 +116,10 @@ dependency installation alone does not verify custom device-flow integrations.
 Hub's OpenTelemetry API, SDK, protocol and HTTP exporter are upgraded together
 with their matching semantic conventions and a source-patched pulpcore
 dependency range to avoid incompatible runtime pins.
+The decision environment also rebuilds signed vendor sources for Pixman,
+ICU and kbd, covering CVE-2022-44638, CVE-2025-5222 and CVE-2026-72693.
+These fixes are required even when CentOS Stream's available package releases
+do not contain the distribution security backports.
 
 All controller runtimes pin the fixed `pyasn1` 0.6.5; upgrading only AWX does
 not protect EDA or Hub's separate virtual environments. The decision environment

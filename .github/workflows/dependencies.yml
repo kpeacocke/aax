@@ -47,8 +47,8 @@ jobs:
           set -euo pipefail
           {
             echo '## Image vulnerability fix inventory'
-            jq -r '"\(.alert_count) alerts grouped into \(.advisory_package_count) advisory/package pairs."',
-              '"\(.status_counts.scanner_reported_fix) pairs have scanner-reported fixes; \(.status_counts.no_fix_reported) have no reported fix; \(.status_counts.fix_metadata_missing) need missing metadata investigated."' \
+            jq -r '"\(.alert_count) alerts grouped into \(.advisory_package_count) advisory/package pairs.",
+              "\(.status_counts.scanner_reported_fix) pairs have scanner-reported fixes; \(.status_counts.no_fix_reported) have no reported fix; \(.status_counts.fix_metadata_missing) need missing metadata investigated."' \
               image-fix-inventory.json
             echo 'No findings are dismissed. Reported fixes require availability checks and fresh exact-image scans.'
             echo '| Advisory | Package | Severity | Reported fixed versions | Alerts |'
