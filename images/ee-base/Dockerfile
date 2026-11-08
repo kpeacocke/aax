@@ -15,6 +15,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY python-security /patches
 RUN sh /patches/build.sh
 
+FROM runtime-base AS openssh-security-builder
+# hadolint ignore=DL3008
+RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    openssh-client dpkg-dev devscripts quilt patchutils python3-paramiko && apt-get build-dep -y openssh
+COPY openssh-security/client-lifetime.patch openssh-security/build.sh /patches/
+WORKDIR /source
+RUN sh /patches/build.sh
+COPY openssh-security/test_rekey.py openssh-security/verify.sh /patches/
+RUN sh /patches/verify.sh
+
 FROM runtime-base
 
 # Build arguments for metadata
@@ -38,10 +49,12 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY --from=pip-builder /wheels /tmp/aax-pip-wheels
 COPY --from=runtime-security-builder /output/ /
 COPY python-security/test_runtime.py /tmp/aax-python-security-test.py
+COPY --from=openssh-security-builder /output/packages/ /tmp/aax-openssh-packages/
+COPY --from=openssh-security-builder /output/provenance/ /usr/local/share/aax/openssh-security/
 RUN python /tmp/aax-python-security-test.py && rm /tmp/aax-python-security-test.py
 
 # Install system packages, create user, install Python packages
-# hadolint ignore=DL3008
+# hadolint ignore=DL3008,DL3001
 RUN mkdir -p /etc/ansible && \
   useradd -m -u 1000 -s /bin/bash ansible && \
   apt-get update && \
@@ -56,6 +69,11 @@ RUN mkdir -p /etc/ansible && \
   sshpass \
   rsync \
   jq && \
+  apt-get install -y --no-install-recommends /tmp/aax-openssh-packages/*.deb && \
+  test "$(dpkg-query -W -f='${Version}' openssh-client)" = \
+    "$(cat /usr/local/share/aax/openssh-security/vendor-version)+aax.1" && \
+  ssh -V && \
+  rm /tmp/aax-openssh-packages/*.deb && \
   rm -rf /var/lib/apt/lists/* && \
   pip install --no-cache-dir /tmp/aax-pip-wheels/*.whl && \
   pip install --no-cache-dir -r /tmp/requirements.txt && \

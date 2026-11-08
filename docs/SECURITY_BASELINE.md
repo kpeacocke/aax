@@ -116,6 +116,9 @@ dependency installation alone does not verify custom device-flow integrations.
 Hub's OpenTelemetry API, SDK, protocol and HTTP exporter are upgraded together
 with their matching semantic conventions and a source-patched pulpcore
 dependency range to avoid incompatible runtime pins.
+The current Galaxy pyproject requires pulpcore 3.105.24 or newer; the maintained
+source wheel uses 3.105.24 and preserves Galaxy's upstream patched REST framework
+range. Packaging patches still fail explicitly if their source anchors drift.
 The decision environment also rebuilds signed vendor sources for Pixman,
 ICU and kbd, covering CVE-2022-44638, CVE-2025-5222 and CVE-2026-72693.
 These fixes are required even when CentOS Stream's available package releases
@@ -131,9 +134,17 @@ The final slim image executes regressions for malformed and valid inputs.
 Neither the Python version nor scanner metadata is rewritten: scanners may
 continue to report these version-based findings after the backport. Review the
 retained patch evidence and executed runtime regressions, not just the count.
-OpenSSH CVE-2026-60002 still requires a verified source backport or a fixed
-stable distribution package; it is not unfixable merely because Debian's
-stable package has no published fix.
+The execution environment source-backports OpenSSH CVE-2026-60002 onto the
+installed Debian client source, acquired through signed archive metadata.
+It retains Debian's build recipe, hardening and vendor checks, and installs only
+the rebuilt client with an exactly verified downstream package version.
+Loopback IPv4 and IPv6 regressions require unchanged-key reexchange to succeed
+and an untrusted changed host key to be rejected cleanly. The build first
+reproduces the unpatched heap use-after-free with AddressSanitizer, then requires
+all four flows to pass with the patched instrumented client. Sanitizer binaries
+and the test server remain build-only; source and test evidence are retained.
+Native execution is required for these checks: emulated AMD64 configure signal
+tests can stall on an ARM64 Docker host. Published AMD64 builds run natively.
 
 All controller runtimes pin the fixed `pyasn1` 0.6.5; upgrading only AWX does
 not protect EDA or Hub's separate virtual environments. The decision environment

@@ -404,6 +404,30 @@ def test_galaxy_metadata_requires_current_maintained_dab(patch_name: str) -> Non
     assert re.search(r'^\+.*version.*\+aax\.3', patch, re.MULTILINE)
 
 
+def test_hub_patch_preserves_current_upstream_security_constraints(tmp_path: Path) -> None:
+    project = tmp_path / "pyproject.toml"
+    project.write_text(
+        '[project]\nname = "galaxy-ng"\nversion = "4.13.0dev"\n'
+        'description = "galaxy-ng plugin for the Pulp Project"\n'
+        'dependencies = [\n  "django-flags>=5.0.13",\n'
+        '  "django-ansible-base[jwt-consumer,feature-flags] @ '
+        'git+https://github.com/ansible/django-ansible-base@'
+        '62a1a424db58ea859321d4ae49de2dc9d681ec63",\n'
+        '  "django-crum==0.7.9",\n  "pulpcore>=3.105.24,<3.106",\n'
+        '  "djangorestframework>=3.18.2,<3.19",\n]\n'
+    )
+    result = subprocess.run(
+        ["bash", str(ROOT / "images/hub-security/patch-galaxy.sh"),
+         str(tmp_path), str(ROOT / "images/hub-security")],
+        capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+    metadata = project.read_text()
+    assert '"pulpcore>=3.105.24,<3.106"' in metadata
+    assert '"djangorestframework>=3.18.2,<3.19"' in metadata
+    assert 'django-ansible-base[jwt-consumer,feature-flags]==2026.10.9.0.dev104+aax.3' in metadata
+
+
 @pytest.mark.parametrize("version", ["2026.9.17.0.dev74+aax.1", "2026.10.9.0.dev104+aax.1"])
 def test_eda_requires_exact_verified_dab_wheel(tmp_path: Path, version: str) -> None:
     pin = runpy.run_path(str(ROOT / "images/runtime-security/pin_eda_dab.py"))["pin"]

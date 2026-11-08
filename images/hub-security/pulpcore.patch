@@ -4,10 +4,10 @@ diff --git a/pyproject.toml b/pyproject.toml
 @@ -8,3 +8,3 @@
  [project]
  name = "pulpcore"
--version = "3.105.23"
-+version = "3.105.23+aax.3"
+-version = "3.105.24"
++version = "3.105.24+aax.3"
 @@ -40,1 +40,1 @@
--  "djangorestframework>=3.14.0,<3.18",  # API-stable z-Streams. https://www.django-rest-framework.org/community/release-notes/
+-  "djangorestframework>=3.14.0,<3.19",  # API-stable z-Streams. https://www.django-rest-framework.org/community/release-notes/
 +  "djangorestframework>=3.18.2,<3.19",  # Downstream security compatibility range.
 @@ -52,3 +52,3 @@
 -  "opentelemetry-api>=1.27.0,<1.41",
