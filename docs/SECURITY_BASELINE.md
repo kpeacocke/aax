@@ -53,6 +53,30 @@ upstream application images or OS packages. Image publication gates remain
 independent. The full `dependency-audit` artifact is retained on failure as well
 as success.
 
+## Deduplicated image fix inventory
+
+Export all open GitHub image alerts and group advisory/package pairs locally:
+
+```bash
+gh api --paginate '/repos/kpeacocke/aax/code-scanning/alerts?state=open&per_page=100' \
+  --jq '.[] | {number,rule_id:.rule.id,severity:.rule.security_severity_level,tool:.tool.name,help:.rule.help,message:.most_recent_instance.message.text,category:.most_recent_instance.category,ref:.most_recent_instance.ref,path:.most_recent_instance.location.path,commit:.most_recent_instance.commit_sha,url:.html_url}' \
+  > image-alerts.jsonl &&
+python scripts/report-image-fixes.py image-alerts.jsonl image-fix-inventory.json
+```
+
+Use `scanner_reported_fix` findings as the initial patch queue. The inventory
+retains every affected image/architecture, scanner, version, path, commit and
+alert link; it never dismisses GitHub alerts. `no_fix_reported` is not proof that
+no source patch exists, and `fix_metadata_missing` requires investigation.
+Fixed versions from historical alerts must be checked against current vendor
+artifacts and fresh exact-image scans. Advisory aliases are not merged without
+verified evidence. Refresh all Trivy and Grype reports before calling remediation
+complete; a language-only SBOM scan does not establish OS coverage.
+The weekly/manual Dependency Management workflow publishes the same
+`image-fix-inventory` artifact and a patch-queue table in its run summary,
+independently of the Python requirements audit. Failed exports or malformed
+reports fail that job rather than publishing a partial inventory.
+
 ## Upstream Blockers
 
 A clean package resolver does not establish a clean image. In particular, pip

@@ -33,6 +33,57 @@ IMAGES = [
 ]
 
 
+def test_image_fix_inventory_groups_scanners_and_keeps_affected_images() -> None:
+    summarize = runpy.run_path(str(ROOT / "scripts/report-image-fixes.py"))["summarize"]
+    common = {
+        "severity": "high", "ref": "refs/heads/main", "commit": "abc",
+        "url": "https://github.com/kpeacocke/aax/security/code-scanning/1",
+    }
+    alerts = [
+        dict(common, number=1, rule_id="CVE-2026-1234", tool="Trivy",
+             message="Package: expat\nInstalled Version: 2.5\nSeverity: HIGH\nFixed Version: 2.7",
+             category="published-ee-base/amd64/0", path="aax-ee-base"),
+        dict(common, number=2, rule_id="CVE-2026-1234-expat", tool="Grype",
+             message="A high vulnerability in rpm package: expat, version 2.5 was found in image x at: /rpmdb",
+             help="| high | expat | 2.5 | 2.7 | rpm | /rpmdb | redhat | link |",
+             category="devel-bundle/grype/awx", path="aax-awx//rpmdb"),
+        dict(common, number=3, rule_id="CVE-2026-1234", tool="Trivy",
+             message="Package: expat\nInstalled Version: 2.5\nSeverity: HIGH\nFixed Version: ",
+             category="published-ee-base/arm64/0", path="aax-ee-base"),
+    ]
+    result = summarize(alerts)
+    assert result["alert_count"] == 3
+    assert result["advisory_package_count"] == 1
+    finding = result["findings"][0]
+    assert finding["status"] == "scanner_reported_fix"
+    assert finding["reported_fixed_versions"] == ["2.7"]
+    assert {item["category"] for item in finding["occurrences"]} == {
+        alert["category"] for alert in alerts
+    }
+    assert finding["occurrences"][2]["fixed_version"] is None
+
+
+def test_image_fix_inventory_distinguishes_missing_metadata_and_rejects_bad_exports() -> None:
+    summarize = runpy.run_path(str(ROOT / "scripts/report-image-fixes.py"))["summarize"]
+    alert = {
+        "number": 1, "rule_id": "GO-2026-1234-example", "tool": "Grype", "severity": None,
+        "message": "A medium vulnerability in go-module package: example, version v1 was found in image x at: /bin/x",
+        "category": "devel-bundle/grype/awx", "path": "/bin/x",
+        "ref": "refs/heads/main", "commit": "abc", "url": "https://example.test/1",
+    }
+    finding = summarize([alert])["findings"][0]
+    assert finding["advisory"] == "GO-2026-1234"
+    assert finding["severity"] == "medium"
+    assert finding["status"] == "fix_metadata_missing"
+    alert["help"] = "| medium | example | v1 | | go-module | /bin/x | github | link |"
+    assert summarize([alert])["findings"][0]["status"] == "no_fix_reported"
+    with pytest.raises(ValueError, match="Duplicate exported alert"):
+        summarize([alert, alert])
+    alert["message"] = "Malformed scanner output"
+    with pytest.raises(ValueError, match="Unrecognized Grype"):
+        summarize([alert])
+
+
 AWX_PRODUCTION_CHECK = '''def assert_production_settings(settings: Dynaconf, settings_dir: str, settings_file_path: str):  # pragma: no cover
     """Ensure at least one setting file has been loaded in production mode.
     Current systems will require /etc/tower/settings.py and
