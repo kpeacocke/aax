@@ -9,6 +9,7 @@ import re
 import shlex
 import subprocess
 import runpy
+import sys
 import tarfile
 import zipfile
 
@@ -112,6 +113,20 @@ def test_image_fix_inventory_workflow_renders_patch_queue(tmp_path: Path) -> Non
     assert "3 alerts grouped into 2 advisory/package pairs." in text
     assert "| CVE-2026-1234 | expat | high | 2.7 | 2 |" in text
     assert "CVE-2026-5678" not in text
+
+
+def test_image_fix_inventory_cli_rejects_invalid_export_without_writing_report(tmp_path: Path) -> None:
+    alerts = tmp_path / "alerts.jsonl"
+    alerts.write_text('{"number": 1}\n')
+    output = tmp_path / "report.json"
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/report-image-fixes.py"), str(alerts), str(output)],
+        text=True, capture_output=True, check=False,
+    )
+    assert result.returncode == 2
+    assert "Invalid alert export" in result.stderr
+    assert not output.exists()
+
 
 AWX_PRODUCTION_CHECK = '''def assert_production_settings(settings: Dynaconf, settings_dir: str, settings_file_path: str):  # pragma: no cover
     """Ensure at least one setting file has been loaded in production mode.

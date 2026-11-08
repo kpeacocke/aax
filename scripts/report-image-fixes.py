@@ -118,8 +118,9 @@ def main() -> None:
         result = summarize(alerts)
     except (KeyError, TypeError, ValueError) as error:
         parser.error(f"Invalid alert export: {error}")
-    args.output.write_text(json.dumps(result, indent=2) + "\n")
-    print(json.dumps({key: value for key, value in result.items() if key != "findings"}, indent=2))
+    else:
+        args.output.write_text(json.dumps(result, indent=2) + "\n")
+        print(json.dumps({key: value for key, value in result.items() if key != "findings"}, indent=2))
 
 
 if __name__ == "__main__":
