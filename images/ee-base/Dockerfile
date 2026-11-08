@@ -1,3 +1,5 @@
+FROM python:3.14-slim AS runtime-base
+
 FROM python:3.15-slim-bookworm AS pip-builder
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends git build-essential && \
@@ -6,7 +8,14 @@ COPY pip-security /patches
 WORKDIR /source
 RUN sh /patches/build.sh
 
-FROM python:3.14-slim
+FROM runtime-base AS runtime-security-builder
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc libc6-dev libbluetooth-dev git curl xz-utils && rm -rf /var/lib/apt/lists/*
+COPY python-security /patches
+RUN sh /patches/build.sh
+
+FROM runtime-base
 
 # Build arguments for metadata
 ARG VERSION=dev
@@ -27,6 +36,9 @@ COPY constraints.txt /etc/pip/constraints.txt
 COPY ansible.cfg /etc/ansible/ansible.cfg
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY --from=pip-builder /wheels /tmp/aax-pip-wheels
+COPY --from=runtime-security-builder /output/ /
+COPY python-security/test_runtime.py /tmp/aax-python-security-test.py
+RUN python /tmp/aax-python-security-test.py && rm /tmp/aax-python-security-test.py
 
 # Install system packages, create user, install Python packages
 # hadolint ignore=DL3008

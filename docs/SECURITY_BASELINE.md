@@ -121,6 +121,20 @@ ICU and kbd, covering CVE-2022-44638, CVE-2025-5222 and CVE-2026-72693.
 These fixes are required even when CentOS Stream's available package releases
 do not contain the distribution security backports.
 
+Tooling images retain Python 3.14 and source-backport CPython fixes for POP3
+command injection (CVE-2025-15367), HTTP response framing (CVE-2026-103995)
+and null-byte truncation in `getaddrinfo` (CVE-2026-116566). The build verifies
+the official Python source checksum and upstream patch checksums, rebuilds only
+the affected socket extension against the matching interpreter's headers and
+flags, and retains the patches and runtime ABI provenance in the image.
+The final slim image executes regressions for malformed and valid inputs.
+Neither the Python version nor scanner metadata is rewritten: scanners may
+continue to report these version-based findings after the backport. Review the
+retained patch evidence and executed runtime regressions, not just the count.
+OpenSSH CVE-2026-60002 still requires a verified source backport or a fixed
+stable distribution package; it is not unfixable merely because Debian's
+stable package has no published fix.
+
 All controller runtimes pin the fixed `pyasn1` 0.6.5; upgrading only AWX does
 not protect EDA or Hub's separate virtual environments. The decision environment
 is headless: it excludes the complete `libX11*` (including `libX11-xcb`) and
