@@ -1,4 +1,4 @@
-FROM python:3.14-slim AS runtime-base
+FROM python:3.14.10-slim AS runtime-base
 
 FROM python:3.15-slim-bookworm AS pip-builder
 # hadolint ignore=DL3008

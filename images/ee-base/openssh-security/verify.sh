@@ -4,7 +4,10 @@ directory="$(find /source -mindepth 1 -maxdepth 1 -type d -name 'openssh-*')"
 test -n "$directory"
 cd "$directory"
 export QUILT_PATCH_OPTS=--fuzz=0
-/usr/bin/python3 /patches/test_rekey.py > /output/provenance/rekey-runtime.log 2>&1
+if ! /usr/bin/python3 /patches/test_rekey.py > /output/provenance/rekey-runtime.log 2>&1; then
+    cat /output/provenance/rekey-runtime.log >&2
+    exit 1
+fi
 
 build_asan() {
     make -C debian/build-deb clean
@@ -24,6 +27,9 @@ cat /output/provenance/rekey-unpatched-asan.log
 grep -F 'heap-use-after-free' /output/provenance/rekey-unpatched-asan.log
 quilt push
 build_asan
-(cd debian/build-deb && /usr/bin/python3 /patches/test_rekey.py --asan) \
-    > /output/provenance/rekey-patched-asan.log 2>&1
+if ! (cd debian/build-deb && /usr/bin/python3 /patches/test_rekey.py --asan) \
+    > /output/provenance/rekey-patched-asan.log 2>&1; then
+    cat /output/provenance/rekey-patched-asan.log >&2
+    exit 1
+fi
 cat /output/provenance/rekey-runtime.log /output/provenance/rekey-patched-asan.log
