@@ -9,6 +9,7 @@ import re
 import shlex
 import subprocess
 import runpy
+import sys
 import tarfile
 import zipfile
 
@@ -31,6 +32,100 @@ IMAGES = [
     "eda-podman",
     "eda-decision-environment",
 ]
+
+
+def test_image_fix_inventory_groups_scanners_and_keeps_affected_images() -> None:
+    summarize = runpy.run_path(str(ROOT / "scripts/report-image-fixes.py"))["summarize"]
+    common = {
+        "severity": "high", "ref": "refs/heads/main", "commit": "abc",
+        "url": "https://github.com/kpeacocke/aax/security/code-scanning/1",
+    }
+    alerts = [
+        dict(common, number=1, rule_id="CVE-2026-1234", tool="Trivy",
+             message="Package: expat\nInstalled Version: 2.5\nSeverity: HIGH\nFixed Version: 2.7",
+             category="published-ee-base/amd64/0", path="aax-ee-base"),
+        dict(common, number=2, rule_id="CVE-2026-1234-expat", tool="Grype",
+             message="A high vulnerability in rpm package: expat, version 2.5 was found in image x at: /rpmdb",
+             help="| high | expat | 2.5 | 2.7 | rpm | /rpmdb | redhat | link |",
+             category="devel-bundle/grype/awx", path="aax-awx//rpmdb"),
+        dict(common, number=3, rule_id="CVE-2026-1234", tool="Trivy",
+             message="Package: expat\nInstalled Version: 2.5\nSeverity: HIGH\nFixed Version: ",
+             category="published-ee-base/arm64/0", path="aax-ee-base"),
+    ]
+    result = summarize(alerts)
+    assert result["alert_count"] == 3
+    assert result["advisory_package_count"] == 1
+    finding = result["findings"][0]
+    assert finding["status"] == "scanner_reported_fix"
+    assert finding["reported_fixed_versions"] == ["2.7"]
+    assert {item["category"] for item in finding["occurrences"]} == {
+        alert["category"] for alert in alerts
+    }
+    assert finding["occurrences"][2]["fixed_version"] is None
+
+
+def test_image_fix_inventory_distinguishes_missing_metadata_and_rejects_bad_exports() -> None:
+    summarize = runpy.run_path(str(ROOT / "scripts/report-image-fixes.py"))["summarize"]
+    alert = {
+        "number": 1, "rule_id": "GO-2026-1234-example", "tool": "Grype", "severity": None,
+        "message": "A medium vulnerability in go-module package: example, version v1 was found in image x at: /bin/x",
+        "category": "devel-bundle/grype/awx", "path": "/bin/x",
+        "ref": "refs/heads/main", "commit": "abc", "url": "https://example.test/1",
+    }
+    finding = summarize([alert])["findings"][0]
+    assert finding["advisory"] == "GO-2026-1234"
+    assert finding["severity"] == "medium"
+    assert finding["status"] == "fix_metadata_missing"
+    alert["help"] = "| medium | example | v1 | | go-module | /bin/x | github | link |"
+    assert summarize([alert])["findings"][0]["status"] == "no_fix_reported"
+    with pytest.raises(ValueError, match="Duplicate exported alert"):
+        summarize([alert, alert])
+    alert["message"] = "Malformed scanner output"
+    with pytest.raises(ValueError, match="Unrecognized Grype"):
+        summarize([alert])
+
+
+def test_image_fix_inventory_workflow_renders_patch_queue(tmp_path: Path) -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/dependencies.yml").read_text())
+    step = next(
+        step for step in workflow["jobs"]["image-fix-inventory"]["steps"]
+        if step["name"] == "Summarize patch queue"
+    )
+    report = {
+        "alert_count": 3, "advisory_package_count": 2,
+        "status_counts": {
+            "scanner_reported_fix": 1, "no_fix_reported": 1, "fix_metadata_missing": 0,
+        },
+        "findings": [
+            {"advisory": "CVE-2026-1234", "package": "expat", "severity": "high",
+             "status": "scanner_reported_fix", "reported_fixed_versions": ["2.7"], "alert_count": 2},
+            {"advisory": "CVE-2026-5678", "package": "other", "severity": "low",
+             "status": "no_fix_reported", "reported_fixed_versions": [], "alert_count": 1},
+        ],
+    }
+    (tmp_path / "image-fix-inventory.json").write_text(json.dumps(report))
+    summary = tmp_path / "summary.md"
+    subprocess.run(
+        ["bash", "-c", step["run"]], cwd=tmp_path,
+        env={**os.environ, "GITHUB_STEP_SUMMARY": str(summary)}, check=True,
+    )
+    text = summary.read_text()
+    assert "3 alerts grouped into 2 advisory/package pairs." in text
+    assert "| CVE-2026-1234 | expat | high | 2.7 | 2 |" in text
+    assert "CVE-2026-5678" not in text
+
+
+def test_image_fix_inventory_cli_rejects_invalid_export_without_writing_report(tmp_path: Path) -> None:
+    alerts = tmp_path / "alerts.jsonl"
+    alerts.write_text('{"number": 1}\n')
+    output = tmp_path / "report.json"
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/report-image-fixes.py"), str(alerts), str(output)],
+        text=True, capture_output=True, check=False,
+    )
+    assert result.returncode == 2
+    assert "Invalid alert export" in result.stderr
+    assert not output.exists()
 
 
 AWX_PRODUCTION_CHECK = '''def assert_production_settings(settings: Dynaconf, settings_dir: str, settings_file_path: str):  # pragma: no cover
@@ -307,6 +402,30 @@ def test_galaxy_metadata_requires_current_maintained_dab(patch_name: str) -> Non
     assert dependency is not None
     assert dependency.group(1) == "2026.10.9.0.dev104" + suffix.group(1)
     assert re.search(r'^\+.*version.*\+aax\.3', patch, re.MULTILINE)
+
+
+def test_hub_patch_preserves_current_upstream_security_constraints(tmp_path: Path) -> None:
+    project = tmp_path / "pyproject.toml"
+    project.write_text(
+        '[project]\nname = "galaxy-ng"\nversion = "4.13.0dev"\n'
+        'description = "galaxy-ng plugin for the Pulp Project"\n'
+        'dependencies = [\n  "django-flags>=5.0.13",\n'
+        '  "django-ansible-base[jwt-consumer,feature-flags] @ '
+        'git+https://github.com/ansible/django-ansible-base@'
+        '62a1a424db58ea859321d4ae49de2dc9d681ec63",\n'
+        '  "django-crum==0.7.9",\n  "pulpcore>=3.105.24,<3.106",\n'
+        '  "djangorestframework>=3.18.2,<3.19",\n]\n'
+    )
+    result = subprocess.run(
+        ["bash", str(ROOT / "images/hub-security/patch-galaxy.sh"),
+         str(tmp_path), str(ROOT / "images/hub-security")],
+        capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+    metadata = project.read_text()
+    assert '"pulpcore>=3.105.24,<3.106"' in metadata
+    assert '"djangorestframework>=3.18.2,<3.19"' in metadata
+    assert 'django-ansible-base[jwt-consumer,feature-flags]==2026.10.9.0.dev104+aax.3' in metadata
 
 
 @pytest.mark.parametrize("version", ["2026.9.17.0.dev74+aax.1", "2026.10.9.0.dev104+aax.1"])
@@ -1323,6 +1442,16 @@ def test_native_go_jose_pin_covers_embedded_jwk_parser_fix() -> None:
     prepare = (ROOT / "images/rpm-security/prepare.sh").read_text()
     assert "git-lfs|podman|skopeo)" in prepare
     assert "bash %{SOURCE9999} %{SOURCE9998} %{SOURCE9997}" in prepare
+
+
+def test_receptor_and_native_go_security_pins_match() -> None:
+    pins = json.loads((ROOT / "images/rpm-security/go-dependencies.json").read_text())
+    dockerfile = (ROOT / "images/receptor-runtime/Dockerfile").read_text()
+    for module in (
+        "github.com/klauspost/compress", "golang.org/x/crypto",
+        "golang.org/x/net", "golang.org/x/text",
+    ):
+        assert f"{module}@{pins[module]}" in dockerfile
 
 
 @pytest.mark.parametrize(

@@ -2,8 +2,9 @@ ARG BASE_IMAGE=receptor:upstream
 FROM golang:1.27.3-bookworm AS builder
 WORKDIR /source
 COPY . .
-RUN go get github.com/klauspost/compress@v1.18.7 \
-    golang.org/x/crypto@v0.57.0 golang.org/x/net@v0.60.0 golang.org/x/text@v0.42.0 && \
+RUN go get github.com/klauspost/compress@v1.20.2 \
+    golang.org/x/crypto@v0.58.1-0.20261009181718-2f1f834330b2 \
+    golang.org/x/net@v0.62.0 golang.org/x/text@v0.43.0 && \
     go mod tidy && \
     go test -timeout 120s ./pkg/utils ./pkg/framer ./pkg/certificates
 ARG VERSION=1.6.9.dev1

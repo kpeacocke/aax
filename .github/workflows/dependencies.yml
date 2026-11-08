@@ -16,6 +16,56 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  image-fix-inventory:
+    name: Inventory Image Fixes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Export all open image alerts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          for tool in Trivy Grype; do
+            gh api --paginate "/repos/$REPOSITORY/code-scanning/alerts?state=open&tool_name=$tool&per_page=100" \
+              --jq '.[] | {number,rule_id:.rule.id,severity:.rule.security_severity_level,tool:.tool.name,help:.rule.help,message:.most_recent_instance.message.text,category:.most_recent_instance.category,ref:.most_recent_instance.ref,path:.most_recent_instance.location.path,commit:.most_recent_instance.commit_sha,url:.html_url}' \
+              >> image-alerts.jsonl.tmp
+          done
+          mv image-alerts.jsonl.tmp image-alerts.jsonl
+      - name: Group advisories and retain every affected scope
+        run: python3 scripts/report-image-fixes.py image-alerts.jsonl image-fix-inventory.json
+      - name: Summarize patch queue
+        run: |
+          set -euo pipefail
+          {
+            echo '## Image vulnerability fix inventory'
+            jq -r '"\(.alert_count) alerts grouped into \(.advisory_package_count) advisory/package pairs.",
+              "\(.status_counts.scanner_reported_fix) pairs have scanner-reported fixes; \(.status_counts.no_fix_reported) have no reported fix; \(.status_counts.fix_metadata_missing) need missing metadata investigated."' \
+              image-fix-inventory.json
+            echo 'No findings are dismissed. Reported fixes require availability checks and fresh exact-image scans.'
+            echo '| Advisory | Package | Severity | Reported fixed versions | Alerts |'
+            echo '| --- | --- | --- | --- | --- |'
+            jq -r '.findings[] | select(.status == "scanner_reported_fix") |
+              "| \(.advisory) | \(.package) | \(.severity) | \(.reported_fixed_versions | join(", ")) | \(.alert_count) |"' \
+              image-fix-inventory.json
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve complete inventory
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-fix-inventory
+          path: |
+            image-alerts.jsonl
+            image-fix-inventory.json
+          if-no-files-found: error
+
   check-updates:
     name: Check for Updates
     runs-on: ubuntu-latest

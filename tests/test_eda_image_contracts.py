@@ -74,6 +74,35 @@ def test_podman_backend_uses_persistent_vfs_storage() -> None:
     assert 'tcp://0.0.0.0:8888' in dockerfile
 
 
+def test_podman_bundle_build_uses_dockerfile_base_pin() -> None:
+    build = (ROOT / "scripts/build-bundle-image.sh").read_text()
+    podman = build.split("  eda-podman)", 1)[1].split("    ;;", 1)[0]
+    assert "images/eda-podman" in podman
+    assert "--build-arg BASE_IMAGE=" not in podman
+
+
+def test_controller_runtimes_use_same_oauthlib_security_release() -> None:
+    awx = (ROOT / "images/runtime-security/requirements-awx.txt").read_text()
+    awx_pin = re.search(r"^oauthlib==([^\s]+)$", awx, re.MULTILINE)
+    assert awx_pin is not None
+    for path in ("images/runtime-security/EDA.Dockerfile", "images/hub-security/Dockerfile"):
+        pin = re.search(r"\boauthlib==([^\s\\]+)", (ROOT / path).read_text())
+        assert pin is not None
+        assert pin.group(1) == awx_pin.group(1)
+
+
+def test_hub_telemetry_family_matches_awx() -> None:
+    awx = dict(line.split("==") for line in (
+        ROOT / "images/runtime-security/requirements-awx.txt"
+    ).read_text().splitlines() if line.startswith("opentelemetry-"))
+    hub = dict(re.findall(
+        r"\b(opentelemetry-[a-z-]+)==([^\s\\]+)",
+        (ROOT / "images/hub-security/Dockerfile").read_text(),
+    ))
+    assert hub
+    assert all(awx.get(name) == version for name, version in hub.items())
+
+
 def test_decision_environment_receives_runtime_security_patches() -> None:
     dockerfile = (ROOT / "images/eda-decision-environment/Security.Dockerfile").read_text()
     workflow = (ROOT / ".github/workflows/publish-devel.yml").read_text()
