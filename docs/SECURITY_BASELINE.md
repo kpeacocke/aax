@@ -59,7 +59,7 @@ Export all open GitHub image alerts and group advisory/package pairs locally:
 
 ```bash
 gh api --paginate '/repos/kpeacocke/aax/code-scanning/alerts?state=open&per_page=100' \
-  --jq '.[] | {number,rule_id:.rule.id,severity:.rule.security_severity_level,tool:.tool.name,help:.rule.help,message:.most_recent_instance.message.text,category:.most_recent_instance.category,ref:.most_recent_instance.ref,path:.most_recent_instance.location.path,commit:.most_recent_instance.commit_sha,url:.html_url}' \
+  --jq '.[] | select(.tool.name=="Trivy" or .tool.name=="Grype") | {number,rule_id:.rule.id,severity:.rule.security_severity_level,tool:.tool.name,help:.rule.help,message:.most_recent_instance.message.text,category:.most_recent_instance.category,ref:.most_recent_instance.ref,path:.most_recent_instance.location.path,commit:.most_recent_instance.commit_sha,url:.html_url}' \
   > image-alerts.jsonl &&
 python scripts/report-image-fixes.py image-alerts.jsonl image-fix-inventory.json
 ```
