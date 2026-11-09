@@ -408,7 +408,6 @@ def test_galaxy_metadata_requires_current_maintained_dab(patch_name: str) -> Non
     )
     assert dependency is not None
     assert dependency.group(1) == "@AAX_DAB_VERSION@"
-    assert '--build-arg DAB_VERSION="$version"' in runtime
     assert re.search(r'^\+.*version.*\+aax\.3', patch, re.MULTILINE)
 
 
@@ -1353,6 +1352,12 @@ def test_runtime_security_updates_precede_exact_image_scans(tmp_path: Path) -> N
         assert any(f"DAB_IMAGE=aax/dab-security:{name}" in command for command in commands)
         evidence = json.loads((tmp_path / f"bundle-reports/{name}-dab-source.json").read_text())
         assert evidence["revision"] == "0" * 39 + "1"
+        if name == "galaxy-ng":
+            hub_build = next(
+                command for command in commands if "-t galaxy-ng:patched " in command
+            )
+            assert f"DAB_IMAGE=aax/dab-security:{name}" in shlex.split(hub_build)
+            assert f"DAB_VERSION={evidence['version']}" in shlex.split(hub_build)
     dockerfile = (ROOT / "images/runtime-security/Dockerfile").read_text()
     assert '"${PYTHON}" -m pip check' in dockerfile
     assert any(
