@@ -105,6 +105,12 @@ pip build, even if an inherited image reports the same package version. Version
 equality alone cannot prove that a downstream wheel contains the current
 vendored security fixes.
 
+Hub's exact DAB dependency is rendered from the same retained upstream version
+used to build its tested source-patched wheel, not a hardcoded development
+version. The metadata patch rejects missing or non-current AAX patch versions;
+the resolver and `pip check` still require that exact wheel. Upstream pulpcore
+and REST framework security constraints remain unchanged.
+
 DAB's OpenAPI validator 0.9.0 uses the guarded, source-anchored `referencing`
 constraint adapter. The wheel build runs both upstream OAuth and API
 documentation tests before producing the patched wheel. Both upgrades retain

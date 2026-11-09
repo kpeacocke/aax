@@ -21,13 +21,14 @@ RUN echo '8005019e9669c39daa477698c69a163a389c2072394dbde8b21ec4b7cd04164c  /tmp
       /source/pulpcore /source/pulp-glue
 # hadolint ignore=DL3006
 FROM ${BASE_IMAGE}
+ARG DAB_VERSION
 # hadolint ignore=DL3066
 USER root
 COPY --from=builder /wheels /tmp/aax-wheels
 COPY --from=dab /wheels /tmp/aax-wheels
 COPY galaxy.patch galaxy-pyproject.patch patch-galaxy.sh /tmp/
 COPY test_telemetry.py /tmp/aax-test-hub-telemetry.py
-RUN bash /tmp/patch-galaxy.sh /app /tmp && \
+RUN bash /tmp/patch-galaxy.sh /app /tmp "${DAB_VERSION}" && \
     /venv/bin/python -m pip wheel --no-deps --wheel-dir /tmp/aax-wheels /app && \
     /venv/bin/python -m pip install --no-cache-dir --upgrade /tmp/aax-wheels/*.whl \
       aiohttp==3.14.5 social-auth-core==6.2.0 social-auth-app-django==7.2.0 \

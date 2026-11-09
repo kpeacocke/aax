@@ -9,5 +9,5 @@ diff --git a/pyproject.toml b/pyproject.toml
 @@ -39,3 +39,3 @@
    "django-flags>=5.0.13",
 -  "django-ansible-base[jwt-consumer,feature-flags] @ git+https://github.com/ansible/django-ansible-base@62a1a424db58ea859321d4ae49de2dc9d681ec63",
-+  "django-ansible-base[jwt-consumer,feature-flags]==2026.10.9.0.dev104+aax.3",
++  "django-ansible-base[jwt-consumer,feature-flags]==@AAX_DAB_VERSION@",
    "django-crum==0.7.9",
