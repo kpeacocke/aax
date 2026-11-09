@@ -76,6 +76,7 @@ case "$name" in
     ;;
   galaxy-ng)
     docker build --build-arg BASE_IMAGE=galaxy-ng:devel --build-arg DAB_IMAGE=aax/dab-security:galaxy-ng \
+      --build-arg DAB_VERSION="$version" \
       -t galaxy-ng:patched images/hub-security
     ;;
   ansible-rulebook)

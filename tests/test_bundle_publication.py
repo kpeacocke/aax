@@ -366,14 +366,17 @@ def test_hub_patch_selection_checks_before_applying(tmp_path: Path, layout: str)
     if layout != "missing":
         (tmp_path / layout).touch()
     git = tmp_path / "git"
-    git.write_text('#!/bin/bash\nprintf "%s\\n" "$*" >> "$GIT_LOG"\n')
+    git.write_text(
+        '#!/bin/bash\nprintf "%s\\n" "$*" >> "$GIT_LOG"\n'
+        'cat >> "$PATCH_LOG"\n'
+    )
     git.chmod(0o755)
     log = tmp_path / "git.log"
     result = subprocess.run(
         ["bash", str(ROOT / "images/hub-security/patch-galaxy.sh"),
-         str(tmp_path), str(ROOT / "images/hub-security")],
+         str(tmp_path), str(ROOT / "images/hub-security"), "2026.10.23.0.dev3+aax.3"],
         env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
-             "GIT_LOG": str(log)},
+             "GIT_LOG": str(log), "PATCH_LOG": str(tmp_path / "patch.log")},
         capture_output=True, text=True, timeout=10,
     )
     if layout == "missing":
@@ -384,9 +387,13 @@ def test_hub_patch_selection_checks_before_applying(tmp_path: Path, layout: str)
     assert result.returncode == 0, result.stderr
     patch = "galaxy.patch" if layout == "setup.py" else "galaxy-pyproject.patch"
     assert log.read_text().splitlines() == [
-        f"-C {tmp_path} apply --check {ROOT / 'images/hub-security' / patch}",
-        f"-C {tmp_path} apply {ROOT / 'images/hub-security' / patch}",
+        f"-C {tmp_path} apply --check -",
+        f"-C {tmp_path} apply -",
     ]
+    expected = (ROOT / "images/hub-security" / patch).read_text().replace(
+        "@AAX_DAB_VERSION@", "2026.10.23.0.dev3+aax.3",
+    )
+    assert (tmp_path / "patch.log").read_text() == expected * 2
 
 
 @pytest.mark.parametrize("patch_name", ["galaxy.patch", "galaxy-pyproject.patch"])
@@ -400,11 +407,14 @@ def test_galaxy_metadata_requires_current_maintained_dab(patch_name: str) -> Non
         patch, re.MULTILINE,
     )
     assert dependency is not None
-    assert dependency.group(1) == "2026.10.9.0.dev104" + suffix.group(1)
+    assert dependency.group(1) == "@AAX_DAB_VERSION@"
     assert re.search(r'^\+.*version.*\+aax\.3', patch, re.MULTILINE)
 
 
-def test_hub_patch_preserves_current_upstream_security_constraints(tmp_path: Path) -> None:
+@pytest.mark.parametrize("version", ["2026.10.9.0.dev104+aax.3", "2026.10.23.0.dev3+aax.3"])
+def test_hub_patch_preserves_current_upstream_security_constraints(
+    tmp_path: Path, version: str,
+) -> None:
     project = tmp_path / "pyproject.toml"
     project.write_text(
         '[project]\nname = "galaxy-ng"\nversion = "4.13.0dev"\n'
@@ -418,14 +428,29 @@ def test_hub_patch_preserves_current_upstream_security_constraints(tmp_path: Pat
     )
     result = subprocess.run(
         ["bash", str(ROOT / "images/hub-security/patch-galaxy.sh"),
-         str(tmp_path), str(ROOT / "images/hub-security")],
+         str(tmp_path), str(ROOT / "images/hub-security"), version],
         capture_output=True, text=True, timeout=10,
     )
     assert result.returncode == 0, result.stderr
     metadata = project.read_text()
     assert '"pulpcore>=3.105.24,<3.106"' in metadata
     assert '"djangorestframework>=3.18.2,<3.19"' in metadata
-    assert 'django-ansible-base[jwt-consumer,feature-flags]==2026.10.9.0.dev104+aax.3' in metadata
+    assert f'django-ansible-base[jwt-consumer,feature-flags]=={version}' in metadata
+
+
+@pytest.mark.parametrize("version", ["", "2026.10.23.0.dev3", "2026.10.23.0.dev3+aax.2",
+                                   "2026.10.23.0.dev3+aax.3/unsafe"])
+def test_hub_patch_rejects_unverified_dab_version(tmp_path: Path, version: str) -> None:
+    project = tmp_path / "pyproject.toml"
+    project.write_text("unchanged")
+    result = subprocess.run(
+        ["bash", str(ROOT / "images/hub-security/patch-galaxy.sh"),
+         str(tmp_path), str(ROOT / "images/hub-security"), version],
+        capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode != 0
+    assert "verified DAB version" in result.stderr
+    assert project.read_text() == "unchanged"
 
 
 @pytest.mark.parametrize("version", ["2026.9.17.0.dev74+aax.1", "2026.10.9.0.dev104+aax.1"])
@@ -1327,6 +1352,12 @@ def test_runtime_security_updates_precede_exact_image_scans(tmp_path: Path) -> N
         assert any(f"DAB_IMAGE=aax/dab-security:{name}" in command for command in commands)
         evidence = json.loads((tmp_path / f"bundle-reports/{name}-dab-source.json").read_text())
         assert evidence["revision"] == "0" * 39 + "1"
+        if name == "galaxy-ng":
+            hub_build = next(
+                command for command in commands if "-t galaxy-ng:patched " in command
+            )
+            assert f"DAB_IMAGE=aax/dab-security:{name}" in shlex.split(hub_build)
+            assert f"DAB_VERSION={evidence['version']}" in shlex.split(hub_build)
     dockerfile = (ROOT / "images/runtime-security/Dockerfile").read_text()
     assert '"${PYTHON}" -m pip check' in dockerfile
     assert any(
