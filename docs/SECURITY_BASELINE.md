@@ -143,6 +143,9 @@ The final slim image executes regressions for malformed and valid inputs.
 Neither the Python version nor scanner metadata is rewritten: scanners may
 continue to report these version-based findings after the backport. Review the
 retained patch evidence and executed runtime regressions, not just the count.
+CI retains each Grype SARIF report as a `grype-<image>` artifact even when the
+critical-severity gate fails. Scanner report uploads run only when their report
+exists, so an earlier image-build failure is not obscured by a missing-file error.
 The execution environment source-backports OpenSSH CVE-2026-60002 onto the
 installed Debian client source, acquired through signed archive metadata.
 It retains Debian's build recipe, hardening and vendor checks, and installs only
@@ -171,7 +174,7 @@ The image build verifies Java remains executable, sets its explicit library
 path, and initializes the real Drools JPY engine in both rulebook runtimes as the unprivileged runtime user,
 and publication still requires a real rulebook smoke test and image scan.
 
-EDA retains Django 5.2.18: the pinned controller requires Django below 5.3,
+EDA retains Django 5.2.19: the pinned controller requires Django below 5.3,
 and its DAB integration does not support Django 6. Removing a resolver bound
 is not a framework migration. Remove the remaining Django major-version
 exclusion only after coordinated EDA/DAB source and runtime tests pass.
