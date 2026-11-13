@@ -281,6 +281,21 @@ def test_ci_workflow_does_not_use_latest_image_tags() -> None:
     assert offenders == [], "Found unpinned latest tags in CI workflow:\n" + "\n".join(offenders)
 
 
+def test_ci_preserves_failed_scan_reports_without_secondary_upload_errors() -> None:
+    content = _read(".github/workflows/ci.yml")
+    scan = content.split("- name: Scan SBOM with Grype", 1)[1].split("- name:", 1)[0]
+    assert "output-file: grype-${{ matrix.image }}.sarif" in scan
+    assert "fail-build: true" in scan
+    assert "severity-cutoff: critical" in scan
+    for scanner, heading in (
+        ("trivy", "Upload Trivy results to GitHub Security"),
+        ("grype", "Upload Grype report"),
+    ):
+        upload = content.split(f"- name: {heading}", 1)[1].split("- name:", 1)[0]
+        assert f"if: always() && hashFiles(format('{scanner}-{{0}}.sarif', matrix.image)) != ''" in upload
+        assert f"{scanner}-${{{{ matrix.image }}}}.sarif" in upload
+
+
 def test_runtime_files_do_not_contain_weak_secret_fallbacks() -> None:
     """Maintained runtime and Kubernetes config must not add weak secret fallbacks."""
     checks = {

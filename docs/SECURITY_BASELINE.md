@@ -130,18 +130,23 @@ ICU and kbd, covering CVE-2022-44638, CVE-2025-5222 and CVE-2026-72693.
 These fixes are required even when CentOS Stream's available package releases
 do not contain the distribution security backports.
 
-Tooling images retain Python 3.14, with a pinned 3.14.10 base to prevent stale
+The tooling image uses a pinned Python 3.15.2 base, including the compromised
+certificate denylist fix for CVE-2026-115557, to prevent stale
 architecture-specific cached tags from retaining already-fixed runtime CVEs,
-and source-backport CPython fixes for POP3
+and source-backports CPython fixes for POP3
 command injection (CVE-2025-15367), HTTP response framing (CVE-2026-103995)
 and null-byte truncation in `getaddrinfo` (CVE-2026-116566). The build verifies
 the official Python source checksum and upstream patch checksums, rebuilds only
 the affected socket extension against the matching interpreter's headers and
-flags, and retains the patches and runtime ABI provenance in the image.
+flags, skips patches already present upstream, and retains the patches and
+runtime ABI provenance in the image.
 The final slim image executes regressions for malformed and valid inputs.
 Neither the Python version nor scanner metadata is rewritten: scanners may
 continue to report these version-based findings after the backport. Review the
 retained patch evidence and executed runtime regressions, not just the count.
+CI retains each Grype SARIF report as a `grype-<image>` artifact even when the
+critical-severity gate fails. Scanner report uploads run only when their report
+exists, so an earlier image-build failure is not obscured by a missing-file error.
 The execution environment source-backports OpenSSH CVE-2026-60002 onto the
 installed Debian client source, acquired through signed archive metadata.
 It retains Debian's build recipe, hardening and vendor checks, and installs only
@@ -151,6 +156,8 @@ and an untrusted changed host key to be rejected cleanly. The build first
 reproduces the unpatched heap use-after-free with AddressSanitizer, then requires
 all four flows to pass with the patched instrumented client. Sanitizer binaries
 and the test server remain build-only; source and test evidence are retained.
+The loopback server waits for the client's synchronization marker before rekeying
+and lets a successful client finish disconnecting before closing its transport.
 Native execution is required for these checks: emulated AMD64 configure signal
 tests can stall on an ARM64 Docker host. Published AMD64 builds run natively.
 
@@ -170,7 +177,7 @@ The image build verifies Java remains executable, sets its explicit library
 path, and initializes the real Drools JPY engine in both rulebook runtimes as the unprivileged runtime user,
 and publication still requires a real rulebook smoke test and image scan.
 
-EDA retains Django 5.2.18: the pinned controller requires Django below 5.3,
+EDA retains Django 5.2.19: the pinned controller requires Django below 5.3,
 and its DAB integration does not support Django 6. Removing a resolver bound
 is not a framework migration. Remove the remaining Django major-version
 exclusion only after coordinated EDA/DAB source and runtime tests pass.

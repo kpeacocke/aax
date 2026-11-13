@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from image_test_helpers import ee_base_python_minor_version, pinned_version
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -42,7 +44,7 @@ def ee_base_image_built():
         "images/ee-base/Dockerfile",
         "images/ee-base",
     )
-    assert result.returncode == 0, f"Build failed: {result.stderr}"
+    assert result.returncode == 0, f"Build failed:\n{result.stdout}\n{result.stderr}"
 
 
 @pytest.mark.usefixtures("ee_base_image_built")
@@ -69,7 +71,8 @@ class TestEEBaseImage:
             text=True
         )
         assert result.returncode == 0, f"Ansible not found: {result.stderr}"
-        assert "ansible [core 2.21.5]" in result.stdout
+        ansible_core = pinned_version(REPO_ROOT / "images/ee-base/requirements.txt", "ansible-core")
+        assert f"ansible [core {ansible_core}]" in result.stdout
 
     def test_ansible_runner_installed(self):
         """Test that ansible-runner is installed."""
@@ -79,7 +82,8 @@ class TestEEBaseImage:
             text=True
         )
         assert result.returncode == 0, f"ansible-runner not found: {result.stderr}"
-        assert "2.4.3" in result.stdout
+        ansible_runner = pinned_version(REPO_ROOT / "images/ee-base/requirements.txt", "ansible-runner")
+        assert ansible_runner in result.stdout
 
     def test_python_version(self):
         """Test that the correct Python version is installed."""
@@ -89,7 +93,7 @@ class TestEEBaseImage:
             text=True
         )
         assert result.returncode == 0
-        assert "Python 3.14" in result.stdout
+        assert result.stdout.startswith(f"Python {ee_base_python_minor_version()}.")
 
     def test_required_packages(self):
         """Test that required system packages are installed."""
@@ -156,14 +160,14 @@ class TestEEBuilderImage:
             "images/ee-base/Dockerfile",
             "images/ee-base",
         )
-        assert base_result.returncode == 0, f"Build failed: {base_result.stderr}"
+        assert base_result.returncode == 0, f"Build failed:\n{base_result.stdout}\n{base_result.stderr}"
         result = build_image(
             self.IMAGE_NAME,
             "images/ee-builder/Dockerfile",
             "images/ee-builder",
             build_args={"BASE_IMAGE": "aax/ee-base:1.0.0"},
         )
-        assert result.returncode == 0, f"Build failed: {result.stderr}"
+        assert result.returncode == 0, f"Build failed:\n{result.stdout}\n{result.stderr}"
 
     def test_ansible_builder_installed(self):
         """Test that ansible-builder is installed and accessible."""
@@ -173,11 +177,9 @@ class TestEEBuilderImage:
             text=True
         )
         assert result.returncode == 0, f"ansible-builder not found: {result.stderr}"
-        requirements = (REPO_ROOT / "images/ee-builder/requirements.txt").read_text(encoding="utf-8")
-        expected_version = next(
-            line.split("==", 1)[1]
-            for line in requirements.splitlines()
-            if line.startswith("ansible-builder==")
+        expected_version = pinned_version(
+            REPO_ROOT / "images/ee-builder/requirements.txt",
+            "ansible-builder",
         )
         assert result.stdout.strip() == expected_version
 
@@ -189,7 +191,8 @@ class TestEEBuilderImage:
             text=True
         )
         assert result.returncode == 0
-        assert "ansible [core 2.21.5]" in result.stdout
+        ansible_core = pinned_version(REPO_ROOT / "images/ee-base/requirements.txt", "ansible-core")
+        assert f"ansible [core {ansible_core}]" in result.stdout
 
     def test_python_version(self):
         """Test that the correct Python version is installed."""
@@ -199,7 +202,7 @@ class TestEEBuilderImage:
             text=True
         )
         assert result.returncode == 0
-        assert "Python 3.14" in result.stdout
+        assert result.stdout.startswith(f"Python {ee_base_python_minor_version()}.")
 
     def test_user_is_ansible(self):
         """Test that the container runs as the ansible user."""
@@ -243,14 +246,14 @@ class TestDevToolsImage:
             "images/ee-base/Dockerfile",
             "images/ee-base",
         )
-        assert base_result.returncode == 0, f"Build failed: {base_result.stderr}"
+        assert base_result.returncode == 0, f"Build failed:\n{base_result.stdout}\n{base_result.stderr}"
         result = build_image(
             self.IMAGE_NAME,
             "images/dev-tools/Dockerfile",
             "images/dev-tools",
             build_args={"BASE_IMAGE": "aax/ee-base:1.0.0"},
         )
-        assert result.returncode == 0, f"Build failed: {result.stderr}"
+        assert result.returncode == 0, f"Build failed:\n{result.stdout}\n{result.stderr}"
 
     def test_ansible_navigator_installed(self):
         """Test that ansible-navigator is installed and accessible."""
@@ -260,7 +263,8 @@ class TestDevToolsImage:
             text=True
         )
         assert result.returncode == 0, f"ansible-navigator not found: {result.stderr}"
-        assert "26.10.0" in result.stdout
+        ansible_navigator = pinned_version(REPO_ROOT / "images/dev-tools/requirements.txt", "ansible-navigator")
+        assert ansible_navigator in result.stdout
 
     def test_ansible_lint_installed(self):
         """Test that ansible-lint is installed and accessible."""
@@ -270,7 +274,8 @@ class TestDevToolsImage:
             text=True
         )
         assert result.returncode == 0, f"ansible-lint not found: {result.stderr}"
-        assert "26.10.1" in result.stdout
+        ansible_lint = pinned_version(REPO_ROOT / "images/dev-tools/requirements.txt", "ansible-lint")
+        assert ansible_lint in result.stdout
 
     def test_inherits_from_base(self):
         """Test that dev-tools inherits ansible from ee-base."""
@@ -294,7 +299,7 @@ class TestGatewayImage:
             "images/gateway/Dockerfile",
             "images/gateway",
         )
-        assert result.returncode == 0, f"Build failed: {result.stderr}"
+        assert result.returncode == 0, f"Build failed:\n{result.stdout}\n{result.stderr}"
 
     def test_nginx_config_valid(self):
         """Test that the bundled nginx config is valid."""
@@ -384,7 +389,7 @@ class TestAWXImage:
             "images/awx",
             build_args={"AWX_VERSION": "devel"},
         )
-        assert result.returncode == 0, f"Build failed: {result.stderr}"
+        assert result.returncode == 0, f"Build failed:\n{result.stdout}\n{result.stderr}"
 
     def test_django_installed(self):
         """Test that Django is installed."""

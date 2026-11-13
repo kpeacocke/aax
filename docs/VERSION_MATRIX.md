@@ -29,9 +29,9 @@ The upstream development stack uses Python 3.12, Django 5.2, and the matching
 `django-ansible-base` development branch. The AWX image retains an explicit
 compatibility pin for callers who build the older `24.6.1` stable tag.
 
-The execution environment uses `ansible-core` 2.21.5, `ansible-runner` 2.4.3,
-and Python 3.14. Development tools use `ansible-navigator` 26.10.0,
-`ansible-lint` 26.10.1, and `ansible-dev-tools` 26.10.0. Controller and Hub
+The execution environment uses `ansible-core` 2.22.0, `ansible-runner` 2.4.3,
+and Python 3.15. Development tools use `ansible-navigator` 26.11.0,
+`ansible-lint` 26.11.0, and `ansible-dev-tools` 26.11.0. Controller and Hub
 versions follow the exact source revisions and source-patched dependencies
 recorded in each successful upstream bundle's provenance, not the versions
 in the retained legacy Docker recipes.

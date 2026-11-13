@@ -48,6 +48,15 @@ def exercise(client: str, host: str, rotate: bool) -> None:
                 channel = transport.accept(30)
                 if channel is None or not server.executed.wait(30):
                     raise TimeoutError("Client did not execute before rekey")
+                channel.settimeout(30)
+                ready = b""
+                while len(ready) < 6:
+                    chunk = channel.recv(6 - len(ready))
+                    if not chunk:
+                        raise AssertionError("Client closed before the rekey synchronization marker")
+                    ready += chunk
+                if ready != b"ready\n":
+                    raise AssertionError("Client did not send the rekey synchronization marker")
                 transport.add_server_key(second)
                 try:
                     transport.renegotiate_keys()
@@ -60,6 +69,10 @@ def exercise(client: str, host: str, rotate: bool) -> None:
                     channel.sendall(b"rekey-complete\n")
                     channel.send_exit_status(0)
                     channel.close()
+                    # Let the client finish its disconnect before closing the socket.
+                    transport.join(30)
+                    if transport.is_active():
+                        raise TimeoutError("Client did not disconnect after successful rekey")
 
         with ThreadPoolExecutor(max_workers=1) as executor:
             server = executor.submit(serve)
@@ -68,7 +81,7 @@ def exercise(client: str, host: str, rotate: bool) -> None:
                  "-o", f"UserKnownHostsFile={known_hosts}", "-o", "GlobalKnownHostsFile=/dev/null",
                  "-o", "UpdateHostKeys=no", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
                  host, "true"],
-                text=True, capture_output=True, timeout=60, check=False,
+                 input="ready\n", text=True, capture_output=True, timeout=60, check=False,
                 env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"},
             )
             server.result(timeout=35)
