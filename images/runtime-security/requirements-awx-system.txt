@@ -1,2 +1,2 @@
-filelock==4.2.4
-virtualenv==21.15.1
+filelock==4.2.10
+virtualenv==21.15.6
