@@ -48,6 +48,9 @@ def exercise(client: str, host: str, rotate: bool) -> None:
                 channel = transport.accept(30)
                 if channel is None or not server.executed.wait(30):
                     raise TimeoutError("Client did not execute before rekey")
+                channel.settimeout(30)
+                if channel.recv(1) != b"":
+                    raise AssertionError("Client sent unexpected input before rekey")
                 transport.add_server_key(second)
                 try:
                     transport.renegotiate_keys()
@@ -68,7 +71,7 @@ def exercise(client: str, host: str, rotate: bool) -> None:
                  "-o", f"UserKnownHostsFile={known_hosts}", "-o", "GlobalKnownHostsFile=/dev/null",
                  "-o", "UpdateHostKeys=no", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
                  host, "true"],
-                text=True, capture_output=True, timeout=60, check=False,
+                 input="", text=True, capture_output=True, timeout=60, check=False,
                 env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"},
             )
             server.result(timeout=35)

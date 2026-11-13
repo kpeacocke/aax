@@ -130,14 +130,15 @@ ICU and kbd, covering CVE-2022-44638, CVE-2025-5222 and CVE-2026-72693.
 These fixes are required even when CentOS Stream's available package releases
 do not contain the distribution security backports.
 
-Tooling images retain Python 3.14, with a pinned 3.14.10 base to prevent stale
+The tooling image uses a pinned Python 3.15.0 base to prevent stale
 architecture-specific cached tags from retaining already-fixed runtime CVEs,
-and source-backport CPython fixes for POP3
+and source-backports CPython fixes for POP3
 command injection (CVE-2025-15367), HTTP response framing (CVE-2026-103995)
 and null-byte truncation in `getaddrinfo` (CVE-2026-116566). The build verifies
 the official Python source checksum and upstream patch checksums, rebuilds only
 the affected socket extension against the matching interpreter's headers and
-flags, and retains the patches and runtime ABI provenance in the image.
+flags, skips patches already present upstream, and retains the patches and
+runtime ABI provenance in the image.
 The final slim image executes regressions for malformed and valid inputs.
 Neither the Python version nor scanner metadata is rewritten: scanners may
 continue to report these version-based findings after the backport. Review the

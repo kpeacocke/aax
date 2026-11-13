@@ -7,7 +7,6 @@ from pathlib import Path
 import platform
 import poplib
 import socket
-import sys
 import sysconfig
 import unittest
 
@@ -89,7 +88,6 @@ class RuntimeSecurityTests(unittest.TestCase):
         self.assertEqual(provenance["version"], platform.python_version())
         self.assertEqual(provenance["soabi"], sysconfig.get_config_var("SOABI"))
         self.assertEqual(provenance["architecture"], platform.machine())
-        self.assertEqual(sys.version_info[:2], (3, 14))
 
 
 if __name__ == "__main__":

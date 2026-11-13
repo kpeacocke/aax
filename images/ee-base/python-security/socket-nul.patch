@@ -1,5 +1,5 @@
 Backport of CPython 131a3a66c5f400b588f9fd2732a5ed4e89623ee3.
-Only the declaration context is adapted to the pre-Argument-Clinic entrypoint.
+The declaration context is adapted to the supported legacy entrypoint.
 
 diff --git a/Modules/socketmodule.c b/Modules/socketmodule.c
 --- a/Modules/socketmodule.c

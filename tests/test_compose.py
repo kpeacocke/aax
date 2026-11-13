@@ -11,6 +11,8 @@ from typing import Any
 
 import pytest
 
+from image_test_helpers import pinned_version
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -436,7 +438,8 @@ class TestServiceFunctionality:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "ansible [core 2.21.5]" in result.stdout
+        ansible_core = pinned_version(REPO_ROOT / "images/ee-base/requirements.txt", "ansible-core")
+        assert f"ansible [core {ansible_core}]" in result.stdout
 
     def test_ee_builder_ansible_builder_works(self, compose_up: Any) -> None:
         """Test that ansible-builder command works in ee-builder service."""
@@ -448,7 +451,8 @@ class TestServiceFunctionality:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "3.1" in result.stdout
+        ansible_builder = pinned_version(REPO_ROOT / "images/ee-builder/requirements.txt", "ansible-builder")
+        assert result.stdout.strip() == ansible_builder
 
     def test_dev_tools_ansible_navigator_works(self, compose_up: Any) -> None:
         """Test that ansible-navigator command works in dev-tools service."""
@@ -460,7 +464,8 @@ class TestServiceFunctionality:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "26.10.0" in result.stdout
+        ansible_navigator = pinned_version(REPO_ROOT / "images/dev-tools/requirements.txt", "ansible-navigator")
+        assert ansible_navigator in result.stdout
 
     def test_dev_tools_ansible_lint_works(self, compose_up: Any) -> None:
         """Test that ansible-lint command works in dev-tools service."""
@@ -472,7 +477,8 @@ class TestServiceFunctionality:
             env=_required_compose_env(),
         )
         assert result.returncode == 0
-        assert "26.10.1" in result.stdout
+        ansible_lint = pinned_version(REPO_ROOT / "images/dev-tools/requirements.txt", "ansible-lint")
+        assert ansible_lint in result.stdout
 
     def test_services_share_network(self, compose_up: Any) -> None:
         """Test that services can communicate on the ansible network."""
