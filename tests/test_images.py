@@ -44,7 +44,7 @@ def ee_base_image_built():
         "images/ee-base/Dockerfile",
         "images/ee-base",
     )
-    assert result.returncode == 0, f"Build failed: {result.stderr}"
+    assert result.returncode == 0, f"Build failed:\n{result.stdout}\n{result.stderr}"
 
 
 @pytest.mark.usefixtures("ee_base_image_built")
@@ -160,14 +160,14 @@ class TestEEBuilderImage:
             "images/ee-base/Dockerfile",
             "images/ee-base",
         )
-        assert base_result.returncode == 0, f"Build failed: {base_result.stderr}"
+        assert base_result.returncode == 0, f"Build failed:\n{base_result.stdout}\n{base_result.stderr}"
         result = build_image(
             self.IMAGE_NAME,
             "images/ee-builder/Dockerfile",
             "images/ee-builder",
             build_args={"BASE_IMAGE": "aax/ee-base:1.0.0"},
         )
-        assert result.returncode == 0, f"Build failed: {result.stderr}"
+        assert result.returncode == 0, f"Build failed:\n{result.stdout}\n{result.stderr}"
 
     def test_ansible_builder_installed(self):
         """Test that ansible-builder is installed and accessible."""
@@ -246,14 +246,14 @@ class TestDevToolsImage:
             "images/ee-base/Dockerfile",
             "images/ee-base",
         )
-        assert base_result.returncode == 0, f"Build failed: {base_result.stderr}"
+        assert base_result.returncode == 0, f"Build failed:\n{base_result.stdout}\n{base_result.stderr}"
         result = build_image(
             self.IMAGE_NAME,
             "images/dev-tools/Dockerfile",
             "images/dev-tools",
             build_args={"BASE_IMAGE": "aax/ee-base:1.0.0"},
         )
-        assert result.returncode == 0, f"Build failed: {result.stderr}"
+        assert result.returncode == 0, f"Build failed:\n{result.stdout}\n{result.stderr}"
 
     def test_ansible_navigator_installed(self):
         """Test that ansible-navigator is installed and accessible."""
@@ -299,7 +299,7 @@ class TestGatewayImage:
             "images/gateway/Dockerfile",
             "images/gateway",
         )
-        assert result.returncode == 0, f"Build failed: {result.stderr}"
+        assert result.returncode == 0, f"Build failed:\n{result.stdout}\n{result.stderr}"
 
     def test_nginx_config_valid(self):
         """Test that the bundled nginx config is valid."""
@@ -389,7 +389,7 @@ class TestAWXImage:
             "images/awx",
             build_args={"AWX_VERSION": "devel"},
         )
-        assert result.returncode == 0, f"Build failed: {result.stderr}"
+        assert result.returncode == 0, f"Build failed:\n{result.stdout}\n{result.stderr}"
 
     def test_django_installed(self):
         """Test that Django is installed."""

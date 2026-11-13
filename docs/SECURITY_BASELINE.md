@@ -130,7 +130,8 @@ ICU and kbd, covering CVE-2022-44638, CVE-2025-5222 and CVE-2026-72693.
 These fixes are required even when CentOS Stream's available package releases
 do not contain the distribution security backports.
 
-The tooling image uses a pinned Python 3.15.0 base to prevent stale
+The tooling image uses a pinned Python 3.15.2 base, including the compromised
+certificate denylist fix for CVE-2026-115557, to prevent stale
 architecture-specific cached tags from retaining already-fixed runtime CVEs,
 and source-backports CPython fixes for POP3
 command injection (CVE-2025-15367), HTTP response framing (CVE-2026-103995)
@@ -155,6 +156,8 @@ and an untrusted changed host key to be rejected cleanly. The build first
 reproduces the unpatched heap use-after-free with AddressSanitizer, then requires
 all four flows to pass with the patched instrumented client. Sanitizer binaries
 and the test server remain build-only; source and test evidence are retained.
+The loopback server waits for the client's synchronization marker before rekeying
+and lets a successful client finish disconnecting before closing its transport.
 Native execution is required for these checks: emulated AMD64 configure signal
 tests can stall on an ARM64 Docker host. Published AMD64 builds run natively.
 
