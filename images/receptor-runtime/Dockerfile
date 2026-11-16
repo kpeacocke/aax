@@ -1,5 +1,5 @@
 ARG BASE_IMAGE=receptor:upstream
-FROM golang:1.27.3-bookworm AS builder
+FROM golang:1.27.4-bookworm AS builder
 WORKDIR /source
 COPY . .
 RUN go get github.com/klauspost/compress@v1.20.2 \
